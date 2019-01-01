@@ -1,0 +1,29 @@
+
+10.139.13.104    root/1qaz!QAZ
+冯永设 今天 14:21:07
+
+
+Caused by: GSSException: No valid credentials provided (Mechanism level: Receive timed out)
+	at sun.security.jgss.krb5.Krb5Context.initSecContext(Krb5Context.java:715)
+	at sun.security.jgss.GSSContextImpl.initSecContext(GSSContextImpl.java:248)
+	at sun.security.jgss.GSSContextImpl.initSecContext(GSSContextImpl.java:179)
+	at com.sun.security.sasl.gsskerb.GssKrb5Client.evaluateChallenge(GssKrb5Client.java:193)
+	... 41 more
+Caused by: java.net.SocketTimeoutException: Receive timed out
+	at java.net.PlainDatagramSocketImpl.receive0(Native Method)
+	at java.net.AbstractPlainDatagramSocketImpl.receive(AbstractPlainDatagramSocketImpl.java:145)
+	at java.net.DatagramSocket.receive(DatagramSocket.java:786)
+	at sun.security.krb5.internal.UDPClient.receive(NetClient.java:207)
+	at sun.security.krb5.KdcComm$KdcCommunication.run(KdcComm.java:390)
+	at sun.security.krb5.KdcComm$KdcCommunication.run(KdcComm.java:343)
+	at java.security.AccessController.doPrivileged(Native Method)
+	at sun.security.krb5.KdcComm.send(KdcComm.java:327)
+	at sun.security.krb5.KdcComm.send(KdcComm.java:219)
+	at sun.security.krb5.KdcComm.send(KdcComm.java:191)
+	at sun.security.krb5.KrbTgsReq.send(KrbTgsReq.java:187)
+	at sun.security.krb5.KrbTgsReq.sendAndGetCreds(KrbTgsReq.java:202)
+	at sun.security.krb5.internal.CredentialsUtil.serviceCreds(CredentialsUtil.java:309)
+	at sun.security.krb5.internal.CredentialsUtil.acquireServiceCreds(CredentialsUtil.java:115)
+	at sun.security.krb5.Credentials.acquireServiceCreds(Credentials.java:454)
+	at sun.securi
+	
