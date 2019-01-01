@@ -1,0 +1,20 @@
+https://git-wip-us.apache.org/repos/asf?p=incubator-slider.git;a=blobdiff;f=app-packages/storm/package/scripts/params.py;h=8354617302fd92232ec96ccb2e0bd34cf122935a;hp=f6cccfbcc2592742e431d03cb4e7c9c2a1bf2b5e;hb=8d0e337;hpb=5f5d8dfb531b3b96469a5978c421157f8adb2d99
+
++metric_collector_sink_jar = "/usr/lib/storm/lib/ambari-metrics-storm-sink*.jar"
++storm_lib_dir = format("{app_root}/lib")
+
+
+
+https://git-wip-us.apache.org/repos/asf?p=incubator-slider.git;a=blobdiff;f=app-packages/storm/appConfig-default.json;h=e04bb9c976e797abdc86c0326959e0cfda1f16c1;hp=9fd71303f4f871ba62380c5b5533c3ce42ddaa98;hb=4a667d3;hpb=9e58112d034cdb0195b340ca4e5fb6c11326b332
+"site.storm-site.nimbus.childopts": "-Xmx1024m -javaagent:${AGENT_WORK_ROOT}/app/install/apache-storm-${storm.version}/external/storm-jmxetric/lib/jmxetric-1.0.4.jar=host=${@//site/global/metric_collector_host},port=${@//site/global/metric_collector_port},wireformat31x=true,mode=multicast,config=${AGENT_WORK_ROOT}/app/install/apache-storm-${storm.version}/external/storm-jmxetric/conf/jmxetric-conf.xml,process=Nimbus_JVM",
++    "site.storm-site.supervisor.childopts": "-Xmx256m -javaagent:${AGENT_WORK_ROOT}/app/install/apache-storm-${storm.version}/external/storm-jmxetric/lib/jmxetric-1.0.4.jar=host=${@//site/global/metric_collector_host},port=${@//site/global/metric_collector_port},wireformat31x=true,mode=multicast,config=${AGEN
+
+
+ "site.storm-site.worker.childopts": "-Xmx768m -javaagent:${AGENT_WORK_ROOT}/app/install/apache-storm-${storm.version}/external/storm-jmxetric/lib/jmxetric-1.0.4.jar=host=${@//site/global/metric_collector_host},port=${@//site/global/metric_collector_port},wireformat31x=true,mode=multicast,config=${AGENT_
+
+
+ https://git-wip-us.apache.org/repos/asf?p=incubator-slider.git;a=blobdiff;f=app-packages/hbase/appConfig-secured-default.json;h=553117ee45f585df3e210bfc3c976971f05cb299;hp=2a2b08fd0beda66e98a105bbfb2e19505b15a885;hb=618cdc4;hpb=96f890b1b13985567505c10492326062f3e6dffd
+
++        "site.global.metric_collector_host": "${NN_HOST}",
++        "site.global.metric_collector_port": "6188",
++        "site.global.metric_collector_lib": "",

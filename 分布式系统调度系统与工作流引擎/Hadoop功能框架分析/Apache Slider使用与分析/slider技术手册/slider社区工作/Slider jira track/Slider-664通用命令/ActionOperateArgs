@@ -1,0 +1,40 @@
+Index: slider-core/src/main/java/org/apache/slider/common/params/ActionOperateArgs.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/common/params/ActionOperateArgs.java	(revision 0)
++++ slider-core/src/main/java/org/apache/slider/common/params/ActionOperateArgs.java	(revision 0)
+@@ -0,0 +1,35 @@
++package org.apache.slider.common.params;
++
++import com.beust.jcommander.Parameter;
++import com.beust.jcommander.Parameters;
++
++import java.util.ArrayList;
++import java.util.List;
++
++/**
++ *
++ * Created by fys on 7/13/15.
++ */
++
++@Parameters(commandNames = {SliderActions.ACTION_OPERATE},
++            commandDescription = SliderActions.DESCRIBE_ACTION_OPERATE)
++
++public class ActionOperateArgs extends AbstractClusterBuildingActionArgs{
++
++  @Override
++  public String getActionName() {
++    return SliderActions.ACTION_OPERATE;
++  }
++
++  @Parameter(names = {ARG_CMD,ARG_OUTPUT_SHORT},
++      description = "input file for containers")
++  public String cmdName;
++
++  @Parameter(names = {ARG_CONTAINERS}, variableArity = true,
++      description = "upload file to specific containers")
++  public List<String> containers = new ArrayList<String>(0);
++
++  @Parameter(names = {ARG_COMPONENTS}, variableArity = true,
++      description = "upload file to specific containers of specific components")
++  public List<String> components = new ArrayList<String>(0);
++}

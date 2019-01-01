@@ -1,0 +1,2226 @@
+diff --git a/slider-agent/src/main/python/agent/ActionQueue.py b/slider-agent/src/main/python/agent/ActionQueue.py
+index 497d4f4..107d6c3 100644
+--- a/slider-agent/src/main/python/agent/ActionQueue.py
++++ b/slider-agent/src/main/python/agent/ActionQueue.py
+@@ -31,6 +31,7 @@ from AgentToggleLogger import AgentToggleLogger
+ from CommandStatusDict import CommandStatusDict
+ from CustomServiceOrchestrator import CustomServiceOrchestrator
+ from DockerManager import DockerManager
++from YarnDockerManager import YarnDockerManager
+ import Constants
+ 
+ 
+@@ -54,6 +55,7 @@ class ActionQueue(threading.Thread):
+   AUTO_RESTART = 'auto_restart'
+   
+   docker_mode = False
++  yarn_docker_mode = False
+ 
+   def __init__(self, config, controller, agentToggleLogger):
+     super(ActionQueue, self).__init__()
+@@ -71,6 +73,7 @@ class ActionQueue(threading.Thread):
+                                                                controller,
+                                                                self.queueOutAgentToggleLogger)
+     self.dockerManager = DockerManager(self.tmpdir, config.getWorkRootPath(), self.customServiceOrchestrator)
++    self.yarnDockerManager = YarnDockerManager(self.tmpdir, config.getWorkRootPath(), self.customServiceOrchestrator)
+     
+ 
+   def stop(self):
+@@ -169,7 +172,10 @@ class ActionQueue(threading.Thread):
+     
+     logger.info("Running command: " + str(command))
+     
+-    if 'configurations' in command and 'docker' in command['configurations']:
++    if 'configurations' in command and 'yarnDockerMode' in command and command['yarnDockerMode'] == True:
++      self.yarn_docker_mode = True
++      commandresult = self.yarnDockerManager.execute_command(command, store_config or store_command)
++    elif 'configurations' in command and 'docker' in command['configurations']:
+       self.docker_mode = True
+       commandresult = self.dockerManager.execute_command(command, store_config or store_command)
+     else:
+@@ -235,6 +241,8 @@ class ActionQueue(threading.Thread):
+       component_status = None
+       if self.docker_mode:
+         component_status = self.dockerManager.query_status(command)
++      elif self.yarn_docker_mode:
++        component_status = self.yarnDockerManager.query_status(command)
+       else:
+         component_status = self.customServiceOrchestrator.requestComponentStatus(command)
+ 
+@@ -254,8 +262,13 @@ class ActionQueue(threading.Thread):
+                      " of service " + str(service) + \
+                      " of cluster " + str(cluster))
+         logger.debug(pprint.pformat(result))
++      if 'ip' in component_status:
++        result['ip'] = component_status['ip']
++      if 'hostname' in component_status:
++        result['hostname'] = component_status['hostname']
+ 
+       if result is not None:
++        logger.debug("result of execute_status_command: " + str(result))
+         self.commandStatuses.put_command_status(command, result, reportResult)
+     except Exception, err:
+       traceback.print_exc()
+diff --git a/slider-agent/src/main/python/agent/CommandStatusDict.py b/slider-agent/src/main/python/agent/CommandStatusDict.py
+index bcbce9e..5af75fb 100644
+--- a/slider-agent/src/main/python/agent/CommandStatusDict.py
++++ b/slider-agent/src/main/python/agent/CommandStatusDict.py
+@@ -73,6 +73,7 @@ class CommandStatusDict():
+       for key, item in self.current_state.items():
+         command = item[0]
+         report = item[1]
++        logger.debug("report inside generate report is: " + str(report))
+         if command ['commandType'] == ActionQueue.EXECUTION_COMMAND:
+           if (report['status']) != ActionQueue.IN_PROGRESS_STATUS:
+             resultReports.append(report)
+@@ -90,6 +91,7 @@ class CommandStatusDict():
+         'reports': resultReports,
+         'componentStatus': resultComponentStatus
+       }
++      logger.debug("result from generate report: " + str(result))
+       return result
+ 
+ 
+diff --git a/slider-agent/src/main/python/agent/Controller.py b/slider-agent/src/main/python/agent/Controller.py
+index ec3bed7..8c01315 100644
+--- a/slider-agent/src/main/python/agent/Controller.py
++++ b/slider-agent/src/main/python/agent/Controller.py
+@@ -165,7 +165,7 @@ class Controller(threading.Thread):
+         print("Registered with the server")
+         self.responseId = int(regResp['responseId'])
+         self.isRegistered = True
+-        if 'statusCommands' in regResp.keys():
++        if ('statusCommands' in regResp.keys()) and (not regResp['statusCommands'] == None):
+           logger.info("Got status commands on registration " + pprint.pformat(
+             regResp['statusCommands']))
+           self.addToQueue(regResp['statusCommands'])
+diff --git a/slider-agent/src/main/python/agent/YarnDockerManager.py b/slider-agent/src/main/python/agent/YarnDockerManager.py
+new file mode 100644
+index 0000000..abdb2fb
+--- /dev/null
++++ b/slider-agent/src/main/python/agent/YarnDockerManager.py
+@@ -0,0 +1,248 @@
++#!/usr/bin/env python
++
++'''
++Licensed to the Apache Software Foundation (ASF) under one
++or more contributor license agreements.  See the NOTICE file
++distributed with this work for additional information
++regarding copyright ownership.  The ASF licenses this file
++to you under the Apache License, Version 2.0 (the
++"License"); you may not use this file except in compliance
++with the License.  You may obtain a copy of the License at
++
++    http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++'''
++
++import logging
++import os
++import subprocess
++import Constants
++import time
++import traceback
++from resource_management import *
++
++logger = logging.getLogger()
++
++class YarnDockerManager(Script):
++  stored_status_command = ''
++  stored_command = ''
++  container_id = ''
++
++  def __init__(self, tmpdir, workroot, customServiceOrchestrator):
++    self.tmpdir = tmpdir
++    self.workroot = workroot
++    self.customServiceOrchestrator = customServiceOrchestrator
++
++  def execute_command(self, command, store_command=False):
++    returncode = ''
++    out = ''
++    err = ''
++    
++    if store_command:
++      logger.info("Storing applied config: " + str(command['configurations']))
++      self.stored_command = command
++    status_command_str = self.extract_config_from_command(command, 'docker.status_command')
++    if status_command_str:
++      self.stored_status_command = status_command_str
++    logger.info("status command" + self.stored_status_command)
++    if 'hostLevelParams' in command:
++      if 'container_id' in command['hostLevelParams']:
++        self.container_id = command['hostLevelParams']['container_id']
++
++    if command['roleCommand'] == 'INSTALL':
++      with Environment(self.workroot) as env:
++        self.install_container(command, env)
++      returncode = 0; out = ''; err = ''
++    if command['roleCommand'] == 'START':
++      returncode, out, err = self.start_container(command)    
++    # need check
++    return {Constants.EXIT_CODE:returncode, 'stdout':out, 'stderr':err}
++
++
++  def extract_config_files_from_command(self, command):
++    if 'containers' in command and len(command['containers']) > 0:
++      if 'configFiles' in command['containers'][0]:
++        return command['containers'][0]['configFiles']
++    return []
++
++  def extract_config_file_properties_from_command(self, command, file):
++    if 'configurations' in command:
++      if 'dictionaryName' in file and file['dictionaryName'] in command['configurations']:
++        properties = {}
++        for k,v in command['configurations'][file['dictionaryName']].iteritems():
++          properties[k] = format(v, **os.environ)
++        return properties
++    return {}
++
++  def extract_config_from_command(self, command, field):
++    value = ''
++    if 'configurations' in command:
++      if 'docker' in command['configurations']:
++        if field in command['configurations']['docker']:
++          logger.info(field + ': ' + str( command['configurations']['docker'][field]))
++          value = command['configurations']['docker'][field]
++    return value
++
++
++  # will evolve into a class hierarch, linux and windows
++  def execute_command_on_linux(self, docker_command, blocking, stdoutFile=None, stderrFile=None):
++
++    logger.info("command str: " + docker_command)
++    logger.info("command env: " + str(os.environ))
++    if stdoutFile != None or stderrFile != None:
++      proc = subprocess.Popen(docker_command, 
++                              stdout = stdoutFile, 
++                              stderr = stderrFile, universal_newlines = True, shell=True)
++    else:
++      proc = subprocess.Popen(docker_command, stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell=True)
++
++    returncode = 0
++    out = ''
++    err = ''
++    if blocking is True:
++      out, err = proc.communicate()
++      returncode = proc.returncode
++    else:
++      time.sleep(5)
++      if proc.returncode is not None:
++        # this means the command has already returned
++        returncode = proc.returncode
++        out, err = proc.communicate()
++    logger.info("returncode: " + str(returncode) + " out: " + str(out) + " err: " + str(err))
++    return returncode, out, err
++
++  def enqueue_output(out, queue):
++    for line in iter(out.readline, b''):
++        queue.put(line)
++    out.close()
++
++  def get_config_file_global(self, command, file, property, useEnv=True):
++    keyName = file['dictionaryName'] + '.' + property
++    if keyName in command['configurations']['global']:
++      if useEnv:
++        return format(command['configurations']['global'][keyName], **os.environ)
++      else:
++        return command['configurations']['global'][keyName]
++    return None
++
++  def install_container(self, command, env):
++    try:
++      configFiles = self.extract_config_files_from_command(command)
++      for configFile in configFiles:
++        properties = self.extract_config_file_properties_from_command(command, configFile)
++        fileName = configFile['fileName']
++        dir = self.get_config_file_global(command, configFile, 'destDir')
++        if dir is None:
++          dir = self.workroot
++        logger.info("creating config file " + str(configFile) + " in directory "+str(dir))
++        Directory(dir, recursive = True)
++        if configFile['type'] == 'properties':
++          PropertiesFile(fileName,
++                         dir=dir,
++                         properties=properties)
++        elif configFile['type'] == 'env':
++          content = self.get_config_file_global(command, configFile, 'content', useEnv=False)
++          if content is not None:
++            File(os.path.join(dir, fileName),
++                 content=InlineTemplate(content, **properties))
++        elif configFile['type'] == 'template':
++          templateFile = self.get_config_file_global(command, configFile, 'templateFile')
++          if templateFile is not None:
++            with open(templateFile,"r") as fp:
++              fileContent = fp.read()
++            File(os.path.join(dir, fileName),
++                 content=InlineTemplate(fileContent, **properties))
++        elif configFile['type'] == 'xml':
++          XmlConfig(fileName,
++                    conf_dir=dir,
++                    configurations=properties)
++    except:
++      traceback.print_exc()
++
++  def start_container(self, command):
++    #extracting param needed by docker run from the command passed from AM
++    startCommand = self.extract_config_from_command(command, 'docker.startCommand')
++    #adding redirecting stdout stderr to file
++    outfilename = Constants.APPLICATION_STD_OUTPUT_LOG_FILE_PREFIX + \
++                    self.container_id + Constants.APPLICATION_STD_OUTPUT_LOG_FILE_FILE_TYPE
++          
++    errfilename = Constants.APPLICATION_STD_ERROR_LOG_FILE_PREFIX + \
++                    self.container_id + Constants.APPLICATION_STD_ERROR_LOG_FILE_FILE_TYPE
++
++    stdoutFile = open(outfilename, 'w')
++    stderrFile = open(errfilename, 'w')
++    returncode,out,err = self.execute_command_on_linux(startCommand, False,  
++                                                       stdoutFile, stderrFile)
++    return returncode,out,err
++
++  def query_status(self, command):
++    if command['roleCommand'] == "GET_CONFIG":
++      return self.getConfig(command)
++    else:
++      returncode = ''
++      out = ''
++      err = ''
++      status_command_str = self.extract_config_from_command(command, 'docker.status_command')
++      if status_command_str:
++        self.stored_status_command = status_command_str
++        logger.info("in query_status, got stored status command" + self.stored_status_command)
++      if self.stored_status_command:
++        logger.info("stored status command to run: " + self.stored_status_command)
++        returncode, out, err = self.execute_command_on_linux(self.stored_status_command, True)
++      logger.info("status of the app in docker container: " + str(returncode) + ";" + str(out) + ";" + str(err))
++      
++      return {Constants.EXIT_CODE:returncode, 'stdout':out, 'stderr':err}
++
++  def getConfig(self, command):
++    logger.info("get config command: " + str(command))
++    config = {}
++    
++    if 'configurations' in self.stored_command:
++      if 'commandParams' in command and 'config_type' in command['commandParams']:
++        config_type = command['commandParams']['config_type']
++        logger.info("Requesting applied config for type {0}".format(config_type))
++        if config_type in self.stored_command['configurations']:
++          logger.info("get config result: " + self.stored_command['configurations'][config_type])
++          config = {
++            'configurations': {config_type: self.stored_command['configurations'][config_type]}
++          }
++        else:
++          config = {
++            'configurations': {}
++          }
++        pass
++      else:
++        logger.info("Requesting all applied config." + str(self.stored_command['configurations']))
++        config = {
++          'configurations': self.stored_command['configurations']
++        }
++      pass
++    else:
++      config = {
++        'configurations': {}
++      }
++    
++    #query the ip and hostname of the docker container where the agent is running
++    ip_query_command = "ip addr show dev eth0 | grep \'inet \' | awk \'{print $2}\' | cut -d / -f 1"
++    proc = subprocess.Popen(ip_query_command, stdout = subprocess.PIPE, shell=True)
++    ip, err = proc.communicate()
++    if err is not None:
++        logger.error("error when retrieving ip: " + err)
++    
++    hostname_query_command = "hostname"
++    proc = subprocess.Popen(hostname_query_command, stdout = subprocess.PIPE, shell=True)
++    hostname, err = proc.communicate()
++    if err is not None:
++        logger.error("error when retrieving hostname: " + err)
++    
++    config['ip'] = ip.rstrip()
++    config['hostname'] = hostname.rstrip()
++    
++    logger.info('response from getconfig: ' + str(config))
++    return config
++    
+diff --git a/slider-agent/src/main/python/agent/main.py b/slider-agent/src/main/python/agent/main.py
+index 36aa4f4..39de1ae 100644
+--- a/slider-agent/src/main/python/agent/main.py
++++ b/slider-agent/src/main/python/agent/main.py
+@@ -55,7 +55,7 @@ def signal_handler(signum, frame):
+     os._exit(0)
+   logger.info('signal received, exiting.')
+   global controller
+-  if controller is not None and hasattr(controller, 'actionQueue'):
++  if controller is not None and hasattr(controller, 'actionQueue') and controller.actionQueue.yarn_docker_mode == False:
+     docker_mode = controller.actionQueue.docker_mode
+     if docker_mode:
+       tmpdir = controller.actionQueue.dockerManager.stop_container()
+diff --git a/slider-agent/src/main/python/resource_management/core/providers/windows/system.py b/slider-agent/src/main/python/resource_management/core/providers/windows/system.py
+index af513a1..b85c020 100644
+--- a/slider-agent/src/main/python/resource_management/core/providers/windows/system.py
++++ b/slider-agent/src/main/python/resource_management/core/providers/windows/system.py
+@@ -89,6 +89,7 @@ def _call_command(command, logoutput=False, cwd=None, env=None, wait_for_finish=
+   if not wait_for_finish:
+     Logger.debug("No need to wait for the process to exit. Will leave the process running ...")
+     code = 0
++    logAnyway = False
+     if pid_file_name:
+       Logger.debug("Writing the process id %s to file %s" % (str(proc.pid), pid_file_name))
+       pidfile = open(pid_file_name, 'w')
+diff --git a/slider-core/src/main/java/org/apache/slider/api/ClusterNode.java b/slider-core/src/main/java/org/apache/slider/api/ClusterNode.java
+index e05a2ef..8b0a563 100644
+--- a/slider-core/src/main/java/org/apache/slider/api/ClusterNode.java
++++ b/slider-core/src/main/java/org/apache/slider/api/ClusterNode.java
+@@ -66,6 +66,8 @@ public final class ClusterNode implements Cloneable {
+    */
+   public boolean released;
+   public String host;
++  public String ip;
++  public String hostname;
+   public String hostUrl;
+ 
+   /**
+diff --git a/slider-core/src/main/java/org/apache/slider/api/ResourceKeys.java b/slider-core/src/main/java/org/apache/slider/api/ResourceKeys.java
+index f92a58d..aba544b 100644
+--- a/slider-core/src/main/java/org/apache/slider/api/ResourceKeys.java
++++ b/slider-core/src/main/java/org/apache/slider/api/ResourceKeys.java
+@@ -66,6 +66,18 @@ public interface ResourceKeys {
+    */
+   String YARN_CORES = "yarn.vcores";
+ 
++  /**
++   * Number of disks per instance to ask YARN for
++   *  {@value}
++   */
++  String YARN_DISKS = "yarn.disks.count-per-instance";
++
++  /**
++   * Disk size per disk to ask YARN for
++   *  {@value}
++   */
++  String YARN_DISK_SIZE = "yarn.disk.size";
++
+   /** {@value} */
+   int DEF_YARN_CORES = 1;
+ 
+@@ -168,6 +180,8 @@ public interface ResourceKeys {
+   String YARN_LOG_INCLUDE_PATTERNS = "yarn.log.include.patterns";
+   String YARN_LOG_EXCLUDE_PATTERNS = "yarn.log.exclude.patterns";
+ 
++  String YARN_PROFILE_NAME = "yarn.resource-profile-name";
++
+   /**
+    * Window of time where application master's failure count
+    * can be reset to 0.
+diff --git a/slider-core/src/main/java/org/apache/slider/client/SliderClient.java b/slider-core/src/main/java/org/apache/slider/client/SliderClient.java
+index cf15dfc..7baf659 100644
+--- a/slider-core/src/main/java/org/apache/slider/client/SliderClient.java
++++ b/slider-core/src/main/java/org/apache/slider/client/SliderClient.java
+@@ -176,6 +176,7 @@ import org.slf4j.LoggerFactory;
+ 
+ import java.io.BufferedReader;
+ import java.io.File;
++import java.io.FilenameFilter;
+ import java.io.FileNotFoundException;
+ import java.io.FileOutputStream;
+ import java.io.IOException;
+@@ -1727,6 +1728,15 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
+     }
+     conf.global.putAll(newglobal);
+ 
++    for (String component : conf.components.keySet()) {
++      Map<String,String> newComponent = new HashMap<>();
++      for (Entry<String,String> entry : conf.components.get(component).entrySet()) {
++        newComponent.put(entry.getKey(), replaceTokens(entry.getValue(),
++            userName, clusterName));
++      }
++      conf.components.get(component).putAll(newComponent);
++    }
++
+     Map<String,List<String>> newcred = new HashMap<>();
+     for (Entry<String,List<String>> entry : conf.credentials.entrySet()) {
+       List<String> resultList = new ArrayList<>();
+diff --git a/slider-core/src/main/java/org/apache/slider/common/tools/SliderUtils.java b/slider-core/src/main/java/org/apache/slider/common/tools/SliderUtils.java
+index 5f5599c..18cc779 100644
+--- a/slider-core/src/main/java/org/apache/slider/common/tools/SliderUtils.java
++++ b/slider-core/src/main/java/org/apache/slider/common/tools/SliderUtils.java
+@@ -117,6 +117,7 @@ import java.util.TreeMap;
+ import java.util.TreeSet;
+ import java.util.concurrent.TimeoutException;
+ import java.util.concurrent.atomic.AtomicBoolean;
++import java.util.regex.Pattern;
+ import java.util.zip.GZIPOutputStream;
+ import java.util.zip.ZipEntry;
+ import java.util.zip.ZipOutputStream;
+@@ -153,9 +154,14 @@ public final class SliderUtils {
+   public static final String PYTHON = "python";
+ 
+   /**
+-   * name of docker program
++   * type of docker standalone application
+    */
+   public static final String DOCKER = "docker";
++  /**
++   * type of docker on yarn application
++   */
++  public static final String DOCKER_YARN = "yarn_docker";
++
+   public static final int NODE_LIST_LIMIT = 10;
+ 
+   private SliderUtils() {
+@@ -1132,6 +1138,11 @@ public final class SliderUtils {
+    * @return a possibly empty map of environment variables.
+    */
+   public static Map<String, String> buildEnvMap(Map<String, String> roleOpts) {
++    return buildEnvMap(roleOpts, null);
++  }
++
++  public static Map<String, String> buildEnvMap(Map<String, String> roleOpts,
++      Map<String,String> tokenMap) {
+     Map<String, String> env = new HashMap<>();
+     if (roleOpts != null) {
+       for (Map.Entry<String, String> entry : roleOpts.entrySet()) {
+@@ -1139,7 +1150,14 @@ public final class SliderUtils {
+         if (key.startsWith(RoleKeys.ENV_PREFIX)) {
+           String envName = key.substring(RoleKeys.ENV_PREFIX.length());
+           if (!envName.isEmpty()) {
+-            env.put(envName, entry.getValue());
++            String value = entry.getValue();
++            if (tokenMap != null) {
++              for (Map.Entry<String,String> token : tokenMap.entrySet()) {
++                value = value.replaceAll(Pattern.quote(token.getKey()),
++                    token.getValue());
++              }
++            }
++            env.put(envName, value);
+           }
+         }
+       }
+diff --git a/slider-core/src/main/java/org/apache/slider/core/launch/AbstractLauncher.java b/slider-core/src/main/java/org/apache/slider/core/launch/AbstractLauncher.java
+index 2ec3cda..0348828 100644
+--- a/slider-core/src/main/java/org/apache/slider/core/launch/AbstractLauncher.java
++++ b/slider-core/src/main/java/org/apache/slider/core/launch/AbstractLauncher.java
+@@ -75,6 +75,11 @@ public abstract class AbstractLauncher extends Configured {
+   // security
+   protected final Credentials credentials;
+   protected LogAggregationContext logAggregationContext;
++  protected boolean yarnDockerMode = false;
++  protected String dockerImage;
++  protected String yarnContainerMountPoints;
++  protected String runPrivilegedContainer;
++
+ 
+   /**
+    * Create instance.
+@@ -97,6 +102,10 @@ public abstract class AbstractLauncher extends Configured {
+   public ContainerLaunchContext getContainerLaunchContext() {
+     return containerLaunchContext;
+   }
++  
++  public void setYarnDockerMode(boolean yarnDockerMode){
++    this.yarnDockerMode = yarnDockerMode;
++  }
+ 
+   /**
+    * Get the env vars to work on
+@@ -181,7 +190,6 @@ public abstract class AbstractLauncher extends Configured {
+    */
+   public ContainerLaunchContext completeContainerLaunch() throws IOException {
+     
+-
+     String cmdStr = SliderUtils.join(commands, " ", false);
+     log.debug("Completed setting up container command {}", cmdStr);
+     containerLaunchContext.setCommands(commands);
+@@ -192,7 +200,7 @@ public abstract class AbstractLauncher extends Configured {
+       for (Map.Entry<String, String> envPair : envVars.entrySet()) {
+         log.debug("    \"{}\"=\"{}\"", envPair.getKey(), envPair.getValue());
+       }
+-    }
++    }    
+     containerLaunchContext.setEnvironment(env);
+ 
+     //service data
+@@ -214,6 +222,14 @@ public abstract class AbstractLauncher extends Configured {
+     containerLaunchContext.setTokens(CredentialUtils.marshallCredentials(
+         credentials));
+ 
++    if(yarnDockerMode){
++      Map<String, String> env = containerLaunchContext.getEnvironment();
++      env.put("YARN_CONTAINER_RUNTIME_TYPE", "docker");
++      env.put("YARN_CONTAINER_RUNTIME_DOCKER_IMAGE", dockerImage);//if yarnDockerMode, then dockerImage is set
++      env.put("YARN_CONTAINER_RUNTIME_DOCKER_RUN_PRIVILEGED_CONTAINER", runPrivilegedContainer);
++      log.info("yarn docker env var has been set {}", containerLaunchContext.getEnvironment().toString());
++    }
++
+     return containerLaunchContext;
+   }
+ 
+@@ -480,5 +496,16 @@ public abstract class AbstractLauncher extends Configured {
+     return null;
+   }
+ 
++  public void setDockerImage(String dockerImage) {
++    this.dockerImage = dockerImage;
++  }
++
++  public void setYarnContainerMountPoints(String yarnContainerMountPoints) {
++    this.yarnContainerMountPoints = yarnContainerMountPoints;
++  }
++
++  public void setRunPrivilegedContainer(String runPrivilegedContainer) {
++    this.runPrivilegedContainer = runPrivilegedContainer;
++  }
+ 
+ }
+diff --git a/slider-core/src/main/java/org/apache/slider/providers/agent/AgentKeys.java b/slider-core/src/main/java/org/apache/slider/providers/agent/AgentKeys.java
+index 5ea95df..b027939 100644
+--- a/slider-core/src/main/java/org/apache/slider/providers/agent/AgentKeys.java
++++ b/slider-core/src/main/java/org/apache/slider/providers/agent/AgentKeys.java
+@@ -64,6 +64,7 @@ public interface AgentKeys {
+   String ARG_ZOOKEEPER_REGISTRY_PATH = "--zk-reg-path";
+   String ARG_DEBUG = "--debug";
+   String AGENT_MAIN_SCRIPT_ROOT = "./infra/agent/slider-agent/";
++  String AGENT_JINJA2_ROOT = "./infra/agent/slider-agent/jinja2";
+   String AGENT_MAIN_SCRIPT = "agent/main.py";
+ 
+   String APP_DEF = "application.def";
+diff --git a/slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java b/slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java
+index 0a1a98f..9d12f1d 100644
+--- a/slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java
++++ b/slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java
+@@ -28,9 +28,12 @@ import org.apache.hadoop.fs.FileStatus;
+ import org.apache.hadoop.fs.Path;
+ import org.apache.hadoop.fs.permission.FsAction;
+ import org.apache.hadoop.fs.permission.FsPermission;
++import org.apache.hadoop.registry.client.binding.RegistryPathUtils;
+ import org.apache.hadoop.registry.client.types.Endpoint;
+ import org.apache.hadoop.registry.client.types.ProtocolTypes;
+ import org.apache.hadoop.registry.client.types.ServiceRecord;
++import org.apache.hadoop.registry.client.types.yarn.PersistencePolicies;
++import org.apache.hadoop.registry.client.types.yarn.YarnRegistryAttributes;
+ import org.apache.hadoop.util.StringUtils;
+ import org.apache.hadoop.yarn.api.ApplicationConstants;
+ import org.apache.hadoop.yarn.api.records.Container;
+@@ -338,7 +341,7 @@ public class AgentProviderService extends AbstractProviderService implements
+                                           Path containerTmpDirPath) throws
+       IOException,
+       SliderException {
+-
++    
+     String appDef = SliderUtils.getApplicationDefinitionPath(instanceDefinition
+         .getAppConfOperations());
+ 
+@@ -346,9 +349,20 @@ public class AgentProviderService extends AbstractProviderService implements
+ 
+     log.info("Build launch context for Agent");
+     log.debug(instanceDefinition.toString());
++    
++    //if we are launching docker based app on yarn, then we need to pass docker image
++    if (isYarnDockerContainer(role)) {
++      launcher.setYarnDockerMode(true);
++      launcher.setDockerImage(getConfigFromMetaInfo(role, "image"));
++      launcher.setRunPrivilegedContainer(getConfigFromMetaInfo(role, "runPriviledgedContainer"));
++      launcher
++          .setYarnContainerMountPoints(getConfigFromMetaInfoWithAppConfigOverriding(
++              role, "yarn.container.mount.points"));
++    }
+ 
+     // Set the environment
+-    launcher.putEnv(SliderUtils.buildEnvMap(appComponent));
++    launcher.putEnv(SliderUtils.buildEnvMap(appComponent,
++        getStandardTokenMap(getAmState().getAppConfSnapshot(), role)));
+ 
+     String workDir = ApplicationConstants.Environment.PWD.$();
+     launcher.setEnv("AGENT_WORK_ROOT", workDir);
+@@ -379,6 +393,7 @@ public class AgentProviderService extends AbstractProviderService implements
+     // set PYTHONPATH
+     List<String> pythonPaths = new ArrayList<String>();
+     pythonPaths.add(AgentKeys.AGENT_MAIN_SCRIPT_ROOT);
++    pythonPaths.add(AgentKeys.AGENT_JINJA2_ROOT);
+     String pythonPath = StringUtils.join(File.pathSeparator, pythonPaths);
+     launcher.setEnv(PYTHONPATH, pythonPath);
+     log.info("PYTHONPATH set to {}", pythonPath);
+@@ -836,7 +851,7 @@ public class AgentProviderService extends AbstractProviderService implements
+     response.setResponseId(id + 1L);
+ 
+     String label = heartBeat.getHostname();
+-    String pkg = heartBeat.getPkg();
++    String pkg = heartBeat.getPackage();
+ 
+     log.debug("package received: " + pkg);
+     
+@@ -851,7 +866,7 @@ public class AgentProviderService extends AbstractProviderService implements
+     CommandScript cmdScript = getScriptPathForMasterPackage(roleName);
+     List<ComponentCommand> commands = getMetaInfo().getApplicationComponent(roleName).getCommands();
+ 
+-    if (!isDockerContainer(roleName)
++    if (!isDockerContainer(roleName) && !isYarnDockerContainer(roleName)
+         && (cmdScript == null || cmdScript.getScript() == null)
+         && commands.size() == 0) {
+       log.error(
+@@ -880,6 +895,51 @@ public class AgentProviderService extends AbstractProviderService implements
+       return response;
+     }
+ 
++    List<ComponentStatus> statuses = heartBeat.getComponentStatus();
++    if (statuses != null && !statuses.isEmpty()) {
++      log.info("status from agent: " + statuses.toString());
++      try {
++        for(ComponentStatus status : statuses){
++          RoleInstance role = null;
++          if(status.getIp() != null && !status.getIp().isEmpty()){
++            role = amState.getOwnedContainer(containerId);
++            role.ip = status.getIp();
++          }
++          if(status.getHostname() != null & !status.getHostname().isEmpty()){
++            role = amState.getOwnedContainer(containerId);
++            role.hostname = status.getHostname();
++          }
++          if (role != null) {
++            // create an updated service record (including hostname and ip) and publish...
++            ServiceRecord record = new ServiceRecord();
++            record.set(YarnRegistryAttributes.YARN_ID, containerId);
++            record.description = roleName;
++            record.set(YarnRegistryAttributes.YARN_PERSISTENCE,
++                       PersistencePolicies.CONTAINER);
++            // TODO:  switch record attributes to use constants from YarnRegistryAttributes
++            // when it's been updated.
++            if (role.ip != null) {
++              record.set("yarn:ip", role.ip);
++            }
++            if (role.hostname != null) {
++              record.set("yarn:hostname", role.hostname);
++            }
++            yarnRegistry.putComponent(
++                RegistryPathUtils.encodeYarnID(containerId), record);
++
++          }
++        }
++
++
++      } catch (NoSuchNodeException e) {
++        // ignore - there is nothing to do if we don't find a container
++        log.warn("Owned container {} not found - {}", containerId, e);
++      } catch (IOException e) {
++        log.warn("Error updating container {} service record in registry",
++                 containerId, e);
++      }
++    }
++
+     Boolean isMaster = isMaster(roleName);
+     ComponentInstanceState componentStatus = getComponentStatuses().get(label);
+     componentStatus.heartbeat(System.currentTimeMillis());
+@@ -944,7 +1004,7 @@ public class AgentProviderService extends AbstractProviderService implements
+             componentStatus.getNextPkgToInstall(), command.toString());
+         if (command == Command.INSTALL) {
+           log.info("Installing {} on {}.", roleName, containerId);
+-          if (isDockerContainer(roleName)){
++          if (isDockerContainer(roleName) || isYarnDockerContainer(roleName)){
+             addInstallDockerCommand(roleName, containerId, response, null, timeout);
+           } else if (scriptPath != null) {
+             addInstallCommand(roleName, containerId, response, scriptPath,
+@@ -994,7 +1054,7 @@ public class AgentProviderService extends AbstractProviderService implements
+           boolean canExecute = commandOrder.canExecute(roleName, command, getComponentStatuses().values());
+           if (canExecute) {
+             log.info("Starting {} on {}.", roleName, containerId);
+-            if (isDockerContainer(roleName)){
++            if (isDockerContainer(roleName) || isYarnDockerContainer(roleName)){
+               addStartDockerCommand(roleName, containerId, response, null, timeout, false);
+             } else if (scriptPath != null) {
+               addStartCommand(roleName,
+@@ -1046,7 +1106,7 @@ public class AgentProviderService extends AbstractProviderService implements
+           && command == Command.NOP) {
+         if (!componentStatus.getConfigReported()) {
+           log.info("Requesting applied config for {} on {}.", roleName, containerId);
+-          if (isDockerContainer(roleName)){
++          if (isDockerContainer(roleName) || isYarnDockerContainer(roleName)){
+             addGetConfigDockerCommand(roleName, containerId, response);
+           } else {
+             addGetConfigCommand(roleName, containerId, response);
+@@ -1080,7 +1140,15 @@ public class AgentProviderService extends AbstractProviderService implements
+   private boolean isDockerContainer(String roleName) {
+     String type = getMetaInfo().getApplicationComponent(roleName).getType();
+     if (SliderUtils.isSet(type)) {
+-      return type.toLowerCase().equals(SliderUtils.DOCKER);
++      return type.toLowerCase().equals(SliderUtils.DOCKER) || type.toLowerCase().equals(SliderUtils.DOCKER_YARN);
++    }
++    return false;
++  }
++
++  private boolean isYarnDockerContainer(String roleName) {
++    String type = getMetaInfo().getApplicationComponent(roleName).getType();
++    if (SliderUtils.isSet(type)) {
++      return type.toLowerCase().equals(SliderUtils.DOCKER_YARN);
+     }
+     return false;
+   }
+@@ -2005,12 +2073,17 @@ public class AgentProviderService extends AbstractProviderService implements
+     cmd.addContainerDetails(componentName, getMetaInfo());
+ 
+     Map<String, String> dockerConfig = new HashMap<String, String>();
+-    dockerConfig.put(
+-        "docker.command_path",
+-        getConfigFromMetaInfoWithAppConfigOverriding(componentName,
+-            "commandPath"));
+-    dockerConfig.put("docker.image_name",
+-        getConfigFromMetaInfo(componentName, "image"));
++    if(isYarnDockerContainer(componentName)){
++      //put nothing
++      cmd.setYarnDockerMode(true);
++    } else {
++      dockerConfig.put(
++          "docker.command_path",
++          getConfigFromMetaInfoWithAppConfigOverriding(componentName,
++              "commandPath"));
++      dockerConfig.put("docker.image_name",
++          getConfigFromMetaInfo(componentName, "image"));
++    }
+     configurations.put("docker", dockerConfig);
+ 
+     log.debug("Docker- command: {}", cmd.toString());
+@@ -2122,7 +2195,7 @@ public class AgentProviderService extends AbstractProviderService implements
+       throws SliderException {
+     assert getAmState().isApplicationLive();
+     ConfTreeOperations appConf = getAmState().getAppConfSnapshot();
+-    if (isDockerContainer(componentName)) {
++    if (isDockerContainer(componentName) || isYarnDockerContainer(componentName)) {
+       addStatusDockerCommand(componentName, containerId, response, scriptPath,
+           timeout);
+       return;
+@@ -2182,9 +2255,14 @@ public class AgentProviderService extends AbstractProviderService implements
+     Map<String, String> dockerConfig = new HashMap<String, String>();
+     String statusCommand = getConfigFromMetaInfoWithAppConfigOverriding(componentName, "statusCommand");
+     if (statusCommand == null) {
+-      statusCommand = "docker top "
++      if(isYarnDockerContainer(componentName)){
++        //should complain the required field is null
++        cmd.setYarnDockerMode(true);
++      } else {
++        statusCommand = "docker top "
+             + containerId
+             + " | grep \"\"";// default value
++      }
+     }
+     dockerConfig.put("docker.status_command",statusCommand);
+     configurations.put("docker", dockerConfig);
+@@ -2218,16 +2296,21 @@ public class AgentProviderService extends AbstractProviderService implements
+     Map<String, String> dockerConfig = new HashMap<String, String>();
+     String statusCommand = getConfigFromMetaInfoWithAppConfigOverriding(componentName, "statusCommand");
+     if (statusCommand == null) {
+-      statusCommand = "docker top "
++      if(isYarnDockerContainer(componentName)){
++        //should complain the required field is null
++        cmd.setYarnDockerMode(true);
++      } else {
++        statusCommand = "docker top "
+             + containerId
+             + " | grep \"\"";// default value
++      }
+     }
+     dockerConfig.put("docker.status_command",statusCommand);
+     configurations.put("docker", dockerConfig);
+ 
+     cmd.setConfigurations(configurations);
+     log.debug("Docker- getconfig command {}", cmd);
+-
++    
+     response.addStatusCommand(cmd);
+   }
+   
+@@ -2309,53 +2392,70 @@ public class AgentProviderService extends AbstractProviderService implements
+     log.debug("after resolution: " + appConf.toString());
+ 
+     Map<String, String> dockerConfig = new HashMap<String, String>();
+-    dockerConfig.put(
++    if (isYarnDockerContainer(componentName)) {
++      dockerConfig.put(
++          "docker.startCommand",
++          getConfigFromMetaInfoWithAppConfigOverriding(componentName,
++              "start_command"));
++      cmd.setYarnDockerMode(true);
++    } else {
++      dockerConfig.put(
+         "docker.command_path",
+         getConfigFromMetaInfoWithAppConfigOverriding(componentName,
+             "commandPath"));
+-    dockerConfig.put("docker.image_name",
+-        getConfigFromMetaInfo(componentName, "image"));
+-    // options should always have -d
+-    String options = getConfigFromMetaInfoWithAppConfigOverriding(
+-        componentName, "options");
+-    if(options != null && !options.isEmpty()){
+-      options = options + " -d";
+-    } else {
+-      options = "-d";
++
++      dockerConfig.put("docker.image_name",
++          getConfigFromMetaInfo(componentName, "image"));
++      // options should always have -d
++      String options = getConfigFromMetaInfoWithAppConfigOverriding(
++          componentName, "options");
++      if(options != null && !options.isEmpty()){
++        options = options + " -d";
++      } else {
++        options = "-d";
++      }
++      dockerConfig.put("docker.options", options);
++      // options should always have -d
++      dockerConfig.put(
++          "docker.containerPort",
++          getConfigFromMetaInfoWithAppConfigOverriding(componentName,
++              "containerPort"));
++      dockerConfig
++          .put(
++              "docker.hostPort",
++              getConfigFromMetaInfoWithAppConfigOverriding(componentName,
++                  "hostPort"));
++  
++      dockerConfig.put(
++          "docker.mounting_directory",
++          getConfigFromMetaInfoWithAppConfigOverriding(componentName,
++              "containerMount"));
++      dockerConfig
++          .put(
++              "docker.host_mounting_directory",
++              getConfigFromMetaInfoWithAppConfigOverriding(componentName,
++                  "hostMount"));
++  
++      dockerConfig.put("docker.additional_param",
++          getConfigFromMetaInfoWithAppConfigOverriding(componentName, "additionalParam"));
++  
++      dockerConfig.put("docker.input_file.mount_path", getConfigFromMetaInfo(
++          componentName, "containerPath"));
+     }
+-    dockerConfig.put("docker.options", options);
+-    // options should always have -d
+-    dockerConfig.put(
+-        "docker.containerPort",
+-        getConfigFromMetaInfoWithAppConfigOverriding(componentName,
+-            "containerPort"));
+-    dockerConfig
+-        .put(
+-            "docker.hostPort",
+-            getConfigFromMetaInfoWithAppConfigOverriding(componentName,
+-                "hostPort"));
+-
+-    dockerConfig.put(
+-        "docker.mounting_directory",
+-        getConfigFromMetaInfoWithAppConfigOverriding(componentName,
+-            "containerMount"));
+-    dockerConfig
+-        .put(
+-            "docker.host_mounting_directory",
+-            getConfigFromMetaInfoWithAppConfigOverriding(componentName,
+-                "hostMount"));
+-
+-    dockerConfig.put("docker.additional_param",
+-        getConfigFromMetaInfoWithAppConfigOverriding(componentName, "additionalParam"));
+-
+-    dockerConfig.put("docker.input_file.mount_path", getConfigFromMetaInfo(
+-        componentName, "containerPath"));
++
++    String lifetime = getConfigFromMetaInfoWithAppConfigOverriding(
++        componentName, "lifetime");
++    dockerConfig.put("docker.lifetime", lifetime);
+     configurations.put("docker", dockerConfig);
+     String statusCommand = getConfigFromMetaInfoWithAppConfigOverriding(
+         componentName, "statusCommand");
+     if (statusCommand == null) {
+-      statusCommand = "docker top "
+-          + containerId + " | grep \"\"";// default value
++      if(isYarnDockerContainer(componentName)){
++        //should complain the required field is null
++      } else {
++        statusCommand = "docker top "
++          + containerId + " | grep \"\"";
++      }
+     }
+     dockerConfig.put("docker.status_command",statusCommand);
+     
+@@ -2413,11 +2513,27 @@ public class AgentProviderService extends AbstractProviderService implements
+     log.debug("Docker- containers metainfo: {}", containers.toString());
+     if (containers.size() > 0) {
+       DockerContainer container = containers.get(0);
+-      
+       switch (configName) {
++      case "start_command":
++        result = container.getStartCommand();
++        break;
+       case "image":
+         result = container.getImage();
+         break;
++      case "network":
++        if (container.getNetwork() == null || container.getNetwork().isEmpty()) {
++          result = "none";
++        } else {
++          result = container.getNetwork();
++        }
++        break;
++      case "useNetworkScript":
++        if (container.getUseNetworkScript() == null || container.getUseNetworkScript().isEmpty()) {
++          result = "yes";
++        } else {
++          result = container.getUseNetworkScript();
++        }
++        break;
+       case "statusCommand":
+         result = container.getStatusCommand();
+         break;
+@@ -2452,6 +2568,13 @@ public class AgentProviderService extends AbstractProviderService implements
+       case "additionalParam":
+         result = container.getAdditionalParam();// to support multi port later
+         break;
++      case "runPriviledgedContainer":
++        if (container.getRunPrivilegedContainer() == null) {
++          result = "false";
++        } else {
++          result = container.getRunPrivilegedContainer();
++        }
++        break;
+       default:
+         break;
+       }
+@@ -2679,12 +2802,16 @@ public class AgentProviderService extends AbstractProviderService implements
+     Map<String, String> tokens = getStandardTokenMap(appConf, componentName);
+ 
+     Set<String> configs = new HashSet<String>();
+-    configs.addAll(getApplicationConfigurationTypes());
++    configs.addAll(getApplicationConfigurationTypes(componentName));
+     configs.addAll(getSystemConfigurationsRequested(appConf));
+ 
+     for (String configType : configs) {
+       addNamedConfiguration(configType, appConf.getGlobalOptions().options,
+                             configurations, tokens, containerId, componentName);
++      if (appConf.getComponent(componentName) != null) {
++        addNamedConfiguration(configType, appConf.getComponent(componentName).options,
++            configurations, tokens, containerId, componentName);
++      }
+     }
+ 
+     //do a final replacement of re-used configs
+@@ -2752,7 +2879,7 @@ public class AgentProviderService extends AbstractProviderService implements
+ 
+ 
+   @VisibleForTesting
+-  protected List<String> getApplicationConfigurationTypes() {
++  protected List<String> getApplicationConfigurationTypes(String componentName) {
+     List<String> configList = new ArrayList<String>();
+     configList.add(GLOBAL_CONFIG_TAG);
+ 
+@@ -2761,6 +2888,23 @@ public class AgentProviderService extends AbstractProviderService implements
+       log.info("Expecting config type {}.", configFile.getDictionaryName());
+       configList.add(configFile.getDictionaryName());
+     }
++    for (Component component : getMetaInfo().getApplication().getComponents()) {
++      if (!component.getName().equals(componentName)) {
++        continue;
++      }
++      if (component.getDockerContainers() == null) {
++        continue;
++      }
++      for (DockerContainer container : component.getDockerContainers()) {
++        if (container.getConfigFiles() == null) {
++          continue;
++        }
++        for (ConfigFile configFile : container.getConfigFiles()) {
++          log.info("Expecting config type {}.", configFile.getDictionaryName());
++          configList.add(configFile.getDictionaryName());
++        }
++      }
++    }
+ 
+     // remove duplicates.  mostly worried about 'global' being listed
+     return new ArrayList<String>(new HashSet<String>(configList));
+diff --git a/slider-core/src/main/java/org/apache/slider/providers/agent/ComponentInstanceState.java b/slider-core/src/main/java/org/apache/slider/providers/agent/ComponentInstanceState.java
+index 55fdba6..6ee0ebb 100644
+--- a/slider-core/src/main/java/org/apache/slider/providers/agent/ComponentInstanceState.java
++++ b/slider-core/src/main/java/org/apache/slider/providers/agent/ComponentInstanceState.java
+@@ -46,6 +46,8 @@ public class ComponentInstanceState {
+   private int failuresSeen = 0;
+   private Boolean configReported = false;
+   private long lastHeartbeat = 0;
++  private String ip;
++  private String hostname;
+   private ContainerState containerState;
+ 
+   private Map<String, State> pkgStatuses;
+@@ -314,7 +316,25 @@ public class ComponentInstanceState {
+     sb.append(", lastHeartbeat=").append(lastHeartbeat);
+     sb.append(", containerState=").append(containerState);
+     sb.append(", componentName='").append(componentName).append('\'');
++    sb.append(", ip=").append(ip);
++    sb.append(", hostname='").append(hostname).append('\'');
+     sb.append('}');
+     return sb.toString();
+   }
++
++  public String getIp() {
++    return ip;
++  }
++
++  public void setIp(String ip) {
++    this.ip = ip;
++  }
++
++  public String getHostname() {
++    return hostname;
++  }
++
++  public void setHostname(String hostname) {
++    this.hostname = hostname;
++  }
+ }
+diff --git a/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/Application.java b/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/Application.java
+index 3a445f4..63546a4 100644
+--- a/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/Application.java
++++ b/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/Application.java
+@@ -130,7 +130,7 @@ public class Application extends AbstractMetainfoSchema {
+     sb.append(",\n\"version\" :").append(version);
+     sb.append(",\n\"components\" : {");
+     for (Component component : components) {
+-      sb.append("\n").append(component);
++      sb.append("\n").append(component.toString());
+     }
+     sb.append("\n},");
+     sb.append('}');
+diff --git a/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/Component.java b/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/Component.java
+index 7099448..3f23455 100644
+--- a/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/Component.java
++++ b/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/Component.java
+@@ -162,6 +162,9 @@ public class Component extends AbstractComponent {
+     sb.append("\n\"name\": ").append(name);
+     sb.append(",\n\"category\": ").append(category);
+     sb.append(",\n\"commandScript\" :").append(commandScript);
++    for(DockerContainer dc : dockerContainers){
++      sb.append(",\n\"container\" :").append(dc.toString());
++    }    
+     sb.append('}');
+     return sb.toString();
+   }
+diff --git a/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/DockerContainer.java b/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/DockerContainer.java
+index ecd0166..4c61e7f 100644
+--- a/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/DockerContainer.java
++++ b/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/DockerContainer.java
+@@ -35,13 +35,18 @@ public class DockerContainer implements Validate {
+ 
+   private String name;
+   private String image;
++  private String network;
++  private String useNetworkScript;
+   private String options;
+   private List<DockerContainerMount> mounts = new ArrayList<>();
+   private List<DockerContainerPort> ports = new ArrayList<>();
+   private String statusCommand;
++  private String startCommand;
+   private String commandPath;
+   private String additionalParam;
++  private String runPrivilegedContainer;
+   private List<DockerContainerInputFile> inputFiles = new ArrayList<>();
++  private List<ConfigFile> configFiles = new ArrayList<>();
+ 
+   public DockerContainer() {
+   }
+@@ -75,6 +80,22 @@ public class DockerContainer implements Validate {
+     this.image = image;
+   }
+ 
++  public String getNetwork() {
++    return network;
++  }
++
++  public void setNetwork(String network) {
++    this.network = network;
++  }
++
++  public String getUseNetworkScript() {
++    return useNetworkScript;
++  }
++
++  public void setUseNetworkScript(String useNetworkScript) {
++    this.useNetworkScript = useNetworkScript;
++  }
++
+   public String getOptions() {
+     return options;
+   }
+@@ -95,10 +116,12 @@ public class DockerContainer implements Validate {
+     }
+   }
+ 
++  @JsonProperty("statusCommand")
+   public String getStatusCommand() {
+     return statusCommand;
+   }
+ 
++  @JsonProperty("statusCommand")
+   public void setStatusCommand(String statusCommand) {
+     this.statusCommand = statusCommand;
+   }
+@@ -119,14 +142,46 @@ public class DockerContainer implements Validate {
+     this.additionalParam = additionalParam;
+   }
+ 
++  @JsonProperty("startCommand")
++  public String getStartCommand() {
++    return startCommand;
++  }
++
++  @JsonProperty("startCommand")
++  public void setStartCommand(String startCommand) {
++    this.startCommand = startCommand;
++  }
++
++  @JsonProperty("runPrivilegedContainer")
++  public String getRunPrivilegedContainer() {
++    return runPrivilegedContainer;
++  }
++
++  @JsonProperty("runPrivilegedContainer")
++  public void setRunPrivilegedContainer(String runPrivilegedContainer) {
++    this.runPrivilegedContainer = runPrivilegedContainer;
++  }
++
++  public List<ConfigFile> getConfigFiles() {
++    return configFiles;
++  }
++
++  public void setConfigFiles(List<ConfigFile> configFiles) {
++    this.configFiles = configFiles;
++  }
++
+   @Override
+   public String toString() {
+     StringBuilder result = new StringBuilder("DockerContainer [name=")
+-              .append(name).append(", image=").append(image).append(", options=")
+-              .append(options).append(", mounts=").append(mounts).append(", ports=")
+-              .append(ports).append(", statusCommand=").append(statusCommand)
+-              .append(", commandPath=").append(commandPath).append(", additionalParam=")
+-              .append(additionalParam).append(", inputFiles=").append(inputFiles).append("]");
++        .append(name).append(", image=").append(image).append(", options=")
++        .append(options).append(", mounts=").append(mounts).append(", ports=")
++        .append(ports).append(", statusCommand=").append(statusCommand)
++        .append(", commandPath=").append(commandPath)
++        .append(", additionalParam=").append(additionalParam)
++        .append(", inputFiles=").append(inputFiles).append(", startCommand=")
++        .append(startCommand).append(", runPriviledgedContainer=")
++        .append(runPrivilegedContainer).append(", configFiles=")
++        .append(configFiles).append("]");
+     return result.toString();
+   }
+ }
+\ No newline at end of file
+diff --git a/slider-core/src/main/java/org/apache/slider/server/appmaster/SliderAppMaster.java b/slider-core/src/main/java/org/apache/slider/server/appmaster/SliderAppMaster.java
+index ba5a060..0759c5a 100644
+--- a/slider-core/src/main/java/org/apache/slider/server/appmaster/SliderAppMaster.java
++++ b/slider-core/src/main/java/org/apache/slider/server/appmaster/SliderAppMaster.java
+@@ -2227,6 +2227,7 @@ public class SliderAppMaster extends AbstractSliderLaunchedService
+                              ContainerLaunchContext ctx,
+                              RoleInstance instance) throws IOException {
+     appState.containerStartSubmitted(container, instance);
++        
+     nmClientAsync.startContainerAsync(container, ctx);
+   }
+ 
+diff --git a/slider-core/src/main/java/org/apache/slider/server/appmaster/state/AppState.java b/slider-core/src/main/java/org/apache/slider/server/appmaster/state/AppState.java
+index c8369c1..a11ce56 100644
+--- a/slider-core/src/main/java/org/apache/slider/server/appmaster/state/AppState.java
++++ b/slider-core/src/main/java/org/apache/slider/server/appmaster/state/AppState.java
+@@ -1703,6 +1703,7 @@ public class AppState {
+     //build the map of node -> containers
+     Map<String, Map<String, ClusterNode>> clusterNodes =
+       createRoleToClusterNodeMap();
++    log.info("app state clusterNodes {} ", clusterNodes.toString());
+     cd.status = new HashMap<>();
+     cd.status.put(ClusterDescriptionKeys.KEY_CLUSTER_LIVE, clusterNodes);
+ 
+diff --git a/slider-core/src/main/java/org/apache/slider/server/appmaster/state/RoleInstance.java b/slider-core/src/main/java/org/apache/slider/server/appmaster/state/RoleInstance.java
+index 30a2bb0..345c67e 100644
+--- a/slider-core/src/main/java/org/apache/slider/server/appmaster/state/RoleInstance.java
++++ b/slider-core/src/main/java/org/apache/slider/server/appmaster/state/RoleInstance.java
+@@ -98,6 +98,8 @@ public final class RoleInstance implements Cloneable {
+    */
+   public String[] environment;
+   
++  public String ip;
++  public String hostname;
+   public String host;
+   public String hostURL;
+   public ContainerAllocationOutcome placement;
+@@ -231,6 +233,8 @@ public final class RoleInstance implements Cloneable {
+       node.environment = Arrays.copyOf(environment, environment.length);
+     }
+     node.exitCode = exitCode;
++    node.ip = ip;
++    node.hostname = hostname;
+     node.host = host;
+     node.hostUrl = hostURL;
+     if (output != null) {
+diff --git a/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/ComponentStatus.java b/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/ComponentStatus.java
+index 63bdd0c..acdc234 100644
+--- a/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/ComponentStatus.java
++++ b/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/ComponentStatus.java
+@@ -34,6 +34,8 @@ public class ComponentStatus {
+   String serviceName;
+   String clusterName;
+   String roleCommand;
++  String ip;
++  String hostname;
+   @JsonProperty("configurations")
+   private Map<String, Map<String, String>> configurations;
+ 
+@@ -104,6 +106,24 @@ public class ComponentStatus {
+            ", serviceName='" + serviceName + '\'' +
+            ", clusterName='" + clusterName + '\'' +
+            ", roleCommand='" + roleCommand + '\'' +
++           ", ip='" + ip + '\'' +
++           ", hostname='" + hostname + '\'' +
+            '}';
+   }
++
++  public String getIp() {
++    return ip;
++  }
++
++  public void setIp(String ip) {
++    this.ip = ip;
++  }
++
++  public String getHostname() {
++    return hostname;
++  }
++
++  public void setHostname(String hostname) {
++    this.hostname = hostname;
++  }
+ }
+diff --git a/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/ExecutionCommand.java b/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/ExecutionCommand.java
+index e0d3a75..eb97a55 100644
+--- a/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/ExecutionCommand.java
++++ b/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/ExecutionCommand.java
+@@ -59,6 +59,7 @@ public class ExecutionCommand {
+   private String componentType;
+   private List<DockerContainer> containers = new ArrayList<>();
+   private String pkg;
++  private boolean yarnDockerMode = false;
+ 
+   public ExecutionCommand(AgentCommandType commandType) {
+     this.commandType = commandType;
+@@ -229,7 +230,16 @@ public class ExecutionCommand {
+   public List<DockerContainer> getContainers() {
+     return containers;
+   }
+-  
++
++  @JsonProperty("yarnDockerMode")
++  public boolean isYarnDockerMode() {
++    return yarnDockerMode ;
++  }
++
++  @JsonProperty("yarnDockerMode")
++  public void setYarnDockerMode(boolean yarnDockerMode) {
++    this.yarnDockerMode = yarnDockerMode;
++  }
+   @Override
+   public String toString() {
+     StringBuilder builder = new StringBuilder();
+@@ -243,7 +253,8 @@ public class ExecutionCommand {
+         .append(", commandParams=").append(commandParams)
+         .append(", serviceName=").append(serviceName)
+         .append(", componentName=").append(componentName)
+-        .append(", componentType=").append(componentType).append(", pkg=")
++        .append(", componentType=").append(componentType)
++        .append(", yarnDockerMode=").append(yarnDockerMode).append(", pkg=")
+         .append(pkg).append("]");
+     return builder.toString();
+   }
+@@ -256,11 +267,14 @@ public class ExecutionCommand {
+     for (DockerContainer metaContainer : component.getDockerContainers()) {
+       DockerContainer container = new DockerContainer();
+       container.setImage(metaContainer.getImage());
++      container.setNetwork(metaContainer.getNetwork());
++      container.setUseNetworkScript(metaContainer.getUseNetworkScript());
+       container.setName(metaContainer.getName());
+       container.setOptions(metaContainer.getOptions());
+       container.setAdditionalParam(metaContainer.getAdditionalParam());
+       container.setCommandPath(metaContainer.getAdditionalParam());
+       container.setStatusCommand(metaContainer.getStatusCommand());
++      container.setStartCommand(metaContainer.getStartCommand());
+       if (metaContainer.getMounts().size() > 0) {
+         for (DockerContainerMount metaContMount : metaContainer.getMounts()) {
+           DockerContainerMount contMnt = new DockerContainerMount();
+@@ -286,6 +300,9 @@ public class ExecutionCommand {
+           container.getInputFiles().add(inpFile);
+         }
+       }
++      if (metaContainer.getConfigFiles() != null) {
++        container.setConfigFiles(metaContainer.getConfigFiles());
++      }
+       log.info("Docker container meta info ready: " + container.toString());
+       this.getContainers().add(container);
+     }
+diff --git a/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/HeartBeat.java b/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/HeartBeat.java
+index b7172c2..d17c465 100644
+--- a/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/HeartBeat.java
++++ b/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/HeartBeat.java
+@@ -125,12 +125,12 @@ public class HeartBeat {
+   }
+ 
+   @JsonProperty("package")
+-  public String getPkg() {
++  public String getPackage() {
+     return pkg;
+   }
+ 
+   @JsonProperty("package")
+-  public void setPkg(String pkg) {
++  public void setPackage(String pkg) {
+     this.pkg = pkg;
+   }
+ 
+diff --git a/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/HeartBeatResponse.java b/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/HeartBeatResponse.java
+index c118840..b500d67 100644
+--- a/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/HeartBeatResponse.java
++++ b/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/HeartBeatResponse.java
+@@ -39,6 +39,7 @@ public class HeartBeatResponse {
+ 
+   RegistrationCommand registrationCommand;
+ 
++  boolean yarnDockerMode = false;
+   boolean restartAgent = false;
+   boolean restartEnabled = true;
+   boolean hasMappedComponents = false;
+diff --git a/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/RegistrationResponse.java b/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/RegistrationResponse.java
+index 50a3c87..80b7a5e 100644
+--- a/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/RegistrationResponse.java
++++ b/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/RegistrationResponse.java
+@@ -58,6 +58,22 @@ public class RegistrationResponse {
+   public RegistrationResponse() {
+   }
+ 
++  public RegistrationStatus getResponse() {
++    return response;
++  }
++
++  public void setResponse(RegistrationStatus response) {
++    this.response = response;
++  }
++
++  public int getExitstatus() {
++    return exitstatus;
++  }
++
++  public void setExitstatus(int exitstatus) {
++    this.exitstatus = exitstatus;
++  }
++
+   public RegistrationStatus getResponseStatus() {
+     return response;
+   }
+@@ -90,8 +106,8 @@ public class RegistrationResponse {
+     this.tags = tags;
+   }
+ 
+-  public void setExitstatus(int exitstatus) {
+-    this.exitstatus = exitstatus;
++  public String getLog() {
++    return log;
+   }
+ 
+   public void setLog(String log) {
+diff --git a/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/StatusCommand.java b/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/StatusCommand.java
+index 52fb8dd..5b205b5 100644
+--- a/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/StatusCommand.java
++++ b/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/StatusCommand.java
+@@ -41,6 +41,7 @@ public class StatusCommand {
+   private Map<String, String> commandParams = new HashMap<String, String>();
+   private Map<String, String> hostLevelParams = new HashMap<String, String>();
+   private String roleCommand;
++  private boolean yarnDockerMode;
+ 
+   public StatusCommand() {
+     this.agentCommandType = AgentCommandType.STATUS_COMMAND;
+@@ -125,6 +126,16 @@ public class StatusCommand {
+   public void setRoleCommand(String roleCommand) {
+     this.roleCommand = roleCommand;
+   }
++  
++  @JsonProperty("yarnDockerMode")
++  public boolean isYarnDockerMode() {
++    return yarnDockerMode;
++  }
++
++  @JsonProperty("yarnDockerMode")
++  public void setYarnDockerMode(boolean yarnDockerMode) {
++    this.yarnDockerMode = yarnDockerMode;
++  }
+ 
+   @Override
+   public String toString() {
+diff --git a/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/allCompFailed/appConfig.json b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/allCompFailed/appConfig.json
+new file mode 100644
+index 0000000..8839efc
+--- /dev/null
++++ b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/allCompFailed/appConfig.json
+@@ -0,0 +1,10 @@
++{
++  "schema": "http://example.org/specification/v2.0.0",
++  "metadata": {},
++  "global": {},
++  "components": {
++    "YCLOUD": {
++      "ycloud.statusCommand": "ls"
++    }
++  }
++}
+\ No newline at end of file
+diff --git a/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/allCompFailed/metainfo.json b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/allCompFailed/metainfo.json
+new file mode 100644
+index 0000000..79c80e9
+--- /dev/null
++++ b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/allCompFailed/metainfo.json
+@@ -0,0 +1,44 @@
++{
++  "schemaVersion": "2.1",
++  "application": {
++    "name": "MYYCLOUD",
++    "components": [
++      {
++        "name": "YCLOUD1",
++        "type": "yarn_docker",
++        "dockerContainers": [
++          {
++            "name": "ycloud1",
++            "image": "doesnotexist",
++            "startCommand": "ls",
++            "yarnContainerMountPoint": "null",
++            "ports": [
++              {
++                "containerPort": "8080",
++                "hostPort": "49160"
++              }
++            ]
++          }
++        ]
++      },
++      {
++        "name": "YCLOUD2",
++        "type": "yarn_docker",
++        "dockerContainers": [
++          {
++            "name": "ycloud2",
++            "image": "doesnotexist",
++            "startCommand": "ls",
++            "yarnContainerMountPoint": "null",
++            "ports": [
++              {
++                "containerPort": "8080",
++                "hostPort": "49161"
++              }
++            ]
++          }
++        ]
++      }
++    ]
++  }
++}
+\ No newline at end of file
+diff --git a/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/allCompFailed/resources.json b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/allCompFailed/resources.json
+new file mode 100644
+index 0000000..985d8e3
+--- /dev/null
++++ b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/allCompFailed/resources.json
+@@ -0,0 +1,20 @@
++{
++  "schema": "http://example.org/specification/v2.0.0",
++  "metadata": {},
++  "global": {},
++  "components": {
++    "slider-appmaster": {},
++    "YCLOUD1": {
++      "yarn.role.priority": "1",
++      "yarn.component.instances": 2,
++      "yarn.memory": "256",
++      "yarn.vcores": "1"
++    },
++    "YCLOUD2": {
++      "yarn.role.priority": "2",
++      "yarn.component.instances": 2,
++      "yarn.memory": "256",
++      "yarn.vcores": "1"
++    }
++  }
++}
+\ No newline at end of file
+diff --git a/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/basic/appConfig.json b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/basic/appConfig.json
+new file mode 100644
+index 0000000..8839efc
+--- /dev/null
++++ b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/basic/appConfig.json
+@@ -0,0 +1,10 @@
++{
++  "schema": "http://example.org/specification/v2.0.0",
++  "metadata": {},
++  "global": {},
++  "components": {
++    "YCLOUD": {
++      "ycloud.statusCommand": "ls"
++    }
++  }
++}
+\ No newline at end of file
+diff --git a/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/basic/metainfo.json b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/basic/metainfo.json
+new file mode 100644
+index 0000000..67d6171
+--- /dev/null
++++ b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/basic/metainfo.json
+@@ -0,0 +1,26 @@
++{
++  "schemaVersion": "2.1",
++  "application": {
++    "name": "MYYCLOUD",
++    "components": [
++      {
++        "name": "YCLOUD",
++        "type": "yarn_docker",
++        "dockerContainers": [
++          {
++            "name": "ycloud",
++            "image": "ycloud-centos6:latest",
++            "startCommand": "ls",
++            "yarnContainerMountPoint": "null",
++            "ports": [
++              {
++                "containerPort": "8080",
++                "hostPort": "49160"
++              }
++            ]
++          }
++        ]
++      }
++    ]
++  }
++}
+\ No newline at end of file
+diff --git a/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/basic/resources.json b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/basic/resources.json
+new file mode 100644
+index 0000000..22ff65e
+--- /dev/null
++++ b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/basic/resources.json
+@@ -0,0 +1,14 @@
++{
++  "schema": "http://example.org/specification/v2.0.0",
++  "metadata": {},
++  "global": {},
++  "components": {
++    "slider-appmaster": {},
++    "YCLOUD": {
++      "yarn.role.priority": "1",
++      "yarn.component.instances": 1,
++      "yarn.memory": "256",
++      "yarn.vcores": "1"
++    }
++  }
++}
+\ No newline at end of file
+diff --git a/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/multiComp/appConfig.json b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/multiComp/appConfig.json
+new file mode 100644
+index 0000000..8839efc
+--- /dev/null
++++ b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/multiComp/appConfig.json
+@@ -0,0 +1,10 @@
++{
++  "schema": "http://example.org/specification/v2.0.0",
++  "metadata": {},
++  "global": {},
++  "components": {
++    "YCLOUD": {
++      "ycloud.statusCommand": "ls"
++    }
++  }
++}
+\ No newline at end of file
+diff --git a/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/multiComp/metainfo.json b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/multiComp/metainfo.json
+new file mode 100644
+index 0000000..efbb638
+--- /dev/null
++++ b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/multiComp/metainfo.json
+@@ -0,0 +1,44 @@
++{
++  "schemaVersion": "2.1",
++  "application": {
++    "name": "MYYCLOUD",
++    "components": [
++      {
++        "name": "YCLOUD1",
++        "type": "yarn_docker",
++        "dockerContainers": [
++          {
++            "name": "ycloud1",
++            "image": "ycloud-centos6:latest",
++            "startCommand": "ls",
++            "yarnContainerMountPoint": "null",
++            "ports": [
++              {
++                "containerPort": "8080",
++                "hostPort": "49160"
++              }
++            ]
++          }
++        ]
++      },
++      {
++        "name": "YCLOUD2",
++        "type": "yarn_docker",
++        "dockerContainers": [
++          {
++            "name": "ycloud2",
++            "image": "ycloud-centos6:latest",
++            "startCommand": "ls",
++            "yarnContainerMountPoint": "null",
++            "ports": [
++              {
++                "containerPort": "8080",
++                "hostPort": "49161"
++              }
++            ]
++          }
++        ]
++      }
++    ]
++  }
++}
+\ No newline at end of file
+diff --git a/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/multiComp/resources.json b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/multiComp/resources.json
+new file mode 100644
+index 0000000..0cbb88a
+--- /dev/null
++++ b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/multiComp/resources.json
+@@ -0,0 +1,20 @@
++{
++  "schema": "http://example.org/specification/v2.0.0",
++  "metadata": {},
++  "global": {},
++  "components": {
++    "slider-appmaster": {},
++    "YCLOUD1": {
++      "yarn.role.priority": "1",
++      "yarn.component.instances": 1,
++      "yarn.memory": "256",
++      "yarn.vcores": "1"
++    },
++    "YCLOUD2": {
++      "yarn.role.priority": "2",
++      "yarn.component.instances": 1,
++      "yarn.memory": "256",
++      "yarn.vcores": "1"
++    }
++  }
++}
+\ No newline at end of file
+diff --git a/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/multiCompMultiContainer/appConfig.json b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/multiCompMultiContainer/appConfig.json
+new file mode 100644
+index 0000000..8839efc
+--- /dev/null
++++ b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/multiCompMultiContainer/appConfig.json
+@@ -0,0 +1,10 @@
++{
++  "schema": "http://example.org/specification/v2.0.0",
++  "metadata": {},
++  "global": {},
++  "components": {
++    "YCLOUD": {
++      "ycloud.statusCommand": "ls"
++    }
++  }
++}
+\ No newline at end of file
+diff --git a/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/multiCompMultiContainer/metainfo.json b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/multiCompMultiContainer/metainfo.json
+new file mode 100644
+index 0000000..efbb638
+--- /dev/null
++++ b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/multiCompMultiContainer/metainfo.json
+@@ -0,0 +1,44 @@
++{
++  "schemaVersion": "2.1",
++  "application": {
++    "name": "MYYCLOUD",
++    "components": [
++      {
++        "name": "YCLOUD1",
++        "type": "yarn_docker",
++        "dockerContainers": [
++          {
++            "name": "ycloud1",
++            "image": "ycloud-centos6:latest",
++            "startCommand": "ls",
++            "yarnContainerMountPoint": "null",
++            "ports": [
++              {
++                "containerPort": "8080",
++                "hostPort": "49160"
++              }
++            ]
++          }
++        ]
++      },
++      {
++        "name": "YCLOUD2",
++        "type": "yarn_docker",
++        "dockerContainers": [
++          {
++            "name": "ycloud2",
++            "image": "ycloud-centos6:latest",
++            "startCommand": "ls",
++            "yarnContainerMountPoint": "null",
++            "ports": [
++              {
++                "containerPort": "8080",
++                "hostPort": "49161"
++              }
++            ]
++          }
++        ]
++      }
++    ]
++  }
++}
+\ No newline at end of file
+diff --git a/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/multiCompMultiContainer/resources.json b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/multiCompMultiContainer/resources.json
+new file mode 100644
+index 0000000..399a301
+--- /dev/null
++++ b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/multiCompMultiContainer/resources.json
+@@ -0,0 +1,20 @@
++{
++  "schema": "http://example.org/specification/v2.0.0",
++  "metadata": {},
++  "global": {},
++  "components": {
++    "slider-appmaster": {},
++    "YCLOUD1": {
++      "yarn.role.priority": "1",
++      "yarn.component.instances": 2,
++      "yarn.memory": "256",
++      "yarn.vcores": "1"
++    },
++    "YCLOUD2": {
++      "yarn.role.priority": "2",
++      "yarn.component.instances": 3,
++      "yarn.memory": "256",
++      "yarn.vcores": "1"
++    }
++  }
++}
+\ No newline at end of file
+diff --git a/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/oneCompFailed/appConfig.json b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/oneCompFailed/appConfig.json
+new file mode 100644
+index 0000000..8839efc
+--- /dev/null
++++ b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/oneCompFailed/appConfig.json
+@@ -0,0 +1,10 @@
++{
++  "schema": "http://example.org/specification/v2.0.0",
++  "metadata": {},
++  "global": {},
++  "components": {
++    "YCLOUD": {
++      "ycloud.statusCommand": "ls"
++    }
++  }
++}
+\ No newline at end of file
+diff --git a/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/oneCompFailed/metainfo.json b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/oneCompFailed/metainfo.json
+new file mode 100644
+index 0000000..2befb20
+--- /dev/null
++++ b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/oneCompFailed/metainfo.json
+@@ -0,0 +1,44 @@
++{
++  "schemaVersion": "2.1",
++  "application": {
++    "name": "MYYCLOUD",
++    "components": [
++      {
++        "name": "YCLOUD1",
++        "type": "yarn_docker",
++        "dockerContainers": [
++          {
++            "name": "ycloud1",
++            "image": "doesnotexist",
++            "startCommand": "ls",
++            "yarnContainerMountPoint": "null",
++            "ports": [
++              {
++                "containerPort": "8080",
++                "hostPort": "49160"
++              }
++            ]
++          }
++        ]
++      },
++      {
++        "name": "YCLOUD2",
++        "type": "yarn_docker",
++        "dockerContainers": [
++          {
++            "name": "ycloud2",
++            "image": "ycloud-centos6:latest",
++            "startCommand": "ls",
++            "yarnContainerMountPoint": "null",
++            "ports": [
++              {
++                "containerPort": "8080",
++                "hostPort": "49161"
++              }
++            ]
++          }
++        ]
++      }
++    ]
++  }
++}
+\ No newline at end of file
+diff --git a/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/oneCompFailed/resources.json b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/oneCompFailed/resources.json
+new file mode 100644
+index 0000000..985d8e3
+--- /dev/null
++++ b/slider-core/src/test/app_packages/test_docker_on_yarn_pkg/oneCompFailed/resources.json
+@@ -0,0 +1,20 @@
++{
++  "schema": "http://example.org/specification/v2.0.0",
++  "metadata": {},
++  "global": {},
++  "components": {
++    "slider-appmaster": {},
++    "YCLOUD1": {
++      "yarn.role.priority": "1",
++      "yarn.component.instances": 2,
++      "yarn.memory": "256",
++      "yarn.vcores": "1"
++    },
++    "YCLOUD2": {
++      "yarn.role.priority": "2",
++      "yarn.component.instances": 2,
++      "yarn.memory": "256",
++      "yarn.vcores": "1"
++    }
++  }
++}
+\ No newline at end of file
+diff --git a/slider-core/src/test/java/org/apache/slider/providers/agent/TestAgentProviderService.java b/slider-core/src/test/java/org/apache/slider/providers/agent/TestAgentProviderService.java
+index 0f31d73..cf5c57b 100644
+--- a/slider-core/src/test/java/org/apache/slider/providers/agent/TestAgentProviderService.java
++++ b/slider-core/src/test/java/org/apache/slider/providers/agent/TestAgentProviderService.java
+@@ -359,8 +359,11 @@ public class TestAgentProviderService {
+     ConfTreeOperations treeOps = aggConf.getAppConfOperations();
+     treeOps.getOrAddComponent("HBASE_MASTER").put(AgentKeys.WAIT_HEARTBEAT, "0");
+     treeOps.set(OptionKeys.APPLICATION_NAME, "HBASE");
++    treeOps.set("site.fs.defaultFS", "hdfs://HOST1:8020/");
++    treeOps.set("internal.data.dir.path", "hdfs://HOST1:8020/database");
+     expect(access.getInstanceDefinitionSnapshot()).andReturn(aggConf);
+     expect(access.getInternalsSnapshot()).andReturn(treeOps).anyTimes();
++    expect(access.getAppConfSnapshot()).andReturn(treeOps).anyTimes();
+     replay(access, ctx, container, sliderFileSystem, mockFs);
+ 
+     try {
+@@ -1279,8 +1282,11 @@ public class TestAgentProviderService {
+     treeOps.getOrAddComponent("HBASE_MASTER").put(AgentKeys.WAIT_HEARTBEAT, "0");
+     treeOps.getOrAddComponent("HBASE_REGIONSERVER").put(AgentKeys.WAIT_HEARTBEAT, "0");
+     treeOps.set(OptionKeys.APPLICATION_NAME, "HBASE");
++    treeOps.set("site.fs.defaultFS", "hdfs://HOST1:8020/");
++    treeOps.set("internal.data.dir.path", "hdfs://HOST1:8020/database");
+     expect(access.getInstanceDefinitionSnapshot()).andReturn(aggConf).anyTimes();
+     expect(access.getInternalsSnapshot()).andReturn(treeOps).anyTimes();
++    expect(access.getAppConfSnapshot()).andReturn(treeOps).anyTimes();
+     doNothing().when(mockAps).publishApplicationInstanceData(anyString(), anyString(), anyCollection());
+     replay(access, ctx, container, sliderFileSystem, mockFs);
+ 
+@@ -1673,7 +1679,7 @@ public class TestAgentProviderService {
+     configurations.add("global");
+     List<String> sysConfigurations = new ArrayList<String>();
+     configurations.add("core-site");
+-    doReturn(configurations).when(mockAps).getApplicationConfigurationTypes();
++    doReturn(configurations).when(mockAps).getApplicationConfigurationTypes(anyString());
+     doReturn(sysConfigurations).when(mockAps).getSystemConfigurationsRequested(any(ConfTreeOperations.class));
+ 
+     Map<String, Map<String, ClusterNode>> roleClusterNodeMap = new HashMap<String, Map<String, ClusterNode>>();
+@@ -1761,7 +1767,7 @@ public class TestAgentProviderService {
+     configurations.add("global");
+     List<String> sysConfigurations = new ArrayList<String>();
+     configurations.add("core-site");
+-    doReturn(configurations).when(mockAps).getApplicationConfigurationTypes();
++    doReturn(configurations).when(mockAps).getApplicationConfigurationTypes(anyString());
+     doReturn(sysConfigurations).when(mockAps).getSystemConfigurationsRequested(any(ConfTreeOperations.class));
+ 
+     Map<String, Map<String, ClusterNode>> roleClusterNodeMap = new HashMap<String, Map<String, ClusterNode>>();
+diff --git a/slider-funtest/src/test/groovy/org/apache/slider/funtest/dockeronyarn/DockerAppLaunchedOnYarnIT.groovy b/slider-funtest/src/test/groovy/org/apache/slider/funtest/dockeronyarn/DockerAppLaunchedOnYarnIT.groovy
+new file mode 100644
+index 0000000..eb0f6ae
+--- /dev/null
++++ b/slider-funtest/src/test/groovy/org/apache/slider/funtest/dockeronyarn/DockerAppLaunchedOnYarnIT.groovy
+@@ -0,0 +1,259 @@
++/*
++ * Licensed to the Apache Software Foundation (ASF) under one or more
++ * contributor license agreements.  See the NOTICE file distributed with
++ * this work for additional information regarding copyright ownership.
++ * The ASF licenses this file to You under the Apache License, Version 2.0
++ * (the "License"); you may not use this file except in compliance with
++ * the License.  You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package org.apache.slider.funtest.dockeronyarn
++
++import groovy.transform.CompileStatic
++import groovy.util.logging.Slf4j
++
++import org.apache.hadoop.security.UserGroupInformation
++import org.apache.hadoop.conf.Configuration;
++import org.apache.hadoop.fs.FileSystem;
++import org.apache.hadoop.fs.Path;
++import org.apache.hadoop.yarn.api.records.YarnApplicationState
++import org.apache.slider.api.ClusterDescription
++import org.apache.slider.api.ClusterNode
++import org.apache.slider.api.StatusKeys
++import org.apache.slider.client.SliderClient
++import org.apache.slider.common.SliderExitCodes
++import org.apache.slider.common.SliderXmlConfKeys
++import org.apache.slider.common.params.Arguments
++import org.apache.slider.common.params.SliderActions
++import org.apache.slider.common.tools.SliderUtils
++import org.apache.slider.api.StateValues
++import org.apache.slider.funtest.framework.AgentCommandTestBase
++import org.apache.slider.funtest.framework.FuntestProperties
++import org.apache.slider.funtest.framework.SliderShell
++import org.apache.slider.funtest.framework.FileUploader
++import org.junit.After
++import org.junit.Before
++import org.junit.Test
++
++@CompileStatic
++@Slf4j
++public class DockerAppLaunchedOnYarnIT extends AgentCommandTestBase{
++
++  static String CLUSTER = "test-docker-on-yarn"
++
++  @Before
++  public void prepareCluster() {
++    setupCluster(CLUSTER)
++  }
++
++  @After
++  public void destroyCluster() {
++    cleanup(CLUSTER)
++  }
++
++  private boolean testable(){
++    //currently the test cases below are designed for ycloud
++    //and should be disabled for general fun test
++    return false;
++  }
++
++  @Test
++  public void testBasicDockerApp() throws Throwable {
++    if(!testable()){
++      return;
++    }
++    String BASIC_APP_RESOURCE = "../slider-core/src/test/app_packages/test_docker_on_yarn_pkg/basic/resources.json"
++    String BASIC_APP_META = "../slider-core/src/test/app_packages/test_docker_on_yarn_pkg/basic/metainfo.json"
++    String BASIC_APP_TEMPLATE = "../slider-core/src/test/app_packages/test_docker_on_yarn_pkg/basic/appConfig.json"
++
++    launchDockerAppOnYarn(BASIC_APP_TEMPLATE, BASIC_APP_META, BASIC_APP_RESOURCE)
++    ClusterDescription cd = execStatus(CLUSTER)
++    ensureNumberOfContainersAlive("YCLOUD", 1, cd);
++    ensureIpAndHostnamePresent("YCLOUD", 1, cd);
++  }
++
++  @Test
++  public void testMultiCompDockerApp() throws Throwable {
++    if(!testable()){
++      return;
++    }
++    String BASIC_APP_RESOURCE = "../slider-core/src/test/app_packages/test_docker_on_yarn_pkg/multiComp/resources.json"
++    String BASIC_APP_META = "../slider-core/src/test/app_packages/test_docker_on_yarn_pkg/multiComp/metainfo.json"
++    String BASIC_APP_TEMPLATE = "../slider-core/src/test/app_packages/test_docker_on_yarn_pkg/multiComp/appConfig.json"
++
++    launchDockerAppOnYarn(BASIC_APP_TEMPLATE, BASIC_APP_META, BASIC_APP_RESOURCE)
++    ClusterDescription cd = execStatus(CLUSTER)
++    ensureNumberOfContainersAlive("YCLOUD1", 1, cd);
++    ensureIpAndHostnamePresent("YCLOUD1", 1, cd);
++    ensureNumberOfContainersAlive("YCLOUD2", 1, cd);
++    ensureIpAndHostnamePresent("YCLOUD2", 1, cd);
++  }
++
++  @Test
++  public void testMultiCompMultiContainersDockerApp() throws Throwable {
++    if(!testable()){
++      return;
++    }
++    String BASIC_APP_RESOURCE = "../slider-core/src/test/app_packages/test_docker_on_yarn_pkg/multiCompMultiContainer/resources.json"
++    String BASIC_APP_META = "../slider-core/src/test/app_packages/test_docker_on_yarn_pkg/multiCompMultiContainer/metainfo.json"
++    String BASIC_APP_TEMPLATE = "../slider-core/src/test/app_packages/test_docker_on_yarn_pkg/multiCompMultiContainer/appConfig.json"
++
++    launchDockerAppOnYarn(BASIC_APP_TEMPLATE, BASIC_APP_META, BASIC_APP_RESOURCE)
++    //need more time for containers to come up
++    sleep(10000)
++    ClusterDescription cd = execStatus(CLUSTER)
++    ensureNumberOfContainersAlive("YCLOUD1", 2, cd);
++    ensureIpAndHostnamePresent("YCLOUD1", 2, cd);
++    ensureNumberOfContainersAlive("YCLOUD2", 3, cd);
++    ensureIpAndHostnamePresent("YCLOUD2", 3, cd);
++  }
++
++  @Test
++  public void testOneCompFailedDockerApp() throws Throwable {
++    if(!testable()){
++      return;
++    }
++    String BASIC_APP_RESOURCE = "../slider-core/src/test/app_packages/test_docker_on_yarn_pkg/oneCompFailed/resources.json"
++    String BASIC_APP_META = "../slider-core/src/test/app_packages/test_docker_on_yarn_pkg/oneCompFailed/metainfo.json"
++    String BASIC_APP_TEMPLATE = "../slider-core/src/test/app_packages/test_docker_on_yarn_pkg/oneCompFailed/appConfig.json"
++
++    launchDockerAppOnYarn(BASIC_APP_TEMPLATE, BASIC_APP_META, BASIC_APP_RESOURCE)
++    //need more time for containers to come up
++    sleep(30000)
++    ClusterDescription cd = execStatus(CLUSTER)
++    print cd.toString()
++    if(cd.status.get("live") != null){
++      Map live = (Map)cd.status.get("live")
++      if (live.get("YCLOUD1") != null){
++        Map compMap = (Map)live.get("YCLOUD1")
++        String[] keys = compMap.keySet().toArray()
++        for(int i = 0; i < 2; i++){
++          ClusterNode node = (ClusterNode)compMap.get(keys[i])
++          assert node.state == StateValues.STATE_LIVE
++          assert node.ip == null
++          assert node.hostname == null
++        }
++      } else {
++        fail("ycloud1 not present")
++      }
++    } else {
++      fail("live is not in the returned state")
++    }
++    ensureNumberOfContainersAlive("YCLOUD2", 2, cd);
++    ensureIpAndHostnamePresent("YCLOUD2", 2, cd);
++  }
++
++  @Test
++  public void testAllCompFailedDockerApp() throws Throwable {
++    if(!testable()){
++      return;
++    }
++    String BASIC_APP_RESOURCE = "../slider-core/src/test/app_packages/test_docker_on_yarn_pkg/allCompFailed/resources.json"
++    String BASIC_APP_META = "../slider-core/src/test/app_packages/test_docker_on_yarn_pkg/allCompFailed/metainfo.json"
++    String BASIC_APP_TEMPLATE = "../slider-core/src/test/app_packages/test_docker_on_yarn_pkg/allCompFailed/appConfig.json"
++
++    launchDockerAppOnYarn(BASIC_APP_TEMPLATE, BASIC_APP_META, BASIC_APP_RESOURCE)
++    //need more time for containers to come up
++    sleep(30000)
++    ClusterDescription cd = execStatus(CLUSTER)
++    print cd.toString()
++    if(cd.status.get("live") != null){
++      Map live = (Map)cd.status.get("live")
++      if (live.get("YCLOUD1") != null){
++        Map compMap = (Map)live.get("YCLOUD1")
++        String[] keys = compMap.keySet().toArray()
++        for(int i = 0; i < 2; i++){
++          ClusterNode node = (ClusterNode)compMap.get(keys[i])
++          assert node.state == StateValues.STATE_LIVE
++          assert node.ip == null
++          assert node.hostname == null
++        }
++      } else {
++        fail("ycloud1 not present")
++      }
++      if (live.get("YCLOUD2") != null){
++        Map compMap = (Map)live.get("YCLOUD2")
++        String[] keys = compMap.keySet().toArray()
++        for(int i = 0; i < 2; i++){
++          ClusterNode node = (ClusterNode)compMap.get(keys[i])
++          assert node.state == StateValues.STATE_LIVE
++          assert node.ip == null
++          assert node.hostname == null
++        }
++      } else {
++        fail("ycloud2 not present")
++      }
++    } else {
++      fail("live is not in the returned state")
++    }
++  }
++
++  private void launchDockerAppOnYarn(String appConfig, String metainfo, String resources) throws Throwable {
++    describe("Create a cluster using metainfo, resources, and appConfig that deploy docker based application on yarn")
++    assumeNotWindows()
++    def clusterpath = buildClusterPath(CLUSTER)
++    File launchReportFile = createTempJsonFile();
++
++    SliderShell shell = createSliderApplicationMinPkg(CLUSTER,
++        metainfo,
++        resources,
++        appConfig,
++        [],
++        launchReportFile)
++
++    logShell(shell)
++
++    def appId = ensureYarnApplicationIsUp(launchReportFile)
++    //need some time for containers to come up
++    sleep(40000)
++  }
++
++  //get cluster description from yarn. make sure all containers and the app master are good
++  private void ensureNumberOfContainersAlive(String compName, int numOfContainers, ClusterDescription cd){
++    print cd.toString()
++    if(cd.status.get("live") != null){
++      Map live = (Map)cd.status.get("live")
++      if (live.get(compName) != null){
++        Map compMap = (Map)live.get(compName)
++        String[] keys = compMap.keySet().toArray()
++        assert numOfContainers == keys.length
++        for(int i = 0; i < numOfContainers; i++){
++          ClusterNode node = (ClusterNode)compMap.get(keys[i])
++          assert node.state == StateValues.STATE_LIVE
++        }
++      } else {
++        fail(compName + " not present")
++      }
++    } else {
++      fail("live is not in the returned state")
++    }
++  }
++
++  private void ensureIpAndHostnamePresent(String compName, int numOfContainers, ClusterDescription cd){
++    print cd.toString()
++    if(cd.status.get("live") != null){
++      Map live = (Map)cd.status.get("live")
++      if (live.get(compName) != null){
++        Map compMap = (Map)live.get(compName)
++        String[] keys = compMap.keySet().toArray()
++        assert numOfContainers == keys.length
++        for(int i = 0; i < numOfContainers; i++){
++          ClusterNode node = (ClusterNode)compMap.get(keys[i])
++          assert node.ip != null
++          assert node.hostname != null
++        }
++      } else {
++        fail(compName + " not present")
++      }
++    } else {
++      fail("live is not in the returned state")
++    }
++  }
++}

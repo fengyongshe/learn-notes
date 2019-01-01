@@ -1,0 +1,22 @@
+2016-11-05 14:28:19,866 DEBUG [qtp1024275447-65 - /jmx/]: jmx.JMXJsonServlet (JMXJsonServlet.java:writeAttribute(327)) - getting attribute UsageThreshold of java.lang:type=MemoryPool,name=PS Survivor Space threw an exception
+javax.management.RuntimeMBeanException: java.lang.UnsupportedOperationException: Usage threshold is not supported
+        at com.sun.jmx.interceptor.DefaultMBeanServerInterceptor.rethrow(DefaultMBeanServerInterceptor.java:839)
+        at com.sun.jmx.interceptor.DefaultMBeanServerInterceptor.rethrowMaybeMBeanException(DefaultMBeanServerInterceptor.java:852)
+        at com.sun.jmx.interceptor.DefaultMBeanServerInterceptor.getAttribute(DefaultMBeanServerInterceptor.java:651)
+        at com.sun.jmx.mbeanserver.JmxMBeanServer.getAttribute(JmxMBeanServer.java:678)
+        at org.apache.hive.service.monitor.jmx.JMXJsonServlet.writeAttribute(JMXJsonServlet.java:322)
+        at org.apache.hive.service.monitor.jmx.JMXJsonServlet.listBeans(JMXJsonServlet.java:300)
+
+
+
+Caused by: java.lang.UnsupportedOperationException: Usage threshold is not supported
+        at sun.management.MemoryPoolImpl.getUsageThreshold(MemoryPoolImpl.java:106)
+        at sun.reflect.GeneratedMethodAccessor29.invoke(Unknown Source)
+        at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+        at java.lang.reflect.Method.invoke(Method.java:606)
+        at sun.reflect.misc.Trampoline.invoke(MethodUtil.java:75)
+        at sun.reflect.GeneratedMethodAccessor13.invoke(Unknown Source)
+        at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+        at java.lang.reflect.Method.invoke(Method.java:606)
+        at sun.reflect.misc.MethodUtil.invoke(MethodUtil.java:279)
+        at com.sun.jmx.mbeanserver.ConvertingMethod.invokeWithOpenReturn(ConvertingMethod.java:193

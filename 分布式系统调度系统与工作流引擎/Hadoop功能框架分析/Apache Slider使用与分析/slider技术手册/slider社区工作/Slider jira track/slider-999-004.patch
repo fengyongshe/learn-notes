@@ -1,0 +1,177 @@
+diff --git a/slider-agent/src/main/python/agent/Constants.py b/slider-agent/src/main/python/agent/Constants.py
+index f120b94..6ede66e 100644
+--- a/slider-agent/src/main/python/agent/Constants.py
++++ b/slider-agent/src/main/python/agent/Constants.py
+@@ -34,3 +34,7 @@ ZK_QUORUM="zk_quorum"
+ ZK_REG_PATH="zk_reg_path"
+ AUTO_GENERATED="auto_generated"
+ MAX_AM_CONNECT_RETRIES = 10
++APPLICATION_STD_OUTPUT_LOG_FILE_PREFIX = "application_"
++APPLICATION_STD_OUTPUT_LOG_FILE_FILE_TYPE = ".out"
++APPLICATION_STD_ERROR_LOG_FILE_PREFIX = "application_"
++APPLICATION_STD_ERROR_LOG_FILE_FILE_TYPE = ".err"
+diff --git a/slider-agent/src/main/python/agent/DockerManager.py b/slider-agent/src/main/python/agent/DockerManager.py
+index d4da40a..023a163 100644
+--- a/slider-agent/src/main/python/agent/DockerManager.py
++++ b/slider-agent/src/main/python/agent/DockerManager.py
+@@ -48,8 +48,8 @@ class DockerManager():
+     if status_command_str:
+       self.stored_status_command = status_command_str.split(" ")
+     logger.info("status command" + str(self.stored_status_command))
+-    if command['hostLevelParams']:
+-        if command['hostLevelParams']['container_id']:
++    if 'hostLevelParams' in command:
++        if 'container_id' in command['hostLevelParams']:
+             self.container_id = command['hostLevelParams']['container_id']
+         
+     if command['roleCommand'] == 'INSTALL':
+@@ -81,13 +81,17 @@ class DockerManager():
+ 
+ 
+   # will evolve into a class hierarch, linux and windows
+-  def execute_command_on_linux(self, docker_command):
++  def execute_command_on_linux(self, docker_command, stdoutFile=None, stderrFile=None):
+     command_str = ''
+     for itr in docker_command:
+-        command_str = command_str + ' ' + itr
++      command_str = command_str + ' ' + itr
+ 
+     logger.info("command str: " + command_str)
+-    proc = subprocess.Popen(command_str, stdout = subprocess.PIPE, shell=True)
++    if stdoutFile != None or stderrFile != None:
++      proc = subprocess.Popen(command_str, stdout = stdoutFile, 
++                              stderr = stderrFile, universal_newlines = True, shell=True)
++    else:
++      proc = subprocess.Popen(command_str, stdout = subprocess.PIPE, shell=True)
+     out, err = proc.communicate()
+     logger.info("docker command output: " + str(out) + " err: " + str(err))
+     return proc.returncode, out, err
+@@ -107,8 +111,6 @@ class DockerManager():
+     
+     docker_command = [command_path, "run"]
+     
+-    #docker_command.append("--net=host")
+-    
+     if options:
+       docker_command = self.add_docker_run_options_to_command(docker_command, options)
+     if containerPort:
+@@ -124,8 +126,17 @@ class DockerManager():
+     docker_command.append(imageName)
+     if additional_param:
+       docker_command = self.add_additional_param_to_command(docker_command, additional_param)
++    #adding redirecting stdout stderr to file
+     logger.info("docker run command: " + str(docker_command))
+-    return self.execute_command_on_linux(docker_command)
++    outfilename = Constants.APPLICATION_STD_OUTPUT_LOG_FILE_PREFIX + \
++                    self.container_id + Constants.APPLICATION_STD_OUTPUT_LOG_FILE_FILE_TYPE
++          
++    errfilename = Constants.APPLICATION_STD_ERROR_LOG_FILE_PREFIX + \
++                    self.container_id + Constants.APPLICATION_STD_ERROR_LOG_FILE_FILE_TYPE
++
++    stdoutFile = open(outfilename, 'w')
++    stderrFile = open(errfilename, 'w')
++    return self.execute_command_on_linux(docker_command, stdoutFile, stderrFile)
+ 
+   def add_docker_run_options_to_command(self, docker_command, options):
+     return docker_command + options.split(" ")
+diff --git a/slider-agent/src/main/python/resource_management/core/providers/windows/system.py b/slider-agent/src/main/python/resource_management/core/providers/windows/system.py
+index f4102fb..b85c020 100644
+--- a/slider-agent/src/main/python/resource_management/core/providers/windows/system.py
++++ b/slider-agent/src/main/python/resource_management/core/providers/windows/system.py
+@@ -30,6 +30,10 @@ import subprocess
+ import shutil
+ from resource_management.libraries.script import Script
+ 
++APPLICATION_STD_OUTPUT_LOG_FILE_PREFIX = 'application-'
++APPLICATION_STD_OUTPUT_LOG_FILE_FILE_TYPE = '.log'
++APPLICATION_STD_ERROR_LOG_FILE_PREFIX = 'application-'
++APPLICATION_STD_ERROR_LOG_FILE_FILE_TYPE = '.err'
+ 
+ def _merge_env(env1, env2, merge_keys=['PYTHONPATH']):
+   """
+@@ -69,7 +73,16 @@ def _call_command(command, logoutput=False, cwd=None, env=None, wait_for_finish=
+                   pid_file_name=None, poll_after=None):
+   # TODO implement user
+   Logger.info("Executing %s" % (command))
+-  proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
++  #adding redirecting stdout stderr to file
++  outfilename = APPLICATION_STD_OUTPUT_LOG_FILE_PREFIX + \
++                    str(pid_file_name) + APPLICATION_STD_OUTPUT_LOG_FILE_FILE_TYPE
++          
++  errfilename = APPLICATION_STD_ERROR_LOG_FILE_PREFIX + \
++                    str(pid_file_name) + APPLICATION_STD_ERROR_LOG_FILE_FILE_TYPE
++
++  stdoutFile = open(outfilename, 'w')
++  stderrFile = open(errfilename, 'w')
++  proc = subprocess.Popen(command, stdout = stdoutFile, stderr = stderrFile, universal_newlines = True,
+                           cwd=cwd, env=env, shell=False)
+   code = None
+   logAnyway = False
+diff --git a/slider-agent/src/main/python/resource_management/core/shell.py b/slider-agent/src/main/python/resource_management/core/shell.py
+index 95d18fc..f21dbbf 100644
+--- a/slider-agent/src/main/python/resource_management/core/shell.py
++++ b/slider-agent/src/main/python/resource_management/core/shell.py
+@@ -31,6 +31,11 @@ from exceptions import ExecuteTimeoutException
+ from resource_management.core.logger import Logger
+ import time
+ 
++APPLICATION_STD_OUTPUT_LOG_FILE_PREFIX = 'application-'
++APPLICATION_STD_OUTPUT_LOG_FILE_FILE_TYPE = '.log'
++APPLICATION_STD_ERROR_LOG_FILE_PREFIX = 'application-'
++APPLICATION_STD_ERROR_LOG_FILE_FILE_TYPE = '.err'
++
+ def checked_call(command, logoutput=False, 
+          cwd=None, env=None, preexec_fn=None, user=None, wait_for_finish=True, timeout=None, pid_file=None, poll_after=None):
+   return _call(command, logoutput, True, cwd, env, preexec_fn, user, wait_for_finish, timeout, pid_file, poll_after)
+@@ -63,10 +68,20 @@ def _call(command, logoutput=False, throw_on_failure=True,
+     command = ["/bin/bash","--login","-c", command]
+   """
+   command = ["/bin/bash","--login","-c", command]
+-  proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
++  #adding redirecting stdout stderr to file
++  outfilename = APPLICATION_STD_OUTPUT_LOG_FILE_PREFIX + \
++                    str(pid_file_name) + APPLICATION_STD_OUTPUT_LOG_FILE_FILE_TYPE
++          
++  errfilename = APPLICATION_STD_ERROR_LOG_FILE_PREFIX + \
++                    str(pid_file_name) + APPLICATION_STD_ERROR_LOG_FILE_FILE_TYPE
++
++  stdoutFile = open(outfilename, 'w')
++  stderrFile = open(errfilename, 'w')
++  
++  proc = subprocess.Popen(command, stdout = stdoutFile, stderr = stderrFile, universal_newlines = True,
+                           cwd=cwd, env=env, shell=False,
+                           preexec_fn=preexec_fn)
+-
++  
+   logAnyway = False
+   if not wait_for_finish:
+     if pid_file_name:
+@@ -91,7 +106,8 @@ def _call(command, logoutput=False, throw_on_failure=True,
+     t = threading.Timer( timeout, on_timeout, [proc, q] )
+     t.start()
+     
+-  out = proc.communicate()[0].strip('\n')
++  #out = proc.communicate()[0].strip('\n')
++  out = proc.communicate()
+   
+   if timeout:
+     if q.empty():
+diff --git a/slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java b/slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java
+index 5bf3330..fdd1110 100644
+--- a/slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java
++++ b/slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java
+@@ -881,10 +881,10 @@ public class AgentProviderService extends AbstractProviderService implements
+             RoleInstance role = amState.getOwnedContainer(containerId);
+             role.ip = status.getIp();
+           }
+-          if(status.getHostname() != null & !status.getHostname().isEmpty()){
+-        	RoleInstance role = amState.getOwnedContainer(containerId);
+-        	role.hostname = status.getHostname();
+-          }
++          if(status.getHostname() != null && !status.getHostname().isEmpty()){
++            RoleInstance role = amState.getOwnedContainer(containerId);
++            role.hostname = status.getHostname();
++        }
+         }
+       } catch (NoSuchNodeException e) {
+         // ignore - there is nothing to do if we don't find a container

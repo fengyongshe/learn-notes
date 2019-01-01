@@ -1,0 +1,103 @@
+{
+    "componentConfigurations": {
+        "slider-appmaster": {
+            "site.global.kafka_version": "kafka_2.10-0.8.2.1",
+            "zookeeper.hosts": "bditest3.cmss.com,bditest2.cmss.com,bditest1.cmss.com",
+            "site.broker.instance.name": "kafka210",
+            "site.global.app_user": "fys",
+            "site.fs.defaultFS": "hdfs://testhbase",
+            "java_home": "/usr/jdk64/jdk1.7.0_67",
+            "site.global.pid_file": "${AGENT_WORK_ROOT}/app/run/koya.pid",
+            "env.MALLOC_ARENA_MAX": "4",
+            "jvm.heapsize": "256M",
+            "site.global.app_install_dir": "${AGENT_WORK_ROOT}/app/install",
+            "site.broker.xms_val": "1024m",
+            "site.broker.zookeeper": "bditest1.cmss.com,bditest2.cmss.com,bditest3.cmss.com",
+            "site.global.hdfs_app_dir": "/slider/.slider/cluster/kafka210/localstore",
+            "zookeeper.quorum": "bditest3.cmss.com:2181,bditest2.cmss.com:2181,bditest1.cmss.com:2181",
+            "site.broker.xmx_val": "1024m",
+            "zookeeper.path": "/services/slider/users/fys/kafka210",
+            "system_configs": "broker",
+            "site.fs.default.name": "hdfs://testhbase",
+            "application.def": "/slider/.slider/package/KOYA2/slider-kafka-app-package-0.80.0-bc1.3.0.zip",
+            "site.server.port": "${KAFKA_BROKER.ALLOCATED_PORT}{PER_CONTAINER}",
+            "site.global.app_root": "${AGENT_WORK_ROOT}/app/install/kafka_2.10-0.8.2.1",
+            "site.global.security_enabled": "false"
+        },
+        "broker": {
+            "site.global.kafka_version": "kafka_2.10-0.8.2.1",
+            "site.broker.xmx_val": "1024m",
+            "env.MALLOC_ARENA_MAX": "4",
+            "java_home": "/usr/jdk64/jdk1.7.0_67",
+            "zookeeper.hosts": "bditest3.cmss.com,bditest2.cmss.com,bditest1.cmss.com",
+            "site.global.app_install_dir": "${AGENT_WORK_ROOT}/app/install",
+            "system_configs": "broker",
+            "site.global.hdfs_app_dir": "/slider/.slider/cluster/kafka210/localstore",
+            "site.fs.default.name": "hdfs://testhbase",
+            "zookeeper.path": "/services/slider/users/fys/kafka210",
+            "site.global.security_enabled": "false",
+            "site.global.app_user": "fys",
+            "application.def": "/slider/.slider/package/KOYA2/slider-kafka-app-package-0.80.0-bc1.3.0.zip",
+            "site.broker.zookeeper": "bditest1.cmss.com,bditest2.cmss.com,bditest3.cmss.com",
+            "site.server.port": "${KAFKA_BROKER.ALLOCATED_PORT}{PER_CONTAINER}",
+            "zookeeper.quorum": "bditest3.cmss.com:2181,bditest2.cmss.com:2181,bditest1.cmss.com:2181",
+            "site.broker.instance.name": "kafka210",
+            "site.fs.defaultFS": "hdfs://testhbase",
+            "site.global.app_root": "${AGENT_WORK_ROOT}/app/install/kafka_2.10-0.8.2.1",
+        }
+    },
+    "clusterName": "kafka210",
+    "componentName": "KAFKA_BROKER",
+    "hostname": "bditest3.cmss.com",
+    "hostLevelParams": {
+        "java_home": "/usr/jdk64/jdk1.7.0_67",
+        "container_id": "container_1461811649094_0010_01_000002",
+        "package_list": "[{\"type\":\"tarball\",\"name\":\"files/kafka_2.10-0.8.2.1.tgz\"}]"
+    },
+    "commandType": "EXECUTION_COMMAND",
+    "roleCommand": "INSTALL",
+    "serviceName": "kafka210",
+    "role": "KAFKA_BROKER",
+    "commandParams": {
+        "record_config": "false",
+        "foreground_start": "false",
+        "script": "scripts/kafka.py",
+        "schema_version": "2.0",
+        "service_package_folder": "${AGENT_WORK_ROOT}/work/app/definition/package",
+        "command_timeout": "600",
+        "script_type": "PYTHON"
+    },
+    "taskId": 2,
+    "public_hostname": "bditest3.cmss.com",
+    "appmaster_hostname": "bditest1.cmss.com",
+    "commandId": "2-1",
+    "containers": [],
+    "configurations": {
+        "global": {
+            "security_enabled": "false",
+            "app_container_id": "container_1461811649094_0010_01_000002",
+            "app_root": "/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install/kafka_2.10-0.8.2.1",
+            "app_log_dir": "/data11/hadoop/yarn/log/application_1461811649094_0010/container_1461811649094_0010_01_000002",
+            "app_user": "fys",
+            "app_pid_dir": "/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/run",
+            "kafka_version": "kafka_2.10-0.8.2.1",
+            "app_container_tag": "1",
+            "pid_file": "/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/run/koya.pid",
+            "app_install_dir": "/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install",
+            "hdfs_app_dir": "/slider/.slider/cluster/kafka210/localstore",
+            "app_input_conf_dir": "/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/propagatedconf"
+        },
+        "broker": {
+            "xmx_val": "1024m",
+            "instance.name": "kafka210",
+            "zookeeper": "bditest1.cmss.com,bditest2.cmss.com,bditest3.cmss.com",
+            "xms_val": "1024m"
+        },
+        "server": {
+            "log.dirs": "/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/run",
+            "broker.id": "1",
+            "zookeeper.connect": "bditest1.cmss.com,bditest2.cmss.com,bditest3.cmss.com/kafka/kafka210",
+            "port": "40045"
+        }
+    }
+}

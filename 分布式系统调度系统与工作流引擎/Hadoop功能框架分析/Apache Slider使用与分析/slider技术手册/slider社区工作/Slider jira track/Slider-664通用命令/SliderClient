@@ -1,0 +1,286 @@
+Index: slider-core/src/main/java/org/apache/slider/client/SliderClient.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/client/SliderClient.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/client/SliderClient.java	(working copy)
+@@ -40,7 +40,6 @@
+ import org.apache.hadoop.registry.client.api.RegistryConstants;
+ import org.apache.hadoop.registry.client.api.RegistryOperations;
+ import org.apache.hadoop.registry.client.binding.RegistryPathUtils;
+-import org.apache.hadoop.registry.client.binding.RegistryUtils;
+ import org.apache.hadoop.registry.client.exceptions.NoRecordException;
+ import org.apache.hadoop.registry.client.types.Endpoint;
+ import org.apache.hadoop.registry.client.types.RegistryPathStatus;
+@@ -82,7 +81,6 @@
+ import org.apache.slider.common.params.ActionAMSuicideArgs;
+ import org.apache.slider.common.params.ActionClientArgs;
+ import org.apache.slider.common.params.ActionCreateArgs;
+-import org.apache.slider.common.params.ActionDeleteArgs;
+ import org.apache.slider.common.params.ActionDiagnosticArgs;
+ import org.apache.slider.common.params.ActionEchoArgs;
+ import org.apache.slider.common.params.ActionExistsArgs;
+@@ -94,13 +92,13 @@
+ import org.apache.slider.common.params.ActionKillContainerArgs;
+ import org.apache.slider.common.params.ActionListArgs;
+ import org.apache.slider.common.params.ActionLookupArgs;
++import org.apache.slider.common.params.ActionOperateArgs;
+ import org.apache.slider.common.params.ActionPackageArgs;
+ import org.apache.slider.common.params.ActionRegistryArgs;
+ import org.apache.slider.common.params.ActionResolveArgs;
+ import org.apache.slider.common.params.ActionStatusArgs;
+ import org.apache.slider.common.params.ActionThawArgs;
+ import org.apache.slider.common.params.ActionUpgradeArgs;
+-import org.apache.slider.common.params.ActionUploadArgs;
+ import org.apache.slider.common.params.Arguments;
+ import org.apache.slider.common.params.ClientArgs;
+ import org.apache.slider.common.params.CommonArgs;
+@@ -208,7 +206,6 @@
+ import static org.apache.slider.common.params.SliderActions.ACTION_BUILD;
+ import static org.apache.slider.common.params.SliderActions.ACTION_CLIENT;
+ import static org.apache.slider.common.params.SliderActions.ACTION_CREATE;
+-import static org.apache.slider.common.params.SliderActions.ACTION_DELETE;
+ import static org.apache.slider.common.params.SliderActions.ACTION_DESTROY;
+ import static org.apache.slider.common.params.SliderActions.ACTION_DIAGNOSTICS;
+ import static org.apache.slider.common.params.SliderActions.ACTION_EXISTS;
+@@ -221,6 +218,7 @@
+ import static org.apache.slider.common.params.SliderActions.ACTION_KILL_CONTAINER;
+ import static org.apache.slider.common.params.SliderActions.ACTION_LIST;
+ import static org.apache.slider.common.params.SliderActions.ACTION_LOOKUP;
++import static org.apache.slider.common.params.SliderActions.ACTION_OPERATE;
+ import static org.apache.slider.common.params.SliderActions.ACTION_PACKAGE;
+ import static org.apache.slider.common.params.SliderActions.ACTION_REGISTRY;
+ import static org.apache.slider.common.params.SliderActions.ACTION_RESOLVE;
+@@ -228,7 +226,6 @@
+ import static org.apache.slider.common.params.SliderActions.ACTION_THAW;
+ import static org.apache.slider.common.params.SliderActions.ACTION_UPDATE;
+ import static org.apache.slider.common.params.SliderActions.ACTION_UPGRADE;
+-import static org.apache.slider.common.params.SliderActions.ACTION_UPLOAD;
+ import static org.apache.slider.common.params.SliderActions.ACTION_VERSION;
+ 
+ /**
+@@ -347,11 +344,12 @@
+       try {
+         username = yarnClient.getBdocUser();
+         sliderFileSystem.setBdocUser(username);
++        yarnAppListClient = new YarnAppListClient(yarnClient, getUsername(), getConfig());
+       } catch (YarnException e) {
+         // do nothing
+       }
+     }
+-    yarnAppListClient = new YarnAppListClient(yarnClient, getUsername(), getConfig());
++    //yarnAppListClient = new YarnAppListClient(yarnClient, getUsername(), getConfig());
+   }
+   /**
+    * this is where the work is done.
+@@ -567,13 +565,10 @@
+         exitCode = actionUpgrade(clusterName, serviceArgs.getActionUpgradeArgs());
+         break;
+ 
+-      case ACTION_UPLOAD:
+-        exitCode = actionUpload(clusterName,serviceArgs.getActionUploadArgs());
++      case ACTION_OPERATE:
++        exitCode = actionOperate(clusterName,serviceArgs.getActionOperateArgs());
+         break;
+ 
+-      case ACTION_DELETE:
+-        exitCode = actionDelete(clusterName,serviceArgs.getActionDeleteArgs());
+-        break;
+       case ACTION_VERSION:
+         exitCode = actionVersion();
+         break;
+@@ -843,156 +838,47 @@
+     return actionUpgradeContainers(clustername, upgradeArgs);
+   }
+ 
+-  /**
+-   * Used to delete file from container install dir
+-   *
+-   * @param clustername
+-   * @param deleteArgs
+-   * @author fys
+-   * */
+-  public int actionDelete(String clustername,ActionDeleteArgs deleteArgs)
+-      throws YarnException,IOException{
+-    log.info("execute action delete , remove file from cluster");
+ 
+-    verifyBindingsDefined();
+-    SliderUtils.validateClusterName(clustername);
+-
+-    String text = "deleteFile from containers";
+-
+-    // not an error to try to delete file from a stopped cluster,just return success
+-    // code, appropriate long messages has already been dumped
+-    if(!isAppInRunningState(clustername)){
+-      return EXIT_SUCCESS;
+-    }
+-
+-    String removeFile = deleteArgs.removeFile;
+-    //For remove spec, --input need to be specified
+-    if( removeFile == null){
+-      throw new BadCommandArgumentsException(
+-          "Option %s must be specified",
+-          Arguments.ARG_INPUT
+-      );
+-    }
+-
+-    //Create sets of containers and components to get rid of duplicates and
+-    //for quick lookup during checks below
+-    Set<String> containers = new HashSet<>();
+-    if(deleteArgs.containers != null){
+-      containers.addAll(new ArrayList<String>(deleteArgs.containers));
+-    }
+-    Set<String> components = new HashSet<>();
+-    if(deleteArgs.components != null){
+-      components.addAll(new ArrayList<String>(deleteArgs.components));
+-    }
+-
+-    //check validity of component name and running containers here
+-    List<ContainerInformation>  liveContainers = getContainers(clustername);
+-
+-    Set<String> validContainers = new HashSet<>();
+-    Set<String> validComponents = new HashSet<>();
+-
+-    for(ContainerInformation liveContainer: liveContainers){
+-      boolean allContainersAndComponentsAccountdFor = true;
+-
+-      if(CollectionUtils.isNotEmpty(containers)){
+-        if(containers.contains(liveContainer.containerId)){
+-          containers.remove(liveContainer.containerId);
+-          validContainers.add(liveContainer.containerId);
+-        }
+-        allContainersAndComponentsAccountdFor = false;
+-      }
+-
+-      if(CollectionUtils.isNotEmpty(components)){
+-        if(components.contains(liveContainer.component)){
+-          components.remove(liveContainer.component);
+-          validComponents.add(liveContainer.component);
+-        }
+-        allContainersAndComponentsAccountdFor = false;
+-      }
+-
+-      if(allContainersAndComponentsAccountdFor){
+-        break;
+-      }
+-    }
+-
+-    //if any item remains in containers or components then they are invalid
+-    //Log warning for then and proceed
+-    if(CollectionUtils.isNotEmpty(containers)){
+-      log.warn("Invalid set of containers provided {}",containers);
+-    }
+-    if(CollectionUtils.isNotEmpty(components)){
+-      log.warn("Invalid set of components provided {}",components);
+-    }
+-
+-    //If not a single valid container or component is specified do not proceed
+-    if(CollectionUtils.isEmpty(validContainers)
+-        && CollectionUtils.isEmpty(validComponents)){
+-      log.error("Not a single valid container or component specified. Nothing to do.");
+-      return EXIT_NOT_FOUND;
+-    }
+-
+-
+-    SliderClusterProtocol appMaster = connect(findInstance(clustername));
+-    Messages.DeleteFileRequestProto request =
+-        Messages.DeleteFileRequestProto
+-            .newBuilder()
+-            .setMessage(text)
+-            .addAllContainer(validContainers)
+-            .addAllComponent(validComponents)
+-            .setRemovefile(removeFile)
+-            .build();
+-    Messages.DeleteFileResponseProto testproto = appMaster.deleteFile(request);
+-
+-    if(CollectionUtils.isNotEmpty(validContainers)){
+-      log.info("Containers (total {}):{}",validContainers.size(),
+-          validContainers);
+-    }
+-    if(CollectionUtils.isNotEmpty(validComponents)){
+-      log.info("Components (total {}):{}",validComponents.size(),
+-          validComponents);
+-    }
+-
+-    return EXIT_SUCCESS;
+-  }
+   /**
+-   * Used to upload file from hdfs to container install dir
++   * Used to operate some command to containers
+    *
+    * @param clustername
+-   * @param uploadArgs
++   * @param operateArgs
+    * @author fys
+    */
+-  public int actionUpload(String clustername,
+-                          ActionUploadArgs uploadArgs)
++  @Override
++  public int actionOperate(String clustername,
++                          ActionOperateArgs operateArgs)
+       throws YarnException,IOException{
+-    System.out.println("execute action upload, file to clusterName");
+ 
+     verifyBindingsDefined();
+     SliderUtils.validateClusterName(clustername);
+ 
+-    String text = "UploadFile to containers";
++    String text = "Operate some commands to containers";
+     //not an error to try to upload file to a stopped cluster ,just return success
+     // code,appropriate long messages has already been dumped
+     if(!isAppInRunningState(clustername)){
+       return EXIT_SUCCESS;
+     }
+ 
+-    String inputfile = uploadArgs.inputFile;
+-    //For upload spec, --input need to be specified
+-    if(inputfile == null){
++    String cmdName = operateArgs.cmdName;
++    List<String> cmdParams = operateArgs.definitions;
++
++    if(cmdName == null){
+       throw new BadCommandArgumentsException(
+           "Option %s must be specified",
+-          Arguments.ARG_INPUT
++          Arguments.ARG_CMD
+       );
+     }
+     //Create sets of containers and components to get rid of duplicates and
+     //for quick lookup during checks below
+     Set<String> containers = new HashSet<>();
+-    if( uploadArgs.containers != null ){
+-      containers.addAll(new ArrayList<String>(uploadArgs.containers));
++    if( operateArgs.containers != null ){
++      containers.addAll(new ArrayList<String>(operateArgs.containers));
+     }
+     Set<String> components = new HashSet<>();
+-    if( uploadArgs.components != null ){
+-      components.addAll(new ArrayList<String>(uploadArgs.components));
++    if( operateArgs.components != null ){
++      components.addAll(new ArrayList<String>(operateArgs.components));
+     }
+     //check validity of component names and running containers here
+     List<ContainerInformation> liveContainers = getContainers(clustername);
+@@ -1041,16 +927,18 @@
+     }
+ 
+     SliderClusterProtocol appMaster = connect(findInstance(clustername));
+-    Messages.UploadFileRequestProto request =
+-        Messages.UploadFileRequestProto
++    Messages.OperateContainersRequestProto request =
++        Messages.OperateContainersRequestProto
+             .newBuilder()
+             .setMessage(text)
+             .addAllContainer(validContainers)
+             .addAllComponent(validComponents)
+-            .setInputfile(inputfile)
++            .setCmdName(cmdName)
++            .addAllParameter(cmdParams)
+             .build();
+-    appMaster.uploadFile(request);
+-    log.info("Cluster upload issued for -");
++    appMaster.operateContainers(request);
++
++    log.info("Cluster operate issued for -");
+     if(CollectionUtils.isNotEmpty(validContainers)){
+       log.info("Containers (total {}):{}",validContainers.size(),
+           validContainers);
+Index: slider-core/src/main/java/org/apache/slider/client/SliderClientAPI.java

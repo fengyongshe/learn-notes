@@ -1,0 +1,63 @@
+Index: slider-core/src/main/java/org/apache/slider/providers/agent/State.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/providers/agent/State.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/providers/agent/State.java	(working copy)
+@@ -57,11 +57,12 @@
+    * @return command allowed in this state.
+    */
+   public Command getSupportedCommand() {
+-    return getSupportedCommand(false,false,false);
++    return getSupportedCommand(false,false,null);
+   }
+ 
+-  public Command getSupportedCommand(boolean isInUpgradeMode,boolean hasUploadingFileCmd,
+-                                     boolean hasDeletingFileCmd) {
++  public Command getSupportedCommand(boolean isInUpgradeMode,
++                                     boolean doOperate,
++                                     String cmdName) {
+     switch (this) {
+       case INIT:
+       case INSTALL_FAILED:
+@@ -71,11 +72,10 @@
+       case STARTED:
+         if(isInUpgradeMode){
+           return Command.UPGRADE;
+-        }else if(hasUploadingFileCmd){
+-          return Command.UPLOADFILE;
+-        }else if(hasDeletingFileCmd){
+-          return Command.DELETEFILE;
+-        }else{
++        }else if(doOperate){
++          return Command.getCommand(cmdName);
++        }
++        else{
+           return Command.NOP;
+         }
+         //return isInUpgradeMode ? Command.UPGRADE : Command.NOP;
+@@ -186,11 +186,13 @@
+           throw new IllegalArgumentException(command + " is not valid for " + this);
+         }
+       case NOP:
+-      case UPLOADFILE:
+-      case DELETEFILE:
+         return this;
+       default:
+-        throw new IllegalArgumentException("Bad command " + command);
++        if(Command.getCommand(command.name()) != Command.NOP){
++          return this;
++        }else {
++          throw new IllegalArgumentException("Bad command " + command);
++        }
+     }
+   }
+ 
+@@ -201,8 +203,8 @@
+         || (this == State.STOPPING 
+            && (command == Command.STOP || command == Command.NOP))
+         || (this == State.TERMINATING && command == Command.TERMINATE)
++        || (this == State.STARTED && command == Command.DELETEFILE)
+         || (this == State.STARTED && command == Command.UPLOADFILE)
+-        || (this == State.STARTED && command == Command.DELETEFILE)
+        ) {
+       return true;
+     }

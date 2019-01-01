@@ -1,0 +1,129 @@
+Index: slider-core/src/main/java/org/apache/slider/server/appmaster/SliderAppMaster.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/server/appmaster/SliderAppMaster.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/server/appmaster/SliderAppMaster.java	(working copy)
+@@ -116,9 +116,8 @@
+ import org.apache.slider.providers.agent.AgentProviderService;
+ import org.apache.slider.providers.slideram.SliderAMClientProvider;
+ import org.apache.slider.providers.slideram.SliderAMProviderService;
+-import org.apache.slider.server.appmaster.actions.ActionDeleteFile;
++import org.apache.slider.server.appmaster.actions.ActionOperateContainers;
+ import org.apache.slider.server.appmaster.actions.ActionRegisterServiceInstance;
+-import org.apache.slider.server.appmaster.actions.ActionUploadFile;
+ import org.apache.slider.server.appmaster.actions.EscalateOutstandingRequests;
+ import org.apache.slider.server.appmaster.actions.RegisterComponentInstance;
+ import org.apache.slider.server.appmaster.actions.QueueExecutor;
+@@ -1629,75 +1628,30 @@
+   }
+ 
+   /**
+-   * Signal that containers are deleting the file. Containers specified with
+-   * --containers option and all containers of all roles specifiled with
+-   * --components option are merged and upgraded
+-   * @param deleteFileRequest
+-   *          request containing delete file details
+-   * */
+-   public synchronized  void onDeleteFile(ActionDeleteFile deleteFileRequest){
+-
+-     LOG_YARN.info(" onDeleteFile({})",
+-         deleteFileRequest.getMessage());
+-
+-     String removeFile = deleteFileRequest.getRemoveFile();
+-
+-     Set<String> containers = deleteFileRequest.getContainers() == null ? new HashSet<String>()
+-         :deleteFileRequest.getContainers();
+-     LOG_YARN.info(" Container list provided (total {}): {}",containers.size(),containers);
+-
+-     Set<String> components = deleteFileRequest.getComponents() == null ? new HashSet<String>()
+-         :deleteFileRequest.getComponents();
+-     LOG_YARN.info(" Component list provided (total {}): {}",components.size(),components);
+-
+-     // If components are specified as well,the grab all the containers of
+-     // each of the components (roles)
+-     if(CollectionUtils.isNotEmpty(components)){
+-       Map<ContainerId,RoleInstance>  liveContainers = appState.getLiveNodes();
+-       if(CollectionUtils.isNotEmpty(liveContainers.keySet())){
+-         Map<String,Set<String> > roleContaineMap = prepareRoleContainerMap(liveContainers);
+-         for(String component: components){
+-           Set<String> roleContainers = roleContaineMap.get(component);
+-           if(roleContainers != null){
+-             containers.addAll(roleContainers);
+-           }
+-         }
+-       }
+-     }
+-
+-     LOG_YARN.info(" Final list of containers to be delete file (total {}) :{}",
+-         containers.size(),containers);
+-
+-     if(providerService instanceof  AgentProviderService){
+-       AgentProviderService agentProviderService = (AgentProviderService) providerService;
+-       agentProviderService.setHasDeletingFileCmd(true);
+-       agentProviderService.addDeletingFileContainers(containers);
+-       agentProviderService.addFileDeletedForContainers(removeFile,containers);
+-     }
+-
+-   }
+-
+-   /**
+-   * Signal that containers are uploading the file. Containers specified with
++   * Signal that containers are  operating some command. Containers specified with
+    * --containers option and all containers of all roles specifed with
+-   * --components option are merged and uploadfile
+-   * @param uploadFileRequest
+-   *          request containing uploadfile details
++   * --components option are merged and operateing
++   * @param operateContainersRequest
++   *          request containing cmd and config details
+    * */
+-  public synchronized  void onUploadFile(ActionUploadFile uploadFileRequest){
+-    LOG_YARN.info(" onUploadFiles({})",
+-        uploadFileRequest.getMessage());
++  public synchronized  void onOperateContainers(ActionOperateContainers operateContainersRequest){
++    LOG_YARN.info(" operate command ({})",
++        operateContainersRequest.getMessage());
+ 
+-    String uploadFile = uploadFileRequest.getInputFile();
++    String cmdName = operateContainersRequest.getCmdName();
+ 
+-    Set<String> containers = uploadFileRequest.getContainers() == null ? new HashSet<String>()
+-        :uploadFileRequest.getContainers();
++    Set<String> containers = operateContainersRequest.getContainers() == null ? new HashSet<String>()
++        :operateContainersRequest.getContainers();
+     LOG_YARN.info(" Container list provided (total {}) : {}",containers.size(),containers);
+ 
+-    Set<String> components = uploadFileRequest.getComponents() == null ? new HashSet<String>()
+-        :uploadFileRequest.getComponents();
+-    LOG_YARN.info(" Component list provied (total {}) : {}", components.size(),components);
++    Set<String> components = operateContainersRequest.getComponents() == null ? new HashSet<String>()
++        :operateContainersRequest.getComponents();
++    LOG_YARN.info(" Component list provided (total {}) : {}", components.size(),components);
+ 
++    Set<String> parameters = operateContainersRequest.getParameters() == null ? new HashSet<String>()
++        :operateContainersRequest.getParameters();
++    LOG_YARN.info(" Paramater list provided (total {}) : {}", parameters.size(),parameters);
++
+     // If components are specified as well,the grab all the containers of
+     // each of the components (roles)
+     if(CollectionUtils.isNotEmpty(components)){
+@@ -1713,14 +1667,15 @@
+       }
+     }
+ 
+-    LOG_YARN.info(" Final list of containers to be upload file (total {}) :{}",
++    LOG_YARN.info(" Final list of containers to operate command (tcdotal {}) :{}",
+         containers.size(),containers);
+ 
+-    if(providerService instanceof  AgentProviderService){
++    if( providerService instanceof AgentProviderService){
+       AgentProviderService agentProviderService = (AgentProviderService)providerService;
+-      agentProviderService.setHasUploadingFileCmd(true);
+-      agentProviderService.addUploadingFileContainers(containers);
+-      agentProviderService.addFileForContainers(uploadFile,containers);
++      agentProviderService.setHasOperate(true);
++      agentProviderService.addNeedOperateContainters(containers);
++      agentProviderService.addCmdForContainers(cmdName,containers);
++      agentProviderService.addParametersForContainers(parameters,containers);
+     }
+ 
+   }

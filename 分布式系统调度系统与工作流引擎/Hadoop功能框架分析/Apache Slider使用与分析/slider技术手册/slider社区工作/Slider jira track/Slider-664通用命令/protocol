@@ -1,0 +1,243 @@
+Index: slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderClusterProtocolPBImpl.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderClusterProtocolPBImpl.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderClusterProtocolPBImpl.java	(working copy)
+@@ -72,28 +72,17 @@
+   }
+ 
+   @Override
+-  public Messages.UploadFileResponseProto uploadFile(RpcController controller,
+-                                                 Messages.UploadFileRequestProto request) throws
++  public Messages.OperateContainersResponseProto operateContainers(RpcController controller,
++                                                 Messages.OperateContainersRequestProto request) throws
+                                                                                    ServiceException {
+     try{
+-      return real.uploadFile(request);
++      return real.operateContainers(request);
+     }catch(Exception e){
+       throw wrap(e);
+     }
+   }
+ 
+   @Override
+-  public Messages.DeleteFileResponseProto deleteFile(RpcController controller,
+-                                                 Messages.DeleteFileRequestProto request) throws
+-                                                                             ServiceException{
+-    try {
+-      return real.deleteFile(request);
+-    }catch(Exception e){
+-      throw wrap(e);
+-    }
+-  }
+-
+-  @Override
+   public Messages.FlexClusterResponseProto flexCluster(RpcController controller,
+                                                        Messages.FlexClusterRequestProto request) throws
+                                                                                                  ServiceException {
+Index: slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderClusterProtocolProxy.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderClusterProtocolProxy.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderClusterProtocolProxy.java	(working copy)
+@@ -111,26 +111,17 @@
+   }
+ 
+   @Override
+-  public Messages.UploadFileResponseProto uploadFile(Messages.UploadFileRequestProto request)
+-              throws IOException, YarnException {
++  public Messages.OperateContainersResponseProto operateContainers(
++                            Messages.OperateContainersRequestProto request)
++                                  throws IOException, YarnException {
+     try{
+-      return endpoint.uploadFile(NULL_CONTROLLER,request);
++      return endpoint.operateContainers(NULL_CONTROLLER,request);
+     }catch(ServiceException e){
+       throw convert(e);
+     }
+   }
+ 
+   @Override
+-  public Messages.DeleteFileResponseProto deleteFile(Messages.DeleteFileRequestProto request)
+-              throws IOException, YarnException {
+-    try{
+-      return endpoint.deleteFile(NULL_CONTROLLER,request);
+-    }catch(ServiceException e){
+-      throw convert(e);
+-    }
+-  }
+-
+-  @Override
+   public Messages.FlexClusterResponseProto flexCluster(Messages.FlexClusterRequestProto request)
+       throws IOException {
+     try {
+Index: slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderIPCService.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderIPCService.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderIPCService.java	(working copy)
+@@ -32,20 +32,18 @@
+ import org.apache.slider.api.types.ContainerInformation;
+ import org.apache.slider.core.conf.AggregateConf;
+ import org.apache.slider.core.conf.ConfTree;
+-import org.apache.slider.core.exceptions.NoSuchNodeException;
+ import org.apache.slider.core.exceptions.ServiceNotReadyException;
+ import org.apache.slider.core.exceptions.SliderException;
+ import org.apache.slider.core.main.LauncherExitCodes;
+ import org.apache.slider.core.persist.AggregateConfSerDeser;
+ import org.apache.slider.core.persist.ConfTreeSerDeser;
+ import org.apache.slider.server.appmaster.AppMasterActionOperations;
+-import org.apache.slider.server.appmaster.actions.ActionDeleteFile;
+ import org.apache.slider.server.appmaster.actions.ActionFlexCluster;
+ import org.apache.slider.server.appmaster.actions.ActionHalt;
+ import org.apache.slider.server.appmaster.actions.ActionKillContainer;
++import org.apache.slider.server.appmaster.actions.ActionOperateContainers;
+ import org.apache.slider.server.appmaster.actions.ActionStopSlider;
+ import org.apache.slider.server.appmaster.actions.ActionUpgradeContainers;
+-import org.apache.slider.server.appmaster.actions.ActionUploadFile;
+ import org.apache.slider.server.appmaster.actions.AsyncAction;
+ import org.apache.slider.server.appmaster.actions.QueueAccess;
+ import org.apache.slider.server.appmaster.management.MetricsAndMonitoring;
+@@ -53,7 +51,6 @@
+ import org.apache.slider.server.appmaster.state.StateAccessForProviders;
+ import org.apache.slider.server.appmaster.web.rest.application.resources.ContentCache;
+ import org.apache.slider.server.services.security.CertificateManager;
+-import org.apache.slider.server.services.security.KeystoreGenerator;
+ import org.apache.slider.server.services.security.SecurityStore;
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
+@@ -215,51 +212,33 @@
+   }
+ 
+   @Override
+-  public Messages.UploadFileResponseProto uploadFile(Messages.UploadFileRequestProto request)
++  public Messages.OperateContainersResponseProto operateContainers(Messages.OperateContainersRequestProto request)
+       throws IOException, YarnException {
+-    onRpcCall("uploadFile");
+-    String message = request.getMessage();
+-    if( null == message){
+-      message = " application containers upgraded by client";
+-    }
+-    String inputFile = request.getInputfile();
+-    ActionUploadFile uploadFile =
+-        new ActionUploadFile(
+-            "Upload Files",
+-            inputFile,
+-            request.getContainerList(),
+-            request.getComponentList(),
+-            message
+-        );
+-    log.info("SliderAppMasterApi.uploadFile:{}",uploadFile);
++    onRpcCall("operateContainers");
++    log.info("Operate Containers");
+ 
+-    schedule(uploadFile);
+-    return Messages.UploadFileResponseProto.getDefaultInstance();
+-  }
+-
+-  @Override
+-  public Messages.DeleteFileResponseProto deleteFile(Messages.DeleteFileRequestProto request)
+-      throws IOException, YarnException {
+-    onRpcCall("deleteFile");
+     String message = request.getMessage();
+     if( null == message){
+       message = " application containers delete file by client";
+     }
+-    String removeFile = request.getRemovefile();
+-
+-    ActionDeleteFile deleteFile =
+-        new ActionDeleteFile(
+-            "Upload Files",
+-            removeFile,
++    String cmdName = request.getCmdName();
++    log.info("cmdName:"+cmdName);
++    log.info(message);
++    ActionOperateContainers operateContainers =
++        new ActionOperateContainers(
++            "Operate containers",
++            cmdName,
+             request.getContainerList(),
+             request.getComponentList(),
+-            message
+-        );
+-    log.info("SliderAppMasterApi.deleteFile:{}",deleteFile);
+-    schedule(deleteFile);
+-    return Messages.DeleteFileResponseProto.getDefaultInstance();
++            request.getParameterList(),
++            message);
++    log.info("SliderAppMasterApi.operateContainers:{}",operateContainers);
++    schedule(operateContainers);
++
++    return Messages.OperateContainersResponseProto.getDefaultInstance();
+   }
+ 
++
+   @Override //SliderClusterProtocol
+   public Messages.FlexClusterResponseProto flexCluster(Messages.FlexClusterRequestProto request)
+       throws IOException {
+Index: slider-core/src/main/proto/SliderClusterMessages.proto
+===================================================================
+--- slider-core/src/main/proto/SliderClusterMessages.proto	(revision 93663)
++++ slider-core/src/main/proto/SliderClusterMessages.proto	(working copy)
+@@ -79,38 +79,22 @@
+ /**
+  * upload file to containers
+ */
+-message UploadFileRequestProto{
++message OperateContainersRequestProto{
+ 
+   required string message = 1;
+   repeated string container = 2;
+   repeated string component = 3;
+-  required string inputfile = 4;
++  required string cmdName = 4;
++  repeated string parameter = 5;
+ }
+ 
+ /**
+   upload file to containers
+ */
+-message UploadFileResponseProto{
++message OperateContainersResponseProto{
+ }
+ 
+ /**
+-* delete file from containers
+-*/
+-message DeleteFileRequestProto{
+-  required string message = 1;
+-  repeated string container = 2;
+-  repeated string component = 3;
+-  required string removefile = 4;
+-}
+-
+-/**
+-  delete file from containers
+-*/
+-message DeleteFileResponseProto{
+-
+-}
+-
+-/**
+  * flex the cluster
+  */
+ message FlexClusterRequestProto {
+Index: slider-core/src/main/proto/SliderClusterProtocol.proto
+===================================================================
+--- slider-core/src/main/proto/SliderClusterProtocol.proto	(revision 93663)
++++ slider-core/src/main/proto/SliderClusterProtocol.proto	(working copy)
+@@ -64,16 +64,10 @@
+   /**
+    * Upload file
+    */
+-  rpc uploadFile(UploadFileRequestProto)
+-    returns(UploadFileResponseProto);
++  rpc operateContainers(OperateContainersRequestProto)
++    returns(OperateContainersResponseProto);
+ 
+   /**
+-   * Delete file
+-  */
+-  rpc deleteFile(DeleteFileRequestProto)
+-    returns(DeleteFileResponseProto);
+-
+-  /**
+    * Flex the cluster. 
+    */

@@ -1,0 +1,238 @@
+Index: slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java	(working copy)
+@@ -175,17 +175,12 @@
+   private boolean isInUpgradeMode;
+   private Set<String> upgradeContainers = new HashSet<String>();
+ 
+-  // used for execute upload cmd
+-  private boolean hasUploadingFileCmd;
+-  private Set<String> uploadingFileContainers = new HashSet<String>();
+-  private Map<String,String> fileForContainers = new HashMap<String,String>();
++  // used for execute operate cmd
++  private boolean hasOperate;
++  private Set<String> needOperateContainers = new HashSet<String>();
++  private Map<String,String> cmdForContainers = new HashMap<String,String>();
++  private Map<String,Set<String>> parametersForContainers = new HashMap<String,Set<String>>();
+ 
+-  // used for execute delete cmd
+-  private boolean hasDeletingFileCmd;
+-  private Set<String> deletingFileContainers = new HashSet<String>();
+-  private Map<String,String> fileDeletedForContainers = new HashMap<String,String>();
+-
+-
+   private final Map<String, ComponentInstanceState> componentStatuses =
+       new ConcurrentHashMap<String, ComponentInstanceState>();
+   private final Map<String, Map<String, String>> componentInstanceData =
+@@ -829,7 +824,7 @@
+     String pkg = heartBeat.getPkg();
+ 
+     log.debug("package received: " + pkg);
+-    
++
+     String roleName = getRoleName(label);
+     String containerId = getContainerId(label);
+ 
+@@ -840,24 +835,17 @@
+       doUpgrade = true;
+     }
+ 
+-    boolean doUploadFile = false;
+-    if(hasUploadingFileCmd && uploadingFileContainers.contains(containerId)){
+-      doUploadFile  = true;
+-      uploadingFileContainers.remove(containerId);
+-      if(CollectionUtils.isEmpty(uploadingFileContainers)){
+-        hasUploadingFileCmd = false;
++    boolean doOperate = false;
++    String commandName = null;
++    if( hasOperate && needOperateContainers.contains(containerId)){
++      doOperate = true;
++      commandName = cmdForContainers.get(containerId);
++      needOperateContainers.remove(containerId);
++      if( CollectionUtils.isEmpty(needOperateContainers)){
++        hasOperate = false;
+       }
+     }
+ 
+-    boolean doDeleteFile = false;
+-    if(hasDeletingFileCmd && deletingFileContainers.contains(containerId)){
+-      doDeleteFile = true;
+-      deletingFileContainers.remove(containerId);
+-      if(CollectionUtils.isEmpty(deletingFileContainers)){
+-        hasDeletingFileCmd = false;
+-      }
+-    }
+-
+     StateAccessForProviders accessor = getAmState();
+     CommandScript cmdScript = getScriptPathForMasterPackage(roleName);
+     List<ComponentCommand> commands = getMetaInfo().getApplicationComponent(roleName).getCommands();
+@@ -942,7 +930,7 @@
+       return response;
+     }
+ 
+-    Command command = componentStatus.getNextCommand(doUpgrade,doUploadFile,doDeleteFile);
++    Command command = componentStatus.getNextCommand(doUpgrade,doOperate,commandName);
+     try {
+       if (Command.NOP != command) {
+         log.debug("For comp {} pkg {} issuing {}", roleName,
+@@ -1033,14 +1021,8 @@
+         } else if (command == Command.UPGRADE) {
+           addUpgradeCommand(roleName, containerId, response, scriptPath,
+               timeout);
+-          componentStatus.commandIssued(command, true,false,false);
+-        }else if(command == Command.UPLOADFILE){
+-          addUploadFileCommand(roleName, containerId, response, scriptPath);
+-          componentStatus.commandIssued(command, false, true,false);
+-        }else if(command == Command.DELETEFILE){
+-          addDeleteFileCommand(roleName,containerId,response,scriptPath);
+-          componentStatus.commandIssued(command,false,false,true);
+-        }else if (command == Command.STOP) {
++          componentStatus.commandIssued(command, true,false,null);
++        } else if (command == Command.STOP) {
+           addStopCommand(roleName, containerId, response, scriptPath, timeout,
+               doUpgrade);
+           componentStatus.commandIssued(command);
+@@ -1048,6 +1030,10 @@
+           log.info("A formal terminate command is being sent to container {}"
+               + " in state {}", label, componentStatus.getState());
+           response.setTerminateAgent(true);
++        } else {
++          log.info(" A Operate command is being sent to container {}",containerId);
++          addOperateCommand(roleName,containerId,response,scriptPath);
++          componentStatus.commandIssued(command,false,true,commandName);
+         }
+       }
+ 
+@@ -1316,30 +1302,24 @@
+     this.upgradeContainers.addAll(upgradeContainers);
+   }
+ 
+-  public void setHasUploadingFileCmd(boolean hasExecutingCmd) { this.hasUploadingFileCmd = hasExecutingCmd;}
++  /**
++   * set flag and containers for operate
++  * */
++  public void setHasOperate(boolean hasOperate) { this.hasOperate = hasOperate;}
+ 
+-  public void addUploadingFileContainers(Set<String> uploadFileContainers){
+-    this.uploadingFileContainers.addAll(uploadFileContainers);
++  public void addNeedOperateContainters( Set<String> needOperateContainers){
++    this.needOperateContainers.addAll(needOperateContainers);
+   }
+ 
+-  public void addFileForContainers(String file,Set<String> uploadingFileContainers){
+-    for(String containerId:uploadingFileContainers){
+-      fileForContainers.put(containerId,file);
++  public void addCmdForContainers(String cmdName,Set<String> needOperateContainers){
++    for(String containerId:needOperateContainers){
++      cmdForContainers.put(containerId,cmdName);
+     }
+   }
+ 
+-  /**
+-   * Set flag and containers for delete file from them
+-   * */
+-  public void setHasDeletingFileCmd(boolean hasDeletingFileCmd){ this.hasDeletingFileCmd = hasDeletingFileCmd;}
+-
+-  public void addDeletingFileContainers(Set<String> deletingFileContainers){
+-    this.deletingFileContainers.addAll(deletingFileContainers);
+-  }
+-
+-  public void addFileDeletedForContainers(String file,Set<String> deletingFileContainers){
+-    for(String containerId: deletingFileContainers){
+-      fileDeletedForContainers.put(containerId,file);
++  public void addParametersForContainers(Set<String> parameters,Set<String> needOperateContainers){
++    for(String containerId:needOperateContainers){
++      parametersForContainers.put(containerId,parameters);
+     }
+   }
+ 
+@@ -2592,69 +2572,45 @@
+   }
+ 
+   /**
+-   * Add command for delete File
+-   * @authro fys
++   * Add Command for operate containers
++   * @author fys
+    * */
+   @VisibleForTesting
+-  protected void addDeleteFileCommand(String componentName,String containerId,
+-        HeartBeatResponse response,String scriptPath)
+-                    throws SliderException{
++  protected void addOperateCommand(String componentName,String containerId,
++                                   HeartBeatResponse response,String scriptPath)
++      throws SliderException{
+     assert getAmState().isApplicationLive();
+     ConfTreeOperations appConf = getAmState().getAppConfSnapshot();
+-    String deleteFile = fileDeletedForContainers.get(containerId);
+-    if(null != deleteFile){
+-      appConf.set(OptionKeys.DELETE_FILE,deleteFile);
+-    }
+-    ConfTreeOperations internalsConf = getAmState().getInternalsSnapshot();
+ 
+-    ExecutionCommand cmd = new ExecutionCommand(
+-        AgentCommandType.EXECUTION_COMMAND);
+-    prepareExecutionCommand(cmd);
+-    String clusterName = internalsConf.get(OptionKeys.APPLICATION_NAME);
+-    String hostName = getClusterInfoPropertyValue(StatusKeys.INFO_AM_HOSTNAME);
+-    cmd.setHostname(hostName);
+-    cmd.setClusterName(clusterName);
+-    cmd.setRoleCommand(Command.DELETEFILE.toString());
+-    cmd.setServiceName(clusterName);
+-    cmd.setComponentName(componentName);
+-    cmd.setRole(componentName);
++    String commandName = cmdForContainers.get(containerId);
++    Set<String> parameters = parametersForContainers.get(containerId);
++    cmdForContainers.remove(containerId);
++    parametersForContainers.remove(containerId);
+ 
+-    cmd.setCommandParams(commandParametersSet(scriptPath,1000,true));
+-    Map<String,Map<String,String>> configurations = buildCommandConfigurations(
+-        appConf,containerId,componentName);
+-    cmd.setConfigurations(configurations);
+-    response.addExecutionCommand(cmd);
+-  }
+-
+-   /**
+-   * Add Command For upload File
+-   * @author  fys
+-   * */
+-  @VisibleForTesting
+-  protected void addUploadFileCommand(String componentName,String containerId,
+-        HeartBeatResponse response,String scriptPath)
+-                    throws SliderException{
+-    assert getAmState().isApplicationLive();
+-    ConfTreeOperations appConf = getAmState().getAppConfSnapshot();
+-    String uploadFile = fileForContainers.get(containerId);
+-    if(null != uploadFile){
+-        appConf.set(OptionKeys.HDFS_UPLOAD_FILE,uploadFile);
++    for (String prop : parameters) {
++      String[] keyval = prop.split("=", 2);
++      if (keyval.length == 2) {
++        appConf.set(keyval[0],keyval[1]);
++      }
+     }
++
+     ConfTreeOperations internalsConf = getAmState().getInternalsSnapshot();
+ 
+     ExecutionCommand cmd = new ExecutionCommand(
+         AgentCommandType.EXECUTION_COMMAND);
+     prepareExecutionCommand(cmd);
++
+     String clusterName = internalsConf.get(OptionKeys.APPLICATION_NAME);
+     String hostName = getClusterInfoPropertyValue(StatusKeys.INFO_AM_HOSTNAME);
++
+     cmd.setHostname(hostName);
+     cmd.setClusterName(clusterName);
+-    cmd.setRoleCommand(Command.UPLOADFILE.toString());
++    cmd.setRoleCommand(Command.getCommand(commandName).toString());
+     cmd.setServiceName(clusterName);
+     cmd.setComponentName(componentName);
+     cmd.setRole(componentName);
+-
+     cmd.setCommandParams(commandParametersSet(scriptPath,1000,true));
++
+     Map<String,Map<String,String>> configurations = buildCommandConfigurations(
+         appConf,containerId,componentName);
+     cmd.setConfigurations(configurations);

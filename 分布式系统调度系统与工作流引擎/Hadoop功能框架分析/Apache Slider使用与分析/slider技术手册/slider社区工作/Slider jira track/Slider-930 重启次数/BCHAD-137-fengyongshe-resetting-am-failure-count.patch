@@ -1,0 +1,350 @@
+Index: slider-core/src/test/java/org/apache/slider/core/launch/TestAppMasterLauncherWithAmReset.java
+===================================================================
+--- slider-core/src/test/java/org/apache/slider/core/launch/TestAppMasterLauncherWithAmReset.java	(revision 0)
++++ slider-core/src/test/java/org/apache/slider/core/launch/TestAppMasterLauncherWithAmReset.java	(revision 0)
+@@ -0,0 +1,92 @@
++/**
++ * Licensed to the Apache Software Foundation (ASF) under one
++ * or more contributor license agreements.  See the NOTICE file
++ * distributed with this work for additional information
++ * regarding copyright ownership.  The ASF licenses this file
++ * to you under the Apache License, Version 2.0 (the
++ * "License"); you may not use this file except in compliance
++ * with the License.  You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package org.apache.slider.core.launch;
++
++import java.util.Collections;
++import java.util.HashMap;
++import java.util.Map;
++import java.util.Set;
++
++import org.apache.hadoop.yarn.api.protocolrecords.GetNewApplicationResponse;
++import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
++import org.apache.hadoop.yarn.client.api.YarnClientApplication;
++import org.apache.hadoop.yarn.util.Records;
++import org.apache.slider.api.ResourceKeys;
++import org.apache.slider.client.SliderYarnClientImpl;
++import org.apache.slider.common.SliderKeys;
++import org.easymock.EasyMock;
++import org.junit.Assert;
++import org.junit.Before;
++import org.junit.Test;
++
++public class TestAppMasterLauncherWithAmReset {
++    SliderYarnClientImpl mockYarnClient;
++    YarnClientApplication yarnClientApp;
++    ApplicationSubmissionContext appSubmissionContext;
++    GetNewApplicationResponse newApp;
++    Set<String> tags = Collections.emptySet();
++    AppMasterLauncher appMasterLauncher = null;
++    boolean isOldApi = true;
++
++    @Before
++    public void initialize() throws Exception {
++        mockYarnClient = EasyMock.createNiceMock(SliderYarnClientImpl.class);
++        yarnClientApp = EasyMock.createNiceMock(YarnClientApplication.class);
++        newApp = EasyMock.createNiceMock(GetNewApplicationResponse.class);
++        EasyMock.expect(mockYarnClient.createApplication())
++                .andReturn(new YarnClientApplication(newApp,
++                        Records.newRecord(ApplicationSubmissionContext.class)));
++    }
++
++    @Test
++    public void testExtractYarnResourceManagerAmRetryCountWindowMs() throws
++            Exception {
++        Map<String, String> options = new HashMap<String, String>();
++        final String expectedInterval = Integer.toString (120000);
++        options.put(ResourceKeys.YARN_RESOURCEMANAGER_AM_RETRY_COUNT_WINDOW_MS,
++                expectedInterval);
++        EasyMock.replay(mockYarnClient, yarnClientApp);
++
++        appMasterLauncher = new AppMasterLauncher("am1", SliderKeys.APP_TYPE, null,
++                null, mockYarnClient, false, null, options, tags);
++
++        ApplicationSubmissionContext ctx = appMasterLauncher.application
++                .getApplicationSubmissionContext();
++        String retryIntervalWindow = Long.toString(ctx
++                .getAttemptFailuresValidityInterval());
++        Assert.assertEquals(expectedInterval, retryIntervalWindow);
++    }
++
++    @Test
++    public void testExtractYarnResourceManagerAmRetryCountWindowMsDefaultValue()
++            throws Exception {
++        Map<String, String> options = new HashMap<String, String>();
++        EasyMock.replay(mockYarnClient, yarnClientApp);
++
++        appMasterLauncher = new AppMasterLauncher("am1", SliderKeys.APP_TYPE, null,
++                null, mockYarnClient, false, null, options, tags);
++
++        ApplicationSubmissionContext ctx = appMasterLauncher.application
++                .getApplicationSubmissionContext();
++        long retryIntervalWindow = ctx.getAttemptFailuresValidityInterval();
++        Assert.assertEquals(ResourceKeys.DEFAULT_AM_RETRY_COUNT_WINDOW_MS,
++                retryIntervalWindow);
++    }
++
++}
+\ No newline at end of file
+Index: slider-core/src/test/groovy/org/apache/slider/agent/standalone/TestStandaloneAMRestart.groovy
+===================================================================
+--- slider-core/src/test/groovy/org/apache/slider/agent/standalone/TestStandaloneAMRestart.groovy	(revision 10006)
++++ slider-core/src/test/groovy/org/apache/slider/agent/standalone/TestStandaloneAMRestart.groovy	(working copy)
+@@ -22,8 +22,10 @@
+ import groovy.util.logging.Slf4j
+ import org.apache.hadoop.yarn.api.records.ApplicationReport
+ import org.apache.hadoop.yarn.api.records.FinalApplicationStatus
++import org.apache.hadoop.yarn.api.records.YarnApplicationState
+ import org.apache.hadoop.yarn.conf.YarnConfiguration
+ import org.apache.slider.agent.AgentMiniClusterTestBase
++import org.apache.slider.api.ResourceKeys
+ import org.apache.slider.client.SliderClient
+ import org.apache.slider.common.SliderXmlConfKeys
+ import org.apache.slider.common.params.ActionAMSuicideArgs
+@@ -94,6 +96,123 @@
+     assert 0 == clusterActionFreeze(sliderClient, clustername, "force", true)
+   }
+ 
++  @Test
++  public void testStandaloneAMRestartWithRetryWindow() throws Throwable {
++      describe "kill a Standalone AM and verify that the AM failure count " +
++                "is reset after the AM retry-count-window elapses"
++      // patch the configuration for AM restart
++      YarnConfiguration conf = getRestartableConfiguration(5)
++
++      int restartLimit = 3;
++      int amRetryWindow = 60000;
++      String amRetryWindowStr = amRetryWindow.toString()
++      String clustername = createMiniCluster("", conf, 1, true)
++      ServiceLauncher<SliderClient> launcher =
++              createStandaloneAMWithArgs(clustername,
++                      [
++                              Arguments.ARG_DEFINE,
++                              SliderXmlConfKeys.KEY_AM_RESTART_LIMIT + "=" + restartLimit,
++                              Arguments.ARG_RESOURCE_OPT,
++                              ResourceKeys.YARN_RESOURCEMANAGER_AM_RETRY_COUNT_WINDOW_MS,
++                              amRetryWindowStr
++                      ],
++                      true,
++                      false)
++      SliderClient sliderClient = launcher.service
++      addToTeardown(sliderClient);
++
++      ApplicationReport report = waitForClusterLive(sliderClient)
++      logReport(report)
++      waitUntilClusterLive(sliderClient, 30000)
++
++      def diagnosticArgs = new ActionDiagnosticArgs()
++      diagnosticArgs.client = true
++      diagnosticArgs.yarn = true
++      sliderClient.actionDiagnostic(diagnosticArgs)
++
++      describe "kill AM #1"
++      int iteration = 1;
++      killAMAndWaitForRestart(sliderClient, iteration, clustername)
++
++      describe "kill AM #2"
++      killAMAndWaitForRestart(sliderClient, iteration++, clustername)
++
++      // app should be running here
++      assert 0 == sliderClient.actionExists(clustername, true)
++
++      // make sure the am reset window has elapsed
++      describe "sleeping to ensure reset window elapsed"
++      sleep (amRetryWindow)
++
++      // kill again & expect the app to still be running
++      describe "kill AM #3 after window elapsed"
++      killAMAndWaitForRestart(sliderClient, iteration++, clustername)
++      assert 0 == sliderClient.actionExists(clustername, true)
++
++      report = sliderClient.applicationReport
++      assert report.getYarnApplicationState() == YarnApplicationState.RUNNING
++
++      logReport(report)
++      describe("stopping the cluster")
++      assert 0 == clusterActionFreeze(sliderClient, clustername, "force", true)
++
++      report = sliderClient.applicationReport
++      assert report.finalApplicationStatus == FinalApplicationStatus.KILLED
++  }
++
++
++  @Test
++  public void testStandaloneAMRestartWithDefaultRetryWindow() throws Throwable {
++      describe "kill AM more than the max limit allowed within the AM " +
++              "retry-count-window and expect the app to fail"
++      // patch the configuration for AM restart
++      YarnConfiguration conf = getRestartableConfiguration(5)
++
++      int restartLimit = 3;
++      String clustername = createMiniCluster("", conf, 1, true)
++      ServiceLauncher<SliderClient> launcher =
++              createStandaloneAMWithArgs(clustername,
++                      [
++                              Arguments.ARG_DEFINE,
++                              SliderXmlConfKeys.KEY_AM_RESTART_LIMIT + "=" + restartLimit,
++                      ],
++                      true,
++                      false)
++      SliderClient sliderClient = launcher.service
++      addToTeardown(sliderClient);
++
++      ApplicationReport report = waitForClusterLive(sliderClient)
++      logReport(report)
++      waitUntilClusterLive(sliderClient, 30000)
++
++      def diagnosticArgs = new ActionDiagnosticArgs()
++      diagnosticArgs.client = true
++      diagnosticArgs.yarn = true
++      sliderClient.actionDiagnostic(diagnosticArgs)
++
++      describe "kill AM #1"
++      int iteration = 1;
++      killAMAndWaitForRestart(sliderClient, iteration, clustername)
++
++      describe "kill AM #2"
++      killAMAndWaitForRestart(sliderClient, iteration++, clustername)
++
++      // app should be running here
++      assert 0 == sliderClient.actionExists(clustername, true)
++
++      // kill again & expect the app to fail
++      describe "kill AM #3"
++      killAmAndWaitForDeath(sliderClient, iteration++, clustername)
++      sleep(40000)
++
++      report = sliderClient.applicationReport
++      assert report.finalApplicationStatus == FinalApplicationStatus.FAILED
++
++      logReport(report)
++      describe("stopping the cluster")
++      assert 0 == clusterActionFreeze(sliderClient, clustername, "force", true)
++  }
++
+   /**
+    * Kill an AM. take an iteration count for the message sent to the 
+    * AM (hence its logs)
+Index: slider-core/src/main/java/org/apache/slider/core/conf/MapOperations.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/core/conf/MapOperations.java	(revision 10006)
++++ slider-core/src/main/java/org/apache/slider/core/conf/MapOperations.java	(working copy)
+@@ -138,7 +138,21 @@
+     String val = getOption(option, Integer.toString(defVal));
+     return Integer.decode(val);
+   }
++
+   /**
++   * Get a long option; use {@link Long#decode(String)} so as to take hex
++   * oct and bin values too.
++   * @param option option name
++   * @param defVal default value
++   * @return parsed value
++   * @throws NumberFormatException
++  */
++   public long getOptionLong(String option, long defVal){
++      String val = getOption(option,Long.toString(defVal));
++      return Long.decode(val);
++   }
++
++   /**
+    * Get a mandatory integer option; use {@link Integer#decode(String)} so as to take hex
+    * oct and bin values too.
+    *
+Index: slider-core/src/main/java/org/apache/slider/core/launch/AbstractLauncher.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/core/launch/AbstractLauncher.java	(revision 10006)
++++ slider-core/src/main/java/org/apache/slider/core/launch/AbstractLauncher.java	(working copy)
+@@ -27,6 +27,7 @@
+ import org.apache.hadoop.io.DataOutputBuffer;
+ import org.apache.hadoop.security.Credentials;
+ import org.apache.hadoop.security.UserGroupInformation;
++import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
+ import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
+ import org.apache.hadoop.yarn.api.records.LocalResource;
+ import org.apache.hadoop.yarn.api.records.LogAggregationContext;
+@@ -279,7 +280,30 @@
+     }
+   }
+ 
+-  public void extractLogAggregationContext(Map<String, String> map) {
++  /**
++   * Extract the valud for option
++   * yarn.resourcemanager.am.retry-count-window-ms
++   * and set it on the ApplicationSubmissionContext. Use the default value
++   * if option is not set
++   *
++   * @param  submissionContext
++   * @param  map
++   * */
++   public void extractAmRetryCount(ApplicationSubmissionContext submissionContext,
++                                   Map<String,String> map){
++       if (map != null){
++           MapOperations options = new MapOperations("",map);
++           long amRetryCountWindow = options.getOptionLong(
++                   ResourceKeys.YARN_RESOURCEMANAGER_AM_RETRY_COUNT_WINDOW_MS,
++                   ResourceKeys.DEFAULT_AM_RETRY_COUNT_WINDOW_MS);
++           log.info("Setting "+
++                ResourceKeys.YARN_RESOURCEMANAGER_AM_RETRY_COUNT_WINDOW_MS +
++                " to " + amRetryCountWindow);
++           submissionContext.setAttemptFailuresValidityInterval(amRetryCountWindow);
++       }
++   }
++
++   public void extractLogAggregationContext(Map<String, String> map) {
+     if (map != null) {
+       String logPatternSepStr = "\\|";
+       String logPatternJoinStr = "|";
+@@ -424,7 +448,7 @@
+   }
+ 
+   /**
+-   * Suubmit an entire directory
++   * Submit an entire directory
+    * @param srcDir src path in filesystem
+    * @param destRelativeDir relative path under destination local dir
+    * @throws IOException IO problems
+Index: slider-core/src/main/java/org/apache/slider/core/launch/AppMasterLauncher.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/core/launch/AppMasterLauncher.java	(revision 10006)
++++ slider-core/src/main/java/org/apache/slider/core/launch/AppMasterLauncher.java	(working copy)
+@@ -109,6 +109,7 @@
+       submissionContext.setApplicationTags(applicationTags);
+     }
+     submissionContext.setNodeLabelExpression(extractLabelExpression(options));
++    extractAmRetryCount(submissionContext,resourceGlobalOptions);
+     extractResourceRequirements(resource, options);
+     extractLogAggregationContext(resourceGlobalOptions);
+   }
+Index: slider-core/src/main/java/org/apache/slider/api/ResourceKeys.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/api/ResourceKeys.java	(revision 10006)
++++ slider-core/src/main/java/org/apache/slider/api/ResourceKeys.java	(working copy)
+@@ -167,4 +167,16 @@
+    */
+   String YARN_LOG_INCLUDE_PATTERNS = "yarn.log.include.patterns";
+   String YARN_LOG_EXCLUDE_PATTERNS = "yarn.log.exclude.patterns";
+-}
++
++  /**
++   * Window of time where application master's failure count
++   * can be reset to 0
++   * */
++   String YARN_RESOURCEMANAGER_AM_RETRY_COUNT_WINDOW_MS = "yarn.resourcemanager.am.retry-count-window-ms";
++
++   /**
++    * The default window for Slider
++    */
++   long DEFAULT_AM_RETRY_COUNT_WINDOW_MS = 300000;
++
++ }

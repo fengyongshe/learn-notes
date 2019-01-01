@@ -1,0 +1,27 @@
+Index: slider-core/src/main/java/org/apache/slider/common/params/SliderActions.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/common/params/SliderActions.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/common/params/SliderActions.java	(working copy)
+@@ -29,8 +29,7 @@
+   String ACTION_CREATE = "create";
+   String ACTION_UPDATE = "update";
+   String ACTION_UPGRADE = "upgrade";
+-  String ACTION_UPLOAD = "upload";
+-  String ACTION_DELETE = "delete";
++  String ACTION_OPERATE = "operate";
+   String ACTION_DESTROY = "destroy";
+   String ACTION_ECHO = "echo";
+   String ACTION_EXISTS = "exists";
+@@ -64,10 +63,8 @@
+       "Update template for a Slider application";
+   String DESCRIBE_ACTION_UPGRADE =
+       "Rolling upgrade/downgrade the application to a newer/previous version";
+-  String DESCRIBE_ACTION_UPLOAD =
+-      "Upload file to container in cluster, must specify cluster and container";
+-  String DESCRIBE_ACTION_DELETE =
+-      "Delete file from container in cluster ,must specify cluster/container/component";
++  String DESCRIBE_ACTION_OPERATE =
++      "Operate cmd to container in cluster, must specify cluster and container";
+   String DESCRIBE_ACTION_DESTROY =
+         "Destroy a frozen Slider application)";
+   String DESCRIBE_ACTION_EXISTS =

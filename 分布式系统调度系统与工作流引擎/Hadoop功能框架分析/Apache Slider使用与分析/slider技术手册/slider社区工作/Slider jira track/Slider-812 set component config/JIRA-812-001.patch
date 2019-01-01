@@ -1,0 +1,287 @@
+diff --git a/slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java b/slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java
+index b3c513a..9875861 100644
+--- a/slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java
++++ b/slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java
+@@ -1908,7 +1908,9 @@ public class AgentProviderService extends AbstractProviderService implements
+ 
+     Map<String, Map<String, String>> configurations = buildCommandConfigurations(appConf, containerId, componentName);
+     cmd.setConfigurations(configurations);
+-
++    Map<String, Map<String, String>> componentConfigurations = buildComponentConfigurations(appConf);
++    cmd.setComponentConfigurations(componentConfigurations);
++    
+     if (SliderUtils.isSet(scriptPath)) {
+       cmd.setCommandParams(commandParametersSet(scriptPath, timeout, false));
+     } else {
+@@ -1954,7 +1956,9 @@ public class AgentProviderService extends AbstractProviderService implements
+     Map<String, Map<String, String>> configurations = buildCommandConfigurations(
+         appConf, containerId, componentName);
+     cmd.setConfigurations(configurations);
+-
++    Map<String, Map<String, String>> componentConfigurations = buildComponentConfigurations(appConf);
++    cmd.setComponentConfigurations(componentConfigurations);
++    
+     ComponentCommand effectiveCommand = compCmd;
+     if (compCmd == null) {
+       effectiveCommand = new ComponentCommand();
+@@ -2264,7 +2268,9 @@ public class AgentProviderService extends AbstractProviderService implements
+     
+     Map<String, Map<String, String>> configurations = buildCommandConfigurations(
+         appConf, containerId, componentName);
+-
++    Map<String, Map<String, String>> componentConfigurations = buildComponentConfigurations(appConf);
++    cmd.setComponentConfigurations(componentConfigurations);
++    
+     log.info("before resolution: " + appConf.toString());
+     resolveVariablesForComponentAppConfigs(appConf, componentName, containerId);
+     log.info("after resolution: " + appConf.toString());
+@@ -2469,7 +2475,9 @@ public class AgentProviderService extends AbstractProviderService implements
+ 
+     Map<String, Map<String, String>> configurations = buildCommandConfigurations(appConf, containerId, componentName);
+     cmd.setConfigurations(configurations);
+-
++    Map<String, Map<String, String>> componentConfigurations = buildComponentConfigurations(appConf);
++    cmd.setComponentConfigurations(componentConfigurations);
++    
+     if (SliderUtils.isSet(scriptPath)) {
+       cmd.setCommandParams(commandParametersSet(scriptPath, timeout, true));
+     } else {
+diff --git a/slider-core/src/test/app_packages/test_component_config_in_app_config/appConfig.json b/slider-core/src/test/app_packages/test_component_config_in_app_config/appConfig.json
+new file mode 100644
+index 0000000..86c0dc6
+--- /dev/null
++++ b/slider-core/src/test/app_packages/test_component_config_in_app_config/appConfig.json
+@@ -0,0 +1,22 @@
++{
++    "schema": "http://example.org/specification/v2.0.0",
++    "metadata": {
++    },
++    "global": {
++        "application.def": ".slider/package/CMD_LOGGER/test_component_config_in_app_config.zip",
++        "java_home": "/usr/jdk64/jdk1.7.0_67",
++        "site.global.application_id": "CommandLogger",
++        "site.global.app_root": "${AGENT_WORK_ROOT}/app/install/command-logger",
++        "site.cl-site.logfile.location": "${AGENT_LOG_ROOT}/operations.log",
++        "site.cl-site.datetime.format": "%A, %d. %B %Y %I:%M%p",
++        "site.cl-site.pattern.for.test.to.verify": "verify this pattern"
++    },
++    "components": {
++        "COMMAND_LOGGER": {
++        		"file_name":"test_component_in_app_config.txt"
++        },
++        "slider-appmaster": {
++            "jvm.heapsize": "256M"
++        }
++    }
++}
+diff --git a/slider-core/src/test/app_packages/test_component_config_in_app_config/metainfo.xml b/slider-core/src/test/app_packages/test_component_config_in_app_config/metainfo.xml
+new file mode 100644
+index 0000000..da26747
+--- /dev/null
++++ b/slider-core/src/test/app_packages/test_component_config_in_app_config/metainfo.xml
+@@ -0,0 +1,42 @@
++<?xml version="1.0"?>
++<!--
++   Licensed to the Apache Software Foundation (ASF) under one or more
++   contributor license agreements.  See the NOTICE file distributed with
++   this work for additional information regarding copyright ownership.
++   The ASF licenses this file to You under the Apache License, Version 2.0
++   (the "License"); you may not use this file except in compliance with
++   the License.  You may obtain a copy of the License at
++
++       http://www.apache.org/licenses/LICENSE-2.0
++
++   Unless required by applicable law or agreed to in writing, software
++   distributed under the License is distributed on an "AS IS" BASIS,
++   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++   See the License for the specific language governing permissions and
++   limitations under the License.
++-->
++<metainfo>
++  <schemaVersion>2.0</schemaVersion>
++  <application>
++    <name>TEST_COMMAND_LOG</name>
++    <comment>
++      When started it creates a new log file and stores all commands in the
++      log file. When stopped it renames the file.
++    </comment>
++    <version>0.1.0</version>
++    <exportedConfigs>cl-site</exportedConfigs>
++    <components>
++      <component>
++        <name>COMMAND_LOGGER</name>
++        <category>MASTER</category>
++        <publishConfig>true</publishConfig>
++        <commandScript>
++          <script>scripts/COMMAND_LOGGER.py</script>
++          <scriptType>PYTHON</scriptType>
++          <timeout>600</timeout>
++        </commandScript>
++      </component>
++    </components>
++
++  </application>
++</metainfo>
+diff --git a/slider-core/src/test/app_packages/test_component_config_in_app_config/package/scripts/COMMAND_LOGGER.py b/slider-core/src/test/app_packages/test_component_config_in_app_config/package/scripts/COMMAND_LOGGER.py
+new file mode 100644
+index 0000000..7da85fe
+--- /dev/null
++++ b/slider-core/src/test/app_packages/test_component_config_in_app_config/package/scripts/COMMAND_LOGGER.py
+@@ -0,0 +1,62 @@
++#!/usr/bin/env python
++"""
++Licensed to the Apache Software Foundation (ASF) under one
++or more contributor license agreements.  See the NOTICE file
++distributed with this work for additional information
++regarding copyright ownership.  The ASF licenses this file
++to you under the Apache License, Version 2.0 (the
++"License"); you may not use this file except in compliance
++with the License.  You may obtain a copy of the License at
++
++    http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++
++"""
++
++import sys
++import subprocess
++from resource_management import *
++import tempfile
++         
++class COMMAND_LOGGER(Script):
++  def install(self, env):
++    config = Script.get_config()
++    filename = config['componentConfig']['COMMAND_LOGGER']['file_name']
++    self.install_packages(env)
++    f = tempfile.NamedTemporaryFile(mode='w+t', delete=False)
++    TMP_LOCAL_FILE = f.name
++    try:
++      f.write("testing...")
++      print TMP_LOCAL_FILE
++    finally:
++      f.close()
++    cat = subprocess.Popen("hdfs dfs -copyFromLocal " + TMP_LOCAL_FILE + " /tmp/" + filename, shell=True)
++    cat.communicate()
++    print "running install for all components in add on pkg"
++    
++  def configure(self, env):
++    import params
++    env.set_params(params)
++    
++  def start(self, env):
++    import params
++    env.set_params(params)
++    self.configure(env) # for security
++
++    
++  def stop(self, env):
++    import params
++    env.set_params(params)
++
++
++  def status(self, env):
++    pass
++
++if __name__ == "__main__":
++  COMMAND_LOGGER().execute()
++  pass
+diff --git a/slider-funtest/src/test/groovy/org/apache/slider/funtest/basic/ComponentConfigsInAppConfigShowUpOnAgentIT.groovy b/slider-funtest/src/test/groovy/org/apache/slider/funtest/basic/ComponentConfigsInAppConfigShowUpOnAgentIT.groovy
+new file mode 100644
+index 0000000..ab3be78
+--- /dev/null
++++ b/slider-funtest/src/test/groovy/org/apache/slider/funtest/basic/ComponentConfigsInAppConfigShowUpOnAgentIT.groovy
+@@ -0,0 +1,88 @@
++package org.apache.slider.funtest.basic
++
++import groovy.transform.CompileStatic
++import groovy.util.logging.Slf4j
++
++import org.apache.slider.common.tools.SliderUtils
++import org.apache.slider.funtest.framework.AgentCommandTestBase
++import org.apache.slider.common.params.SliderActions
++import org.apache.slider.client.SliderClient
++import org.apache.slider.common.SliderExitCodes
++import org.apache.slider.funtest.framework.SliderShell
++import org.junit.After
++import org.junit.Before
++import org.junit.Test
++
++@CompileStatic
++@Slf4j
++public class ComponentConfigsInAppConfigShowUpOnAgentIT extends AgentCommandTestBase{
++  
++  static String CLUSTER = "test-application-with-component-config"
++  private String APP_RESOURCE = "../slider-core/src/test/app_packages/test_command_log/resources_add_on_pkg.json"
++  private String APP_TEMPLATE = "../slider-core/src/test/app_packages/test_component_config_in_app_config/appConfig.json"
++  private String HDFS_FILENAME = "test_component_in_app_config";
++  private String PACKAGE_DEF_DIR = "../slider-core/src/test/app_packages/test_component_config_in_app_config"
++  private String ZIP_FILE = "test_component_config_in_app_config.zip"
++  private String ZIP_DIR = "target/package-tmp/"
++  private String TARGET_FILE = "/tmp/test_component_in_app_config.txt";
++  
++  @Before
++  public void prepareCluster() {
++    setupCluster(CLUSTER)
++  }
++
++  @After
++  public void destroyCluster() {
++    cleanup(CLUSTER)
++  }
++
++  @Test
++  public void testComponentConfigsInAppConfigCanShowUpOnAgentSide() throws Throwable {
++    describe("Create a cluster with an addon package that apply to one component")
++    setupApplicationPackage()
++    
++    def clusterpath = buildClusterPath(CLUSTER)
++    File launchReportFile = createTempJsonFile();
++
++    SliderShell shell = createTemplatedSliderApplication(CLUSTER,
++        APP_TEMPLATE,
++        APP_RESOURCE,
++        [],
++        launchReportFile)
++
++    logShell(shell)
++
++    def appId = ensureYarnApplicationIsUp(launchReportFile)
++    
++    exists(0, CLUSTER)
++    list(0, [CLUSTER])
++    list(0, [""])
++    list(0, [CLUSTER, ARG_LIVE])
++    list(0, [CLUSTER, ARG_STATE, "running"])
++    list(0, [ARG_LIVE])
++    list(0, [ARG_STATE, "running"])
++    status(0, CLUSTER)
++    Thread.sleep(10000)
++    verifyFileExist(TARGET_FILE)
++  }
++  
++  public void setupApplicationPackage() {
++    SliderUtils.zipFolder(new File(PACKAGE_DEF_DIR), new File(ZIP_DIR + ZIP_FILE))
++    try {
++      File zipFileName = new File(ZIP_DIR, ZIP_FILE).canonicalFile
++      SliderShell shell = slider(EXIT_SUCCESS,
++          [
++              ACTION_INSTALL_PACKAGE,
++              ARG_NAME, TEST_APP_PKG_NAME,
++              ARG_PACKAGE, zipFileName.absolutePath,
++              ARG_REPLACE_PKG
++          ])
++      logShell(shell)
++      log.info "App pkg uploaded at home directory .slider/package/$TEST_APP_PKG_NAME/$ZIP_FILE"
++    } catch (Exception e) {
++      setup_failed = true
++      throw e;
++    }
++    cleanupHdfsFile(TARGET_FILE)
++  }
++}
+\ No newline at end of file

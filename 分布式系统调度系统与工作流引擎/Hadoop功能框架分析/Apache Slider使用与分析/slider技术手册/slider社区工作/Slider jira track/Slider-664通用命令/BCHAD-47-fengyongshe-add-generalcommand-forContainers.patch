@@ -1,0 +1,1747 @@
+Index: slider-core/src/main/java/org/apache/slider/api/OptionKeys.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/api/OptionKeys.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/api/OptionKeys.java	(working copy)
+@@ -57,7 +57,4 @@
+ 
+   String HDFS_APP_DIR = "site.global.hdfs_app_dir";
+ 
+-  String HDFS_UPLOAD_FILE = "site.global.hdfs_upload_file";
+-
+-  String DELETE_FILE = "site.global.delete_file";
+ }
+Index: slider-core/src/main/java/org/apache/slider/api/SliderClusterProtocol.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/api/SliderClusterProtocol.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/api/SliderClusterProtocol.java	(working copy)
+@@ -63,21 +63,10 @@
+    * @throws IOException
+    * @throws YarnException
+    * */
+-  Messages.UploadFileResponseProto uploadFile(
+-      Messages.UploadFileRequestProto request) throws IOException,
++  Messages.OperateContainersResponseProto operateContainers(
++      Messages.OperateContainersRequestProto request) throws IOException,
+       YarnException;
+ 
+-  /**
+-   * Delete the file from containers
+-   * @param request remove request object
+-   * @return remove response object
+-   * @throws IOException
+-   * @throws YarnException
+-   * */
+-  Messages.DeleteFileResponseProto deleteFile(
+-      Messages.DeleteFileRequestProto request) throws IOException,
+-      YarnException;
+-
+    /**
+    * Flex the cluster. 
+    */
+Index: slider-core/src/main/java/org/apache/slider/client/SliderClient.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/client/SliderClient.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/client/SliderClient.java	(working copy)
+@@ -40,7 +40,6 @@
+ import org.apache.hadoop.registry.client.api.RegistryConstants;
+ import org.apache.hadoop.registry.client.api.RegistryOperations;
+ import org.apache.hadoop.registry.client.binding.RegistryPathUtils;
+-import org.apache.hadoop.registry.client.binding.RegistryUtils;
+ import org.apache.hadoop.registry.client.exceptions.NoRecordException;
+ import org.apache.hadoop.registry.client.types.Endpoint;
+ import org.apache.hadoop.registry.client.types.RegistryPathStatus;
+@@ -82,7 +81,6 @@
+ import org.apache.slider.common.params.ActionAMSuicideArgs;
+ import org.apache.slider.common.params.ActionClientArgs;
+ import org.apache.slider.common.params.ActionCreateArgs;
+-import org.apache.slider.common.params.ActionDeleteArgs;
+ import org.apache.slider.common.params.ActionDiagnosticArgs;
+ import org.apache.slider.common.params.ActionEchoArgs;
+ import org.apache.slider.common.params.ActionExistsArgs;
+@@ -94,13 +92,13 @@
+ import org.apache.slider.common.params.ActionKillContainerArgs;
+ import org.apache.slider.common.params.ActionListArgs;
+ import org.apache.slider.common.params.ActionLookupArgs;
++import org.apache.slider.common.params.ActionOperateArgs;
+ import org.apache.slider.common.params.ActionPackageArgs;
+ import org.apache.slider.common.params.ActionRegistryArgs;
+ import org.apache.slider.common.params.ActionResolveArgs;
+ import org.apache.slider.common.params.ActionStatusArgs;
+ import org.apache.slider.common.params.ActionThawArgs;
+ import org.apache.slider.common.params.ActionUpgradeArgs;
+-import org.apache.slider.common.params.ActionUploadArgs;
+ import org.apache.slider.common.params.Arguments;
+ import org.apache.slider.common.params.ClientArgs;
+ import org.apache.slider.common.params.CommonArgs;
+@@ -208,7 +206,6 @@
+ import static org.apache.slider.common.params.SliderActions.ACTION_BUILD;
+ import static org.apache.slider.common.params.SliderActions.ACTION_CLIENT;
+ import static org.apache.slider.common.params.SliderActions.ACTION_CREATE;
+-import static org.apache.slider.common.params.SliderActions.ACTION_DELETE;
+ import static org.apache.slider.common.params.SliderActions.ACTION_DESTROY;
+ import static org.apache.slider.common.params.SliderActions.ACTION_DIAGNOSTICS;
+ import static org.apache.slider.common.params.SliderActions.ACTION_EXISTS;
+@@ -221,6 +218,7 @@
+ import static org.apache.slider.common.params.SliderActions.ACTION_KILL_CONTAINER;
+ import static org.apache.slider.common.params.SliderActions.ACTION_LIST;
+ import static org.apache.slider.common.params.SliderActions.ACTION_LOOKUP;
++import static org.apache.slider.common.params.SliderActions.ACTION_OPERATE;
+ import static org.apache.slider.common.params.SliderActions.ACTION_PACKAGE;
+ import static org.apache.slider.common.params.SliderActions.ACTION_REGISTRY;
+ import static org.apache.slider.common.params.SliderActions.ACTION_RESOLVE;
+@@ -228,7 +226,6 @@
+ import static org.apache.slider.common.params.SliderActions.ACTION_THAW;
+ import static org.apache.slider.common.params.SliderActions.ACTION_UPDATE;
+ import static org.apache.slider.common.params.SliderActions.ACTION_UPGRADE;
+-import static org.apache.slider.common.params.SliderActions.ACTION_UPLOAD;
+ import static org.apache.slider.common.params.SliderActions.ACTION_VERSION;
+ 
+ /**
+@@ -347,11 +344,12 @@
+       try {
+         username = yarnClient.getBdocUser();
+         sliderFileSystem.setBdocUser(username);
++        yarnAppListClient = new YarnAppListClient(yarnClient, getUsername(), getConfig());
+       } catch (YarnException e) {
+         // do nothing
+       }
+     }
+-    yarnAppListClient = new YarnAppListClient(yarnClient, getUsername(), getConfig());
++    //yarnAppListClient = new YarnAppListClient(yarnClient, getUsername(), getConfig());
+   }
+   /**
+    * this is where the work is done.
+@@ -567,13 +565,10 @@
+         exitCode = actionUpgrade(clusterName, serviceArgs.getActionUpgradeArgs());
+         break;
+ 
+-      case ACTION_UPLOAD:
+-        exitCode = actionUpload(clusterName,serviceArgs.getActionUploadArgs());
++      case ACTION_OPERATE:
++        exitCode = actionOperate(clusterName,serviceArgs.getActionOperateArgs());
+         break;
+ 
+-      case ACTION_DELETE:
+-        exitCode = actionDelete(clusterName,serviceArgs.getActionDeleteArgs());
+-        break;
+       case ACTION_VERSION:
+         exitCode = actionVersion();
+         break;
+@@ -843,156 +838,47 @@
+     return actionUpgradeContainers(clustername, upgradeArgs);
+   }
+ 
+-  /**
+-   * Used to delete file from container install dir
+-   *
+-   * @param clustername
+-   * @param deleteArgs
+-   * @author fys
+-   * */
+-  public int actionDelete(String clustername,ActionDeleteArgs deleteArgs)
+-      throws YarnException,IOException{
+-    log.info("execute action delete , remove file from cluster");
+ 
+-    verifyBindingsDefined();
+-    SliderUtils.validateClusterName(clustername);
+-
+-    String text = "deleteFile from containers";
+-
+-    // not an error to try to delete file from a stopped cluster,just return success
+-    // code, appropriate long messages has already been dumped
+-    if(!isAppInRunningState(clustername)){
+-      return EXIT_SUCCESS;
+-    }
+-
+-    String removeFile = deleteArgs.removeFile;
+-    //For remove spec, --input need to be specified
+-    if( removeFile == null){
+-      throw new BadCommandArgumentsException(
+-          "Option %s must be specified",
+-          Arguments.ARG_INPUT
+-      );
+-    }
+-
+-    //Create sets of containers and components to get rid of duplicates and
+-    //for quick lookup during checks below
+-    Set<String> containers = new HashSet<>();
+-    if(deleteArgs.containers != null){
+-      containers.addAll(new ArrayList<String>(deleteArgs.containers));
+-    }
+-    Set<String> components = new HashSet<>();
+-    if(deleteArgs.components != null){
+-      components.addAll(new ArrayList<String>(deleteArgs.components));
+-    }
+-
+-    //check validity of component name and running containers here
+-    List<ContainerInformation>  liveContainers = getContainers(clustername);
+-
+-    Set<String> validContainers = new HashSet<>();
+-    Set<String> validComponents = new HashSet<>();
+-
+-    for(ContainerInformation liveContainer: liveContainers){
+-      boolean allContainersAndComponentsAccountdFor = true;
+-
+-      if(CollectionUtils.isNotEmpty(containers)){
+-        if(containers.contains(liveContainer.containerId)){
+-          containers.remove(liveContainer.containerId);
+-          validContainers.add(liveContainer.containerId);
+-        }
+-        allContainersAndComponentsAccountdFor = false;
+-      }
+-
+-      if(CollectionUtils.isNotEmpty(components)){
+-        if(components.contains(liveContainer.component)){
+-          components.remove(liveContainer.component);
+-          validComponents.add(liveContainer.component);
+-        }
+-        allContainersAndComponentsAccountdFor = false;
+-      }
+-
+-      if(allContainersAndComponentsAccountdFor){
+-        break;
+-      }
+-    }
+-
+-    //if any item remains in containers or components then they are invalid
+-    //Log warning for then and proceed
+-    if(CollectionUtils.isNotEmpty(containers)){
+-      log.warn("Invalid set of containers provided {}",containers);
+-    }
+-    if(CollectionUtils.isNotEmpty(components)){
+-      log.warn("Invalid set of components provided {}",components);
+-    }
+-
+-    //If not a single valid container or component is specified do not proceed
+-    if(CollectionUtils.isEmpty(validContainers)
+-        && CollectionUtils.isEmpty(validComponents)){
+-      log.error("Not a single valid container or component specified. Nothing to do.");
+-      return EXIT_NOT_FOUND;
+-    }
+-
+-
+-    SliderClusterProtocol appMaster = connect(findInstance(clustername));
+-    Messages.DeleteFileRequestProto request =
+-        Messages.DeleteFileRequestProto
+-            .newBuilder()
+-            .setMessage(text)
+-            .addAllContainer(validContainers)
+-            .addAllComponent(validComponents)
+-            .setRemovefile(removeFile)
+-            .build();
+-    Messages.DeleteFileResponseProto testproto = appMaster.deleteFile(request);
+-
+-    if(CollectionUtils.isNotEmpty(validContainers)){
+-      log.info("Containers (total {}):{}",validContainers.size(),
+-          validContainers);
+-    }
+-    if(CollectionUtils.isNotEmpty(validComponents)){
+-      log.info("Components (total {}):{}",validComponents.size(),
+-          validComponents);
+-    }
+-
+-    return EXIT_SUCCESS;
+-  }
+   /**
+-   * Used to upload file from hdfs to container install dir
++   * Used to operate some command to containers
+    *
+    * @param clustername
+-   * @param uploadArgs
++   * @param operateArgs
+    * @author fys
+    */
+-  public int actionUpload(String clustername,
+-                          ActionUploadArgs uploadArgs)
++  @Override
++  public int actionOperate(String clustername,
++                          ActionOperateArgs operateArgs)
+       throws YarnException,IOException{
+-    System.out.println("execute action upload, file to clusterName");
+ 
+     verifyBindingsDefined();
+     SliderUtils.validateClusterName(clustername);
+ 
+-    String text = "UploadFile to containers";
++    String text = "Operate some commands to containers";
+     //not an error to try to upload file to a stopped cluster ,just return success
+     // code,appropriate long messages has already been dumped
+     if(!isAppInRunningState(clustername)){
+       return EXIT_SUCCESS;
+     }
+ 
+-    String inputfile = uploadArgs.inputFile;
+-    //For upload spec, --input need to be specified
+-    if(inputfile == null){
++    String cmdName = operateArgs.cmdName;
++    List<String> cmdParams = operateArgs.definitions;
++
++    if(cmdName == null){
+       throw new BadCommandArgumentsException(
+           "Option %s must be specified",
+-          Arguments.ARG_INPUT
++          Arguments.ARG_CMD
+       );
+     }
+     //Create sets of containers and components to get rid of duplicates and
+     //for quick lookup during checks below
+     Set<String> containers = new HashSet<>();
+-    if( uploadArgs.containers != null ){
+-      containers.addAll(new ArrayList<String>(uploadArgs.containers));
++    if( operateArgs.containers != null ){
++      containers.addAll(new ArrayList<String>(operateArgs.containers));
+     }
+     Set<String> components = new HashSet<>();
+-    if( uploadArgs.components != null ){
+-      components.addAll(new ArrayList<String>(uploadArgs.components));
++    if( operateArgs.components != null ){
++      components.addAll(new ArrayList<String>(operateArgs.components));
+     }
+     //check validity of component names and running containers here
+     List<ContainerInformation> liveContainers = getContainers(clustername);
+@@ -1041,16 +927,18 @@
+     }
+ 
+     SliderClusterProtocol appMaster = connect(findInstance(clustername));
+-    Messages.UploadFileRequestProto request =
+-        Messages.UploadFileRequestProto
++    Messages.OperateContainersRequestProto request =
++        Messages.OperateContainersRequestProto
+             .newBuilder()
+             .setMessage(text)
+             .addAllContainer(validContainers)
+             .addAllComponent(validComponents)
+-            .setInputfile(inputfile)
++            .setCmdName(cmdName)
++            .addAllParameter(cmdParams)
+             .build();
+-    appMaster.uploadFile(request);
+-    log.info("Cluster upload issued for -");
++    appMaster.operateContainers(request);
++
++    log.info("Cluster operate issued for -");
+     if(CollectionUtils.isNotEmpty(validContainers)){
+       log.info("Containers (total {}):{}",validContainers.size(),
+           validContainers);
+Index: slider-core/src/main/java/org/apache/slider/client/SliderClientAPI.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/client/SliderClientAPI.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/client/SliderClientAPI.java	(working copy)
+@@ -34,6 +34,7 @@
+ import org.apache.slider.common.params.ActionInstallKeytabArgs;
+ import org.apache.slider.common.params.ActionInstallPackageArgs;
+ import org.apache.slider.common.params.ActionKeytabArgs;
++import org.apache.slider.common.params.ActionOperateArgs;
+ import org.apache.slider.common.params.ActionPackageArgs;
+ import org.apache.slider.common.params.ActionKillContainerArgs;
+ import org.apache.slider.common.params.ActionListArgs;
+@@ -42,7 +43,6 @@
+ import org.apache.slider.common.params.ActionStatusArgs;
+ import org.apache.slider.common.params.ActionThawArgs;
+ import org.apache.slider.common.params.ActionUpgradeArgs;
+-import org.apache.slider.common.params.ActionUploadArgs;
+ import org.apache.slider.core.exceptions.BadCommandArgumentsException;
+ import org.apache.slider.core.exceptions.SliderException;
+ import org.apache.slider.providers.AbstractClientProvider;
+@@ -180,8 +180,8 @@
+    * @throws YarnException Yarn problems
+    * @throws IOException other problems
+    *  */
+-  int actionUpload(String clustername,
+-      ActionUploadArgs buildInfo)
++  int actionOperate(String clustername,
++      ActionOperateArgs buildInfo)
+       throws YarnException,IOException;
+ 
+    /**
+Index: slider-core/src/main/java/org/apache/slider/common/params/AbstractActionArgs.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/common/params/AbstractActionArgs.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/common/params/AbstractActionArgs.java	(working copy)
+@@ -79,7 +79,8 @@
+   @Parameter(names = ARG_DEFINE, arity = 1, description = "Definitions")
+   public final List<String> definitions = new ArrayList<String>();
+ 
+-  /**
++
++   /**
+    * System properties
+    */
+   @Parameter(names = {ARG_SYSPROP}, arity = 1,
+Index: slider-core/src/main/java/org/apache/slider/common/params/ActionDeleteArgs.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/common/params/ActionDeleteArgs.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/common/params/ActionDeleteArgs.java	(working copy)
+@@ -1,35 +0,0 @@
+-package org.apache.slider.common.params;
+-
+-import com.beust.jcommander.Parameter;
+-import com.beust.jcommander.Parameters;
+-
+-import java.util.ArrayList;
+-import java.util.List;
+-
+-/**
+- * Created by fys on 7/22/15.
+- */
+-
+-@Parameters(commandNames = {SliderActions.ACTION_DELETE},
+-    commandDescription = SliderActions.DESCRIBE_ACTION_DELETE)
+-
+-public class ActionDeleteArgs extends AbstractClusterBuildingActionArgs{
+-
+-  @Override
+-  public String getActionName() {
+-    return SliderActions.ACTION_DELETE;
+-  }
+-
+-  @Parameter(names ={ARG_INPUT,ARG_OUTPUT_SHORT},
+-    description = "delete file from containers")
+-  public String removeFile;
+-
+-  @Parameter(names = {ARG_CONTAINERS}, variableArity = true,
+-    description = "delete file from specify containers")
+-  public List<String> containers = new ArrayList<String>(0);
+-
+-  @Parameter(names = {ARG_COMPONENTS}, variableArity = true,
+-    description = "delete file to specify containers of specific components")
+-  public List<String> components = new ArrayList<String>(0);
+-
+-}
+Index: slider-core/src/main/java/org/apache/slider/common/params/ActionOperateArgs.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/common/params/ActionOperateArgs.java	(revision 0)
++++ slider-core/src/main/java/org/apache/slider/common/params/ActionOperateArgs.java	(revision 0)
+@@ -0,0 +1,35 @@
++package org.apache.slider.common.params;
++
++import com.beust.jcommander.Parameter;
++import com.beust.jcommander.Parameters;
++
++import java.util.ArrayList;
++import java.util.List;
++
++/**
++ *
++ * Created by fys on 7/13/15.
++ */
++
++@Parameters(commandNames = {SliderActions.ACTION_OPERATE},
++            commandDescription = SliderActions.DESCRIBE_ACTION_OPERATE)
++
++public class ActionOperateArgs extends AbstractClusterBuildingActionArgs{
++
++  @Override
++  public String getActionName() {
++    return SliderActions.ACTION_OPERATE;
++  }
++
++  @Parameter(names = {ARG_CMD,ARG_OUTPUT_SHORT},
++      description = "input file for containers")
++  public String cmdName;
++
++  @Parameter(names = {ARG_CONTAINERS}, variableArity = true,
++      description = "upload file to specific containers")
++  public List<String> containers = new ArrayList<String>(0);
++
++  @Parameter(names = {ARG_COMPONENTS}, variableArity = true,
++      description = "upload file to specific containers of specific components")
++  public List<String> components = new ArrayList<String>(0);
++}
+Index: slider-core/src/main/java/org/apache/slider/common/params/ActionUploadArgs.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/common/params/ActionUploadArgs.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/common/params/ActionUploadArgs.java	(working copy)
+@@ -1,35 +0,0 @@
+-package org.apache.slider.common.params;
+-
+-import com.beust.jcommander.Parameter;
+-import com.beust.jcommander.Parameters;
+-
+-import java.util.ArrayList;
+-import java.util.List;
+-
+-/**
+- *
+- * Created by fys on 7/13/15.
+- */
+-
+-@Parameters(commandNames = {SliderActions.ACTION_UPLOAD},
+-            commandDescription = SliderActions.DESCRIBE_ACTION_UPLOAD)
+-
+-public class ActionUploadArgs extends AbstractClusterBuildingActionArgs{
+-
+-  @Override
+-  public String getActionName() {
+-    return SliderActions.ACTION_UPLOAD;
+-  }
+-
+-  @Parameter(names = {ARG_INPUT,ARG_OUTPUT_SHORT},
+-      description = "input file for containers")
+-  public String inputFile;
+-
+-  @Parameter(names = {ARG_CONTAINERS}, variableArity = true,
+-      description = "upload file to specific containers")
+-  public List<String> containers = new ArrayList<String>(0);
+-
+-  @Parameter(names = {ARG_COMPONENTS}, variableArity = true,
+-      description = "upload file to specific containers of specific components")
+-  public List<String> components = new ArrayList<String>(0);
+-}
+Index: slider-core/src/main/java/org/apache/slider/common/params/Arguments.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/common/params/Arguments.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/common/params/Arguments.java	(working copy)
+@@ -86,7 +86,7 @@
+   String ARG_OPTION_SHORT = "-O";
+   String ARG_OUTPUT = "--out";
+   String ARG_OUTPUT_SHORT = "-o";
+-  String ARG_INPUT = "--input";
++  String ARG_CMD = "--cmd";
+   String ARG_OVERWRITE = "--overwrite";
+   String ARG_PACKAGE = "--package";
+   String ARG_PASSWORD = "--password";
+Index: slider-core/src/main/java/org/apache/slider/common/params/ClientArgs.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/common/params/ClientArgs.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/common/params/ClientArgs.java	(working copy)
+@@ -72,8 +72,7 @@
+   private final ActionUpdateArgs actionUpdateArgs = new ActionUpdateArgs();
+   private final ActionVersionArgs actionVersionArgs = new ActionVersionArgs();
+   private final ActionUpgradeArgs actionUpgradeArgs = new ActionUpgradeArgs();
+-  private final ActionUploadArgs actionUploadArgs = new ActionUploadArgs();
+-  private final ActionDeleteArgs actionDeleteArgs = new ActionDeleteArgs();
++  private final ActionOperateArgs actionOperateArgs = new ActionOperateArgs();
+ 
+   public ClientArgs(String[] args) {
+     super(args);
+@@ -101,8 +100,7 @@
+         actionThawArgs,
+         actionUpdateArgs,
+         actionUpgradeArgs,
+-        actionUploadArgs,
+-        actionDeleteArgs,
++        actionOperateArgs,
+         actionDestroyArgs,
+         actionExistsArgs,
+         actionLookupArgs,
+@@ -166,10 +164,8 @@
+     return actionUpgradeArgs;
+   }
+ 
+-  public ActionUploadArgs getActionUploadArgs() { return actionUploadArgs; }
++  public ActionOperateArgs getActionOperateArgs() { return actionOperateArgs; }
+ 
+-  public ActionDeleteArgs getActionDeleteArgs() { return actionDeleteArgs; }
+-
+   public ActionCreateArgs getActionCreateArgs() {
+     return actionCreateArgs;
+   }
+@@ -300,13 +296,10 @@
+     } else if (SliderActions.ACTION_UPGRADE.equals(action)) {
+       bindCoreAction(actionUpgradeArgs);
+ 
+-    } else if (SliderActions.ACTION_UPLOAD.equals(action)){
+-      bindCoreAction(actionUploadArgs);
++    } else if (SliderActions.ACTION_OPERATE.equals(action)){
++      bindCoreAction(actionOperateArgs);
+ 
+-    } else if (SliderActions.ACTION_DELETE.equals(action)){
+-      bindCoreAction(actionDeleteArgs);
+-
+-    }else if (SliderActions.ACTION_VERSION.equals(action)) {
++    } else if (SliderActions.ACTION_VERSION.equals(action)) {
+       bindCoreAction(actionVersionArgs);
+ 
+     } else if (SliderUtils.isUnset(action)) {
+Index: slider-core/src/main/java/org/apache/slider/common/params/SliderActions.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/common/params/SliderActions.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/common/params/SliderActions.java	(working copy)
+@@ -29,8 +29,7 @@
+   String ACTION_CREATE = "create";
+   String ACTION_UPDATE = "update";
+   String ACTION_UPGRADE = "upgrade";
+-  String ACTION_UPLOAD = "upload";
+-  String ACTION_DELETE = "delete";
++  String ACTION_OPERATE = "operate";
+   String ACTION_DESTROY = "destroy";
+   String ACTION_ECHO = "echo";
+   String ACTION_EXISTS = "exists";
+@@ -64,10 +63,8 @@
+       "Update template for a Slider application";
+   String DESCRIBE_ACTION_UPGRADE =
+       "Rolling upgrade/downgrade the application to a newer/previous version";
+-  String DESCRIBE_ACTION_UPLOAD =
+-      "Upload file to container in cluster, must specify cluster and container";
+-  String DESCRIBE_ACTION_DELETE =
+-      "Delete file from container in cluster ,must specify cluster/container/component";
++  String DESCRIBE_ACTION_OPERATE =
++      "Operate cmd to container in cluster, must specify cluster and container";
+   String DESCRIBE_ACTION_DESTROY =
+         "Destroy a frozen Slider application)";
+   String DESCRIBE_ACTION_EXISTS =
+Index: slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java	(working copy)
+@@ -175,17 +175,12 @@
+   private boolean isInUpgradeMode;
+   private Set<String> upgradeContainers = new HashSet<String>();
+ 
+-  // used for execute upload cmd
+-  private boolean hasUploadingFileCmd;
+-  private Set<String> uploadingFileContainers = new HashSet<String>();
+-  private Map<String,String> fileForContainers = new HashMap<String,String>();
++  // used for execute operate cmd
++  private boolean hasOperate;
++  private Set<String> needOperateContainers = new HashSet<String>();
++  private Map<String,String> cmdForContainers = new HashMap<String,String>();
++  private Map<String,Set<String>> parametersForContainers = new HashMap<String,Set<String>>();
+ 
+-  // used for execute delete cmd
+-  private boolean hasDeletingFileCmd;
+-  private Set<String> deletingFileContainers = new HashSet<String>();
+-  private Map<String,String> fileDeletedForContainers = new HashMap<String,String>();
+-
+-
+   private final Map<String, ComponentInstanceState> componentStatuses =
+       new ConcurrentHashMap<String, ComponentInstanceState>();
+   private final Map<String, Map<String, String>> componentInstanceData =
+@@ -829,7 +824,7 @@
+     String pkg = heartBeat.getPkg();
+ 
+     log.debug("package received: " + pkg);
+-    
++
+     String roleName = getRoleName(label);
+     String containerId = getContainerId(label);
+ 
+@@ -840,24 +835,17 @@
+       doUpgrade = true;
+     }
+ 
+-    boolean doUploadFile = false;
+-    if(hasUploadingFileCmd && uploadingFileContainers.contains(containerId)){
+-      doUploadFile  = true;
+-      uploadingFileContainers.remove(containerId);
+-      if(CollectionUtils.isEmpty(uploadingFileContainers)){
+-        hasUploadingFileCmd = false;
++    boolean doOperate = false;
++    String commandName = null;
++    if( hasOperate && needOperateContainers.contains(containerId)){
++      doOperate = true;
++      commandName = cmdForContainers.get(containerId);
++      needOperateContainers.remove(containerId);
++      if( CollectionUtils.isEmpty(needOperateContainers)){
++        hasOperate = false;
+       }
+     }
+ 
+-    boolean doDeleteFile = false;
+-    if(hasDeletingFileCmd && deletingFileContainers.contains(containerId)){
+-      doDeleteFile = true;
+-      deletingFileContainers.remove(containerId);
+-      if(CollectionUtils.isEmpty(deletingFileContainers)){
+-        hasDeletingFileCmd = false;
+-      }
+-    }
+-
+     StateAccessForProviders accessor = getAmState();
+     CommandScript cmdScript = getScriptPathForMasterPackage(roleName);
+     List<ComponentCommand> commands = getMetaInfo().getApplicationComponent(roleName).getCommands();
+@@ -942,7 +930,7 @@
+       return response;
+     }
+ 
+-    Command command = componentStatus.getNextCommand(doUpgrade,doUploadFile,doDeleteFile);
++    Command command = componentStatus.getNextCommand(doUpgrade,doOperate,commandName);
+     try {
+       if (Command.NOP != command) {
+         log.debug("For comp {} pkg {} issuing {}", roleName,
+@@ -1033,14 +1021,8 @@
+         } else if (command == Command.UPGRADE) {
+           addUpgradeCommand(roleName, containerId, response, scriptPath,
+               timeout);
+-          componentStatus.commandIssued(command, true,false,false);
+-        }else if(command == Command.UPLOADFILE){
+-          addUploadFileCommand(roleName, containerId, response, scriptPath);
+-          componentStatus.commandIssued(command, false, true,false);
+-        }else if(command == Command.DELETEFILE){
+-          addDeleteFileCommand(roleName,containerId,response,scriptPath);
+-          componentStatus.commandIssued(command,false,false,true);
+-        }else if (command == Command.STOP) {
++          componentStatus.commandIssued(command, true,false,null);
++        } else if (command == Command.STOP) {
+           addStopCommand(roleName, containerId, response, scriptPath, timeout,
+               doUpgrade);
+           componentStatus.commandIssued(command);
+@@ -1048,6 +1030,10 @@
+           log.info("A formal terminate command is being sent to container {}"
+               + " in state {}", label, componentStatus.getState());
+           response.setTerminateAgent(true);
++        } else {
++          log.info(" A Operate command is being sent to container {}",containerId);
++          addOperateCommand(roleName,containerId,response,scriptPath);
++          componentStatus.commandIssued(command,false,true,commandName);
+         }
+       }
+ 
+@@ -1316,30 +1302,24 @@
+     this.upgradeContainers.addAll(upgradeContainers);
+   }
+ 
+-  public void setHasUploadingFileCmd(boolean hasExecutingCmd) { this.hasUploadingFileCmd = hasExecutingCmd;}
++  /**
++   * set flag and containers for operate
++  * */
++  public void setHasOperate(boolean hasOperate) { this.hasOperate = hasOperate;}
+ 
+-  public void addUploadingFileContainers(Set<String> uploadFileContainers){
+-    this.uploadingFileContainers.addAll(uploadFileContainers);
++  public void addNeedOperateContainters( Set<String> needOperateContainers){
++    this.needOperateContainers.addAll(needOperateContainers);
+   }
+ 
+-  public void addFileForContainers(String file,Set<String> uploadingFileContainers){
+-    for(String containerId:uploadingFileContainers){
+-      fileForContainers.put(containerId,file);
++  public void addCmdForContainers(String cmdName,Set<String> needOperateContainers){
++    for(String containerId:needOperateContainers){
++      cmdForContainers.put(containerId,cmdName);
+     }
+   }
+ 
+-  /**
+-   * Set flag and containers for delete file from them
+-   * */
+-  public void setHasDeletingFileCmd(boolean hasDeletingFileCmd){ this.hasDeletingFileCmd = hasDeletingFileCmd;}
+-
+-  public void addDeletingFileContainers(Set<String> deletingFileContainers){
+-    this.deletingFileContainers.addAll(deletingFileContainers);
+-  }
+-
+-  public void addFileDeletedForContainers(String file,Set<String> deletingFileContainers){
+-    for(String containerId: deletingFileContainers){
+-      fileDeletedForContainers.put(containerId,file);
++  public void addParametersForContainers(Set<String> parameters,Set<String> needOperateContainers){
++    for(String containerId:needOperateContainers){
++      parametersForContainers.put(containerId,parameters);
+     }
+   }
+ 
+@@ -2592,69 +2572,45 @@
+   }
+ 
+   /**
+-   * Add command for delete File
+-   * @authro fys
++   * Add Command for operate containers
++   * @author fys
+    * */
+   @VisibleForTesting
+-  protected void addDeleteFileCommand(String componentName,String containerId,
+-        HeartBeatResponse response,String scriptPath)
+-                    throws SliderException{
++  protected void addOperateCommand(String componentName,String containerId,
++                                   HeartBeatResponse response,String scriptPath)
++      throws SliderException{
+     assert getAmState().isApplicationLive();
+     ConfTreeOperations appConf = getAmState().getAppConfSnapshot();
+-    String deleteFile = fileDeletedForContainers.get(containerId);
+-    if(null != deleteFile){
+-      appConf.set(OptionKeys.DELETE_FILE,deleteFile);
+-    }
+-    ConfTreeOperations internalsConf = getAmState().getInternalsSnapshot();
+ 
+-    ExecutionCommand cmd = new ExecutionCommand(
+-        AgentCommandType.EXECUTION_COMMAND);
+-    prepareExecutionCommand(cmd);
+-    String clusterName = internalsConf.get(OptionKeys.APPLICATION_NAME);
+-    String hostName = getClusterInfoPropertyValue(StatusKeys.INFO_AM_HOSTNAME);
+-    cmd.setHostname(hostName);
+-    cmd.setClusterName(clusterName);
+-    cmd.setRoleCommand(Command.DELETEFILE.toString());
+-    cmd.setServiceName(clusterName);
+-    cmd.setComponentName(componentName);
+-    cmd.setRole(componentName);
++    String commandName = cmdForContainers.get(containerId);
++    Set<String> parameters = parametersForContainers.get(containerId);
++    cmdForContainers.remove(containerId);
++    parametersForContainers.remove(containerId);
+ 
+-    cmd.setCommandParams(commandParametersSet(scriptPath,1000,true));
+-    Map<String,Map<String,String>> configurations = buildCommandConfigurations(
+-        appConf,containerId,componentName);
+-    cmd.setConfigurations(configurations);
+-    response.addExecutionCommand(cmd);
+-  }
+-
+-   /**
+-   * Add Command For upload File
+-   * @author  fys
+-   * */
+-  @VisibleForTesting
+-  protected void addUploadFileCommand(String componentName,String containerId,
+-        HeartBeatResponse response,String scriptPath)
+-                    throws SliderException{
+-    assert getAmState().isApplicationLive();
+-    ConfTreeOperations appConf = getAmState().getAppConfSnapshot();
+-    String uploadFile = fileForContainers.get(containerId);
+-    if(null != uploadFile){
+-        appConf.set(OptionKeys.HDFS_UPLOAD_FILE,uploadFile);
++    for (String prop : parameters) {
++      String[] keyval = prop.split("=", 2);
++      if (keyval.length == 2) {
++        appConf.set(keyval[0],keyval[1]);
++      }
+     }
++
+     ConfTreeOperations internalsConf = getAmState().getInternalsSnapshot();
+ 
+     ExecutionCommand cmd = new ExecutionCommand(
+         AgentCommandType.EXECUTION_COMMAND);
+     prepareExecutionCommand(cmd);
++
+     String clusterName = internalsConf.get(OptionKeys.APPLICATION_NAME);
+     String hostName = getClusterInfoPropertyValue(StatusKeys.INFO_AM_HOSTNAME);
++
+     cmd.setHostname(hostName);
+     cmd.setClusterName(clusterName);
+-    cmd.setRoleCommand(Command.UPLOADFILE.toString());
++    cmd.setRoleCommand(Command.getCommand(commandName).toString());
+     cmd.setServiceName(clusterName);
+     cmd.setComponentName(componentName);
+     cmd.setRole(componentName);
+-
+     cmd.setCommandParams(commandParametersSet(scriptPath,1000,true));
++
+     Map<String,Map<String,String>> configurations = buildCommandConfigurations(
+         appConf,containerId,componentName);
+     cmd.setConfigurations(configurations);
+Index: slider-core/src/main/java/org/apache/slider/providers/agent/Command.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/providers/agent/Command.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/providers/agent/Command.java	(working copy)
+@@ -26,8 +26,8 @@
+   START,         // Start the component
+   STOP,          // Stop the component
+   UPGRADE,       // The component will undergo upgrade
++  DELETEFILE,    // delete file to specified containers
+   UPLOADFILE,    // upload file to specified containers
+-  DELETEFILE,    // delete file to specified containers
+   TERMINATE;     // Send terminate signal to agent
+ 
+   public static Command getCommand(String commandVal) {
+@@ -46,12 +46,12 @@
+     if (commandVal.equals(Command.TERMINATE.toString())) {
+       return Command.TERMINATE;
+     }
+-    if(commandVal.equals(Command.UPLOADFILE.toString())){
++    if (commandVal.equals(Command.DELETEFILE.toString())){
++      return Command.DELETEFILE;
++    }
++    if (commandVal.equals(Command.UPLOADFILE.toString())){
+       return Command.UPLOADFILE;
+     }
+-    if(commandVal.equals(Command.DELETEFILE.toString())){
+-      return Command.DELETEFILE;
+-    }
+     return Command.NOP;
+   }
+ 
+Index: slider-core/src/main/java/org/apache/slider/providers/agent/ComponentInstanceState.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/providers/agent/ComponentInstanceState.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/providers/agent/ComponentInstanceState.java	(working copy)
+@@ -115,12 +115,12 @@
+   }
+ 
+   public void commandIssued(Command command) {
+-    commandIssued(command, false ,false,false);
++    commandIssued(command, false ,false,null);
+   }
+ 
+   public void commandIssued(Command command, boolean isInUpgradeMode,
+-                            boolean hasUploadingFileCmd,boolean hasDeletingFileCmd) {
+-    Command expected = getNextCommand(isInUpgradeMode,hasUploadingFileCmd,hasDeletingFileCmd);
++                            boolean doOperate,String cmdName) {
++    Command expected = getNextCommand(isInUpgradeMode,doOperate,cmdName);
+     if (expected != command) {
+       throw new IllegalArgumentException("Command " + command + " is not allowed in state " + state);
+     }
+@@ -195,15 +195,17 @@
+   }
+ 
+   public Command getNextCommand() {
+-    return getNextCommand(false,false,false);
++    return getNextCommand(false,false,null);
+   }
+ 
+-  public Command getNextCommand(boolean isInUpgradeMode,boolean hasUploadingFileCmd,boolean hasDeletingFileCmd) {
+-    if (!hasPendingCommand()&&!hasUploadingFileCmd&&!hasDeletingFileCmd) {
++  public Command getNextCommand(boolean isInUpgradeMode,
++                                boolean doOperate,
++                                String cmdName) {
++    if (!hasPendingCommand()&&!doOperate) {
+       nextPkgToInstall = null;
+       return Command.NOP;
+     }
+-    log.info("In getNextCommand,checking for component:{}");
++
+     log.debug("In getNextCommand, checking for component: {} ", componentName);
+     // if the master pkg is just installed, check if any add on pkg need to be
+     // installed
+@@ -235,7 +237,8 @@
+         return Command.INSTALL_ADDON;
+       }
+     }
+-    return this.state.getSupportedCommand(isInUpgradeMode,hasUploadingFileCmd,hasDeletingFileCmd);
++    return this.state.getSupportedCommand(isInUpgradeMode,
++        doOperate,cmdName);
+   }
+ 
+   public State getState() {
+Index: slider-core/src/main/java/org/apache/slider/providers/agent/State.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/providers/agent/State.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/providers/agent/State.java	(working copy)
+@@ -57,11 +57,12 @@
+    * @return command allowed in this state.
+    */
+   public Command getSupportedCommand() {
+-    return getSupportedCommand(false,false,false);
++    return getSupportedCommand(false,false,null);
+   }
+ 
+-  public Command getSupportedCommand(boolean isInUpgradeMode,boolean hasUploadingFileCmd,
+-                                     boolean hasDeletingFileCmd) {
++  public Command getSupportedCommand(boolean isInUpgradeMode,
++                                     boolean doOperate,
++                                     String cmdName) {
+     switch (this) {
+       case INIT:
+       case INSTALL_FAILED:
+@@ -71,11 +72,10 @@
+       case STARTED:
+         if(isInUpgradeMode){
+           return Command.UPGRADE;
+-        }else if(hasUploadingFileCmd){
+-          return Command.UPLOADFILE;
+-        }else if(hasDeletingFileCmd){
+-          return Command.DELETEFILE;
+-        }else{
++        }else if(doOperate){
++          return Command.getCommand(cmdName);
++        }
++        else{
+           return Command.NOP;
+         }
+         //return isInUpgradeMode ? Command.UPGRADE : Command.NOP;
+@@ -186,11 +186,13 @@
+           throw new IllegalArgumentException(command + " is not valid for " + this);
+         }
+       case NOP:
+-      case UPLOADFILE:
+-      case DELETEFILE:
+         return this;
+       default:
+-        throw new IllegalArgumentException("Bad command " + command);
++        if(Command.getCommand(command.name()) != Command.NOP){
++          return this;
++        }else {
++          throw new IllegalArgumentException("Bad command " + command);
++        }
+     }
+   }
+ 
+@@ -201,8 +203,8 @@
+         || (this == State.STOPPING 
+            && (command == Command.STOP || command == Command.NOP))
+         || (this == State.TERMINATING && command == Command.TERMINATE)
++        || (this == State.STARTED && command == Command.DELETEFILE)
+         || (this == State.STARTED && command == Command.UPLOADFILE)
+-        || (this == State.STARTED && command == Command.DELETEFILE)
+        ) {
+       return true;
+     }
+Index: slider-core/src/main/java/org/apache/slider/server/appmaster/SliderAppMaster.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/server/appmaster/SliderAppMaster.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/server/appmaster/SliderAppMaster.java	(working copy)
+@@ -116,9 +116,8 @@
+ import org.apache.slider.providers.agent.AgentProviderService;
+ import org.apache.slider.providers.slideram.SliderAMClientProvider;
+ import org.apache.slider.providers.slideram.SliderAMProviderService;
+-import org.apache.slider.server.appmaster.actions.ActionDeleteFile;
++import org.apache.slider.server.appmaster.actions.ActionOperateContainers;
+ import org.apache.slider.server.appmaster.actions.ActionRegisterServiceInstance;
+-import org.apache.slider.server.appmaster.actions.ActionUploadFile;
+ import org.apache.slider.server.appmaster.actions.EscalateOutstandingRequests;
+ import org.apache.slider.server.appmaster.actions.RegisterComponentInstance;
+ import org.apache.slider.server.appmaster.actions.QueueExecutor;
+@@ -1629,75 +1628,30 @@
+   }
+ 
+   /**
+-   * Signal that containers are deleting the file. Containers specified with
+-   * --containers option and all containers of all roles specifiled with
+-   * --components option are merged and upgraded
+-   * @param deleteFileRequest
+-   *          request containing delete file details
+-   * */
+-   public synchronized  void onDeleteFile(ActionDeleteFile deleteFileRequest){
+-
+-     LOG_YARN.info(" onDeleteFile({})",
+-         deleteFileRequest.getMessage());
+-
+-     String removeFile = deleteFileRequest.getRemoveFile();
+-
+-     Set<String> containers = deleteFileRequest.getContainers() == null ? new HashSet<String>()
+-         :deleteFileRequest.getContainers();
+-     LOG_YARN.info(" Container list provided (total {}): {}",containers.size(),containers);
+-
+-     Set<String> components = deleteFileRequest.getComponents() == null ? new HashSet<String>()
+-         :deleteFileRequest.getComponents();
+-     LOG_YARN.info(" Component list provided (total {}): {}",components.size(),components);
+-
+-     // If components are specified as well,the grab all the containers of
+-     // each of the components (roles)
+-     if(CollectionUtils.isNotEmpty(components)){
+-       Map<ContainerId,RoleInstance>  liveContainers = appState.getLiveNodes();
+-       if(CollectionUtils.isNotEmpty(liveContainers.keySet())){
+-         Map<String,Set<String> > roleContaineMap = prepareRoleContainerMap(liveContainers);
+-         for(String component: components){
+-           Set<String> roleContainers = roleContaineMap.get(component);
+-           if(roleContainers != null){
+-             containers.addAll(roleContainers);
+-           }
+-         }
+-       }
+-     }
+-
+-     LOG_YARN.info(" Final list of containers to be delete file (total {}) :{}",
+-         containers.size(),containers);
+-
+-     if(providerService instanceof  AgentProviderService){
+-       AgentProviderService agentProviderService = (AgentProviderService) providerService;
+-       agentProviderService.setHasDeletingFileCmd(true);
+-       agentProviderService.addDeletingFileContainers(containers);
+-       agentProviderService.addFileDeletedForContainers(removeFile,containers);
+-     }
+-
+-   }
+-
+-   /**
+-   * Signal that containers are uploading the file. Containers specified with
++   * Signal that containers are  operating some command. Containers specified with
+    * --containers option and all containers of all roles specifed with
+-   * --components option are merged and uploadfile
+-   * @param uploadFileRequest
+-   *          request containing uploadfile details
++   * --components option are merged and operateing
++   * @param operateContainersRequest
++   *          request containing cmd and config details
+    * */
+-  public synchronized  void onUploadFile(ActionUploadFile uploadFileRequest){
+-    LOG_YARN.info(" onUploadFiles({})",
+-        uploadFileRequest.getMessage());
++  public synchronized  void onOperateContainers(ActionOperateContainers operateContainersRequest){
++    LOG_YARN.info(" operate command ({})",
++        operateContainersRequest.getMessage());
+ 
+-    String uploadFile = uploadFileRequest.getInputFile();
++    String cmdName = operateContainersRequest.getCmdName();
+ 
+-    Set<String> containers = uploadFileRequest.getContainers() == null ? new HashSet<String>()
+-        :uploadFileRequest.getContainers();
++    Set<String> containers = operateContainersRequest.getContainers() == null ? new HashSet<String>()
++        :operateContainersRequest.getContainers();
+     LOG_YARN.info(" Container list provided (total {}) : {}",containers.size(),containers);
+ 
+-    Set<String> components = uploadFileRequest.getComponents() == null ? new HashSet<String>()
+-        :uploadFileRequest.getComponents();
+-    LOG_YARN.info(" Component list provied (total {}) : {}", components.size(),components);
++    Set<String> components = operateContainersRequest.getComponents() == null ? new HashSet<String>()
++        :operateContainersRequest.getComponents();
++    LOG_YARN.info(" Component list provided (total {}) : {}", components.size(),components);
+ 
++    Set<String> parameters = operateContainersRequest.getParameters() == null ? new HashSet<String>()
++        :operateContainersRequest.getParameters();
++    LOG_YARN.info(" Paramater list provided (total {}) : {}", parameters.size(),parameters);
++
+     // If components are specified as well,the grab all the containers of
+     // each of the components (roles)
+     if(CollectionUtils.isNotEmpty(components)){
+@@ -1713,14 +1667,15 @@
+       }
+     }
+ 
+-    LOG_YARN.info(" Final list of containers to be upload file (total {}) :{}",
++    LOG_YARN.info(" Final list of containers to operate command (tcdotal {}) :{}",
+         containers.size(),containers);
+ 
+-    if(providerService instanceof  AgentProviderService){
++    if( providerService instanceof AgentProviderService){
+       AgentProviderService agentProviderService = (AgentProviderService)providerService;
+-      agentProviderService.setHasUploadingFileCmd(true);
+-      agentProviderService.addUploadingFileContainers(containers);
+-      agentProviderService.addFileForContainers(uploadFile,containers);
++      agentProviderService.setHasOperate(true);
++      agentProviderService.addNeedOperateContainters(containers);
++      agentProviderService.addCmdForContainers(cmdName,containers);
++      agentProviderService.addParametersForContainers(parameters,containers);
+     }
+ 
+   }
+Index: slider-core/src/main/java/org/apache/slider/server/appmaster/actions/ActionDeleteFile.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/server/appmaster/actions/ActionDeleteFile.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/server/appmaster/actions/ActionDeleteFile.java	(working copy)
+@@ -1,59 +0,0 @@
+-package org.apache.slider.server.appmaster.actions;
+-
+-import org.apache.commons.collections.CollectionUtils;
+-import org.apache.slider.server.appmaster.SliderAppMaster;
+-import org.apache.slider.server.appmaster.state.AppState;
+-
+-import java.util.HashSet;
+-import java.util.List;
+-import java.util.Set;
+-
+-/**
+- * Created by fys on 7/23/15.
+- */
+-public class ActionDeleteFile extends AsyncAction {
+-
+-  private String message;
+-  private String removeFile;
+-  private Set<String> containers = new HashSet<>();
+-  private Set<String> components = new HashSet<>();
+-
+-  public ActionDeleteFile(String name,
+-                          String removeFile,
+-                          List<String> containers,
+-                          List<String> components,
+-                          String message){
+-    super(name);
+-    this.message = message;
+-    this.containers.addAll(containers);
+-    this.components.addAll(components);
+-    this.removeFile = removeFile;
+-  }
+-
+-  @Override
+-  public void execute(SliderAppMaster appMaster, QueueAccess queueService,
+-                      AppState appState) throws Exception {
+-    if(CollectionUtils.isNotEmpty(this.containers) ||
+-        CollectionUtils.isNotEmpty(this.components)){
+-      SliderAppMaster.getLog().info("SliderAppMaster.deleteFile:{}",
+-          message);
+-      appMaster.onDeleteFile(this);
+-    }
+-  }
+-
+-  public String getMessage(){ return message;}
+-
+-  public void setMessage(String message){ this.message = message;}
+-
+-  public String getRemoveFile() { return removeFile;}
+-
+-  public void setRemoveFile(String removeFile) { this.removeFile = removeFile; }
+-
+-  public Set<String> getContainers() { return containers;}
+-
+-  public void setContainers(Set<String> containers){ this.containers = containers; }
+-
+-  public Set<String> getComponents() { return components;}
+-
+-  public void setComponents(Set<String> components){ this.components = components; }
+-}
+Index: slider-core/src/main/java/org/apache/slider/server/appmaster/actions/ActionOperateContainers.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/server/appmaster/actions/ActionOperateContainers.java	(revision 0)
++++ slider-core/src/main/java/org/apache/slider/server/appmaster/actions/ActionOperateContainers.java	(revision 0)
+@@ -0,0 +1,65 @@
++package org.apache.slider.server.appmaster.actions;
++
++import org.apache.commons.collections.CollectionUtils;
++import org.apache.slider.server.appmaster.SliderAppMaster;
++import org.apache.slider.server.appmaster.state.AppState;
++
++import java.util.HashSet;
++import java.util.List;
++import java.util.Set;
++
++/**
++ * Created by fys on 8/4/15.
++ */
++public class ActionOperateContainers extends AsyncAction {
++
++  private String message;
++  private String cmdName;
++  private Set<String> containers = new HashSet<>();
++  private Set<String> components = new HashSet<>();
++  private Set<String> parameters = new HashSet<>();
++
++  public ActionOperateContainers(String name,
++                                 String cmdName,
++                                 List<String> containers,
++                                 List<String> components,
++                                 List<String> parameters,
++                                 String message){
++    super(name);
++    this.cmdName = cmdName;
++    this.containers.addAll(containers);
++    this.components.addAll(components);
++    this.parameters.addAll(parameters);
++    this.message = message;
++  }
++
++  @Override
++  public void execute(SliderAppMaster appMaster, QueueAccess queueService,
++                      AppState appState) throws Exception {
++    if(CollectionUtils.isNotEmpty(this.containers)||
++        CollectionUtils.isNotEmpty(this.components)){
++      SliderAppMaster.getLog().info("SliderAppMaster.operateContainers:{}",message);
++      appMaster.onOperateContainers(this);
++    }
++  }
++
++  public String getMessage(){return message;}
++
++  public void setMessage(String message){ this.message = message;}
++
++  public String getCmdName(){ return cmdName;}
++
++  public void setCmdName(String cmdName) { this.cmdName = cmdName;}
++
++  public Set<String> getContainers() { return containers;}
++
++  public void setContainers(Set<String> containers){ this.containers = containers;}
++
++  public Set<String> getComponents(){ return components;}
++
++  public void setComponents(Set<String> components){ this.components = components;}
++
++  public Set<String> getParameters(){ return parameters;}
++
++  public void setParameters(Set<String> parameters){ this.parameters = parameters;}
++}
+Index: slider-core/src/main/java/org/apache/slider/server/appmaster/actions/ActionUploadFile.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/server/appmaster/actions/ActionUploadFile.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/server/appmaster/actions/ActionUploadFile.java	(working copy)
+@@ -1,66 +0,0 @@
+-package org.apache.slider.server.appmaster.actions;
+-
+-import org.apache.commons.collections.CollectionUtils;
+-import org.apache.slider.server.appmaster.SliderAppMaster;
+-import org.apache.slider.server.appmaster.state.AppState;
+-
+-import java.util.HashSet;
+-import java.util.List;
+-import java.util.Set;
+-
+-/**
+- * Created by fys on 7/14/15.
+- */
+-
+-public class ActionUploadFile extends AsyncAction {
+-
+-
+-  private String message;
+-  private String inputFile;
+-  private Set<String> containers = new HashSet<>();
+-  private Set<String> components = new HashSet<>();
+-
+-
+-  public ActionUploadFile(String name,
+-                          String inputFile,
+-                          List<String> containers,
+-                          List<String> components,
+-                          String message){
+-    super(name);
+-    this.inputFile = inputFile;
+-    this.containers.addAll(containers);
+-    this.components.addAll(components);
+-    this.message = message;
+-  }
+-
+-  @Override
+-  public void execute(SliderAppMaster appMaster, QueueAccess queueService,
+-                      AppState appState) throws Exception {
+-    if(CollectionUtils.isNotEmpty(this.containers) ||
+-        CollectionUtils.isNotEmpty(this.components)){
+-      SliderAppMaster.getLog().info("SliderAppMaster.uploadFile:{}",
+-          message);
+-      appMaster.onUploadFile(this);
+-    }
+-  }
+-
+-
+-
+-  public String getMessage(){return message;}
+-
+-  public void setMessage(String message){ this.message = message;}
+-
+-  public String getInputFile(){ return inputFile;}
+-
+-  public void setInputFile(String inputFile){
+-    this.inputFile = inputFile;
+-  }
+-
+-  public Set<String> getContainers(){return containers;}
+-
+-  public void setContainers(Set<String> containers){this.containers = containers;}
+-
+-  public Set<String> getComponents(){return components;}
+-
+-  public void setComponents(Set<String> components){this.components = components;}
+-}
+Index: slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderClusterProtocolPBImpl.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderClusterProtocolPBImpl.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderClusterProtocolPBImpl.java	(working copy)
+@@ -72,28 +72,17 @@
+   }
+ 
+   @Override
+-  public Messages.UploadFileResponseProto uploadFile(RpcController controller,
+-                                                 Messages.UploadFileRequestProto request) throws
++  public Messages.OperateContainersResponseProto operateContainers(RpcController controller,
++                                                 Messages.OperateContainersRequestProto request) throws
+                                                                                    ServiceException {
+     try{
+-      return real.uploadFile(request);
++      return real.operateContainers(request);
+     }catch(Exception e){
+       throw wrap(e);
+     }
+   }
+ 
+   @Override
+-  public Messages.DeleteFileResponseProto deleteFile(RpcController controller,
+-                                                 Messages.DeleteFileRequestProto request) throws
+-                                                                             ServiceException{
+-    try {
+-      return real.deleteFile(request);
+-    }catch(Exception e){
+-      throw wrap(e);
+-    }
+-  }
+-
+-  @Override
+   public Messages.FlexClusterResponseProto flexCluster(RpcController controller,
+                                                        Messages.FlexClusterRequestProto request) throws
+                                                                                                  ServiceException {
+Index: slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderClusterProtocolProxy.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderClusterProtocolProxy.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderClusterProtocolProxy.java	(working copy)
+@@ -111,26 +111,17 @@
+   }
+ 
+   @Override
+-  public Messages.UploadFileResponseProto uploadFile(Messages.UploadFileRequestProto request)
+-              throws IOException, YarnException {
++  public Messages.OperateContainersResponseProto operateContainers(
++                            Messages.OperateContainersRequestProto request)
++                                  throws IOException, YarnException {
+     try{
+-      return endpoint.uploadFile(NULL_CONTROLLER,request);
++      return endpoint.operateContainers(NULL_CONTROLLER,request);
+     }catch(ServiceException e){
+       throw convert(e);
+     }
+   }
+ 
+   @Override
+-  public Messages.DeleteFileResponseProto deleteFile(Messages.DeleteFileRequestProto request)
+-              throws IOException, YarnException {
+-    try{
+-      return endpoint.deleteFile(NULL_CONTROLLER,request);
+-    }catch(ServiceException e){
+-      throw convert(e);
+-    }
+-  }
+-
+-  @Override
+   public Messages.FlexClusterResponseProto flexCluster(Messages.FlexClusterRequestProto request)
+       throws IOException {
+     try {
+Index: slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderIPCService.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderIPCService.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderIPCService.java	(working copy)
+@@ -32,20 +32,18 @@
+ import org.apache.slider.api.types.ContainerInformation;
+ import org.apache.slider.core.conf.AggregateConf;
+ import org.apache.slider.core.conf.ConfTree;
+-import org.apache.slider.core.exceptions.NoSuchNodeException;
+ import org.apache.slider.core.exceptions.ServiceNotReadyException;
+ import org.apache.slider.core.exceptions.SliderException;
+ import org.apache.slider.core.main.LauncherExitCodes;
+ import org.apache.slider.core.persist.AggregateConfSerDeser;
+ import org.apache.slider.core.persist.ConfTreeSerDeser;
+ import org.apache.slider.server.appmaster.AppMasterActionOperations;
+-import org.apache.slider.server.appmaster.actions.ActionDeleteFile;
+ import org.apache.slider.server.appmaster.actions.ActionFlexCluster;
+ import org.apache.slider.server.appmaster.actions.ActionHalt;
+ import org.apache.slider.server.appmaster.actions.ActionKillContainer;
++import org.apache.slider.server.appmaster.actions.ActionOperateContainers;
+ import org.apache.slider.server.appmaster.actions.ActionStopSlider;
+ import org.apache.slider.server.appmaster.actions.ActionUpgradeContainers;
+-import org.apache.slider.server.appmaster.actions.ActionUploadFile;
+ import org.apache.slider.server.appmaster.actions.AsyncAction;
+ import org.apache.slider.server.appmaster.actions.QueueAccess;
+ import org.apache.slider.server.appmaster.management.MetricsAndMonitoring;
+@@ -53,7 +51,6 @@
+ import org.apache.slider.server.appmaster.state.StateAccessForProviders;
+ import org.apache.slider.server.appmaster.web.rest.application.resources.ContentCache;
+ import org.apache.slider.server.services.security.CertificateManager;
+-import org.apache.slider.server.services.security.KeystoreGenerator;
+ import org.apache.slider.server.services.security.SecurityStore;
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
+@@ -215,51 +212,33 @@
+   }
+ 
+   @Override
+-  public Messages.UploadFileResponseProto uploadFile(Messages.UploadFileRequestProto request)
++  public Messages.OperateContainersResponseProto operateContainers(Messages.OperateContainersRequestProto request)
+       throws IOException, YarnException {
+-    onRpcCall("uploadFile");
+-    String message = request.getMessage();
+-    if( null == message){
+-      message = " application containers upgraded by client";
+-    }
+-    String inputFile = request.getInputfile();
+-    ActionUploadFile uploadFile =
+-        new ActionUploadFile(
+-            "Upload Files",
+-            inputFile,
+-            request.getContainerList(),
+-            request.getComponentList(),
+-            message
+-        );
+-    log.info("SliderAppMasterApi.uploadFile:{}",uploadFile);
++    onRpcCall("operateContainers");
++    log.info("Operate Containers");
+ 
+-    schedule(uploadFile);
+-    return Messages.UploadFileResponseProto.getDefaultInstance();
+-  }
+-
+-  @Override
+-  public Messages.DeleteFileResponseProto deleteFile(Messages.DeleteFileRequestProto request)
+-      throws IOException, YarnException {
+-    onRpcCall("deleteFile");
+     String message = request.getMessage();
+     if( null == message){
+       message = " application containers delete file by client";
+     }
+-    String removeFile = request.getRemovefile();
+-
+-    ActionDeleteFile deleteFile =
+-        new ActionDeleteFile(
+-            "Upload Files",
+-            removeFile,
++    String cmdName = request.getCmdName();
++    log.info("cmdName:"+cmdName);
++    log.info(message);
++    ActionOperateContainers operateContainers =
++        new ActionOperateContainers(
++            "Operate containers",
++            cmdName,
+             request.getContainerList(),
+             request.getComponentList(),
+-            message
+-        );
+-    log.info("SliderAppMasterApi.deleteFile:{}",deleteFile);
+-    schedule(deleteFile);
+-    return Messages.DeleteFileResponseProto.getDefaultInstance();
++            request.getParameterList(),
++            message);
++    log.info("SliderAppMasterApi.operateContainers:{}",operateContainers);
++    schedule(operateContainers);
++
++    return Messages.OperateContainersResponseProto.getDefaultInstance();
+   }
+ 
++
+   @Override //SliderClusterProtocol
+   public Messages.FlexClusterResponseProto flexCluster(Messages.FlexClusterRequestProto request)
+       throws IOException {
+Index: slider-core/src/main/proto/SliderClusterMessages.proto
+===================================================================
+--- slider-core/src/main/proto/SliderClusterMessages.proto	(revision 93663)
++++ slider-core/src/main/proto/SliderClusterMessages.proto	(working copy)
+@@ -79,38 +79,22 @@
+ /**
+  * upload file to containers
+ */
+-message UploadFileRequestProto{
++message OperateContainersRequestProto{
+ 
+   required string message = 1;
+   repeated string container = 2;
+   repeated string component = 3;
+-  required string inputfile = 4;
++  required string cmdName = 4;
++  repeated string parameter = 5;
+ }
+ 
+ /**
+   upload file to containers
+ */
+-message UploadFileResponseProto{
++message OperateContainersResponseProto{
+ }
+ 
+ /**
+-* delete file from containers
+-*/
+-message DeleteFileRequestProto{
+-  required string message = 1;
+-  repeated string container = 2;
+-  repeated string component = 3;
+-  required string removefile = 4;
+-}
+-
+-/**
+-  delete file from containers
+-*/
+-message DeleteFileResponseProto{
+-
+-}
+-
+-/**
+  * flex the cluster
+  */
+ message FlexClusterRequestProto {
+Index: slider-core/src/main/proto/SliderClusterProtocol.proto
+===================================================================
+--- slider-core/src/main/proto/SliderClusterProtocol.proto	(revision 93663)
++++ slider-core/src/main/proto/SliderClusterProtocol.proto	(working copy)
+@@ -64,16 +64,10 @@
+   /**
+    * Upload file
+    */
+-  rpc uploadFile(UploadFileRequestProto)
+-    returns(UploadFileResponseProto);
++  rpc operateContainers(OperateContainersRequestProto)
++    returns(OperateContainersResponseProto);
+ 
+   /**
+-   * Delete file
+-  */
+-  rpc deleteFile(DeleteFileRequestProto)
+-    returns(DeleteFileResponseProto);
+-
+-  /**
+    * Flex the cluster. 
+    */
+   rpc flexCluster(FlexClusterRequestProto) 
+Index: slider-router/src/main/java/com/cmss/slider/webapp/resources/SliderResource.java
+===================================================================
+--- slider-router/src/main/java/com/cmss/slider/webapp/resources/SliderResource.java	(revision 93663)
++++ slider-router/src/main/java/com/cmss/slider/webapp/resources/SliderResource.java	(working copy)
+@@ -2,7 +2,6 @@
+ 
+ import com.cmss.slider.server.actions.RouterService;
+ import com.cmss.slider.webapp.beans.AppRegisterBean;
+-import com.cmss.slider.webapp.beans.AppLoadBean;
+ import com.cmss.slider.webapp.beans.BdocAuthBean;
+ import com.cmss.slider.webapp.beans.WebContainerCreateBean;
+ import com.cmss.slider.webapp.beans.WebContainerDeleteBean;
+@@ -25,7 +24,6 @@
+ import javax.ws.rs.core.MediaType;
+ import javax.ws.rs.core.Response;
+ import java.io.UnsupportedEncodingException;
+-import java.net.URI;
+ import java.net.URLDecoder;
+ import java.util.Set;
+ 
+@@ -125,40 +123,6 @@
+     return response.build();
+   }
+ 
+-  @PUT
+-  @Path("/{containerName}/apps/{appName}/load")
+-  @Consumes({"*/*"})
+-  @Produces(MediaType.APPLICATION_JSON)
+-  public Response loadApp(String appLoadBean, @PathParam("containerName") String containerName,
+-                          @PathParam("appName") String appName) {
+-    init();
+-    Response.ResponseBuilder response;
+-    boolean result = sliderService.loadApp(getRouterService(), gson.fromJson(appLoadBean, AppLoadBean.class), containerName, appName);
+-    if(result) {
+-      response = Response.ok();
+-    }else {
+-      response = Response.serverError();
+-    }
+-    return response.build();
+-  }
+-
+-  @PUT
+-  @Path("/{containerName}/apps/{appName}/unload")
+-  @Consumes({"*/*"})
+-  @Produces(MediaType.APPLICATION_JSON)
+-  public Response unLoadApp(String authBean, @PathParam("containerName") String containerName,
+-                          @PathParam("appName") String appName) {
+-    init();
+-    Response.ResponseBuilder response;
+-    boolean result = sliderService.unLoadApp(getRouterService(), gson.fromJson(authBean, BdocAuthBean.class), containerName, appName);
+-    if(result) {
+-      response = Response.ok();
+-    }else {
+-      response = Response.serverError();
+-    }
+-    return response.build();
+-  }
+-
+   @DELETE
+   @Path("/{containerName}/apps/{appEndpoint}")
+   @Consumes({"*/*"})
+Index: slider-router/src/main/java/com/cmss/slider/webapp/services/SliderService.java
+===================================================================
+--- slider-router/src/main/java/com/cmss/slider/webapp/services/SliderService.java	(revision 93663)
++++ slider-router/src/main/java/com/cmss/slider/webapp/services/SliderService.java	(working copy)
+@@ -18,7 +18,5 @@
+   public boolean stopContainer(BdocAuthBean authBean, String containerName);
+   public boolean deleteContainer(WebContainerDeleteBean webContainerDeleteBean);
+   public boolean registerApp(RouterService routerService, AppRegisterBean registerBean, String containerName);
+-  public boolean loadApp(RouterService routerService, AppLoadBean appLoadBean, String containerName, String appName);
+-  public boolean unLoadApp(RouterService routerService, BdocAuthBean authBean, String containerName, String appName);
+   public boolean unRegisterApp(RouterService routerService, BdocAuthBean authBean, String containerName, String appEndpoint);
+ }
+Index: slider-router/src/main/java/com/cmss/slider/webapp/services/SliderServiceImpl.java
+===================================================================
+--- slider-router/src/main/java/com/cmss/slider/webapp/services/SliderServiceImpl.java	(revision 93663)
++++ slider-router/src/main/java/com/cmss/slider/webapp/services/SliderServiceImpl.java	(working copy)
+@@ -3,7 +3,6 @@
+ import com.cmss.slider.server.actions.RouterService;
+ import com.cmss.slider.webapp.beans.AppConfigJsonBase;
+ import com.cmss.slider.webapp.beans.AppRegisterBean;
+-import com.cmss.slider.webapp.beans.AppLoadBean;
+ import com.cmss.slider.webapp.beans.BdocAuthBean;
+ import com.cmss.slider.webapp.beans.ResourcesJsonBase;
+ import com.cmss.slider.webapp.beans.WebContainerCreateBean;
+@@ -25,9 +24,7 @@
+ import org.apache.slider.client.SliderClient;
+ import org.apache.slider.common.SliderKeys;
+ import org.apache.slider.common.SliderXmlConfKeys;
+-import org.apache.slider.common.params.ActionDeleteArgs;
+ import org.apache.slider.common.params.ActionFreezeArgs;
+-import org.apache.slider.common.params.ActionUploadArgs;
+ import org.apache.slider.core.exceptions.SliderException;
+ import org.apache.slider.core.main.LauncherExitCodes;
+ 
+@@ -247,106 +244,6 @@
+   }
+ 
+   @Override
+-  public boolean loadApp(RouterService routerService, AppLoadBean appLoadBean, String containerName, String appName) {
+-    try {
+-      SliderClient client = new SliderClient();
+-      Configuration conf = new Configuration();
+-      conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_BDOC_ACCESS_ID, appLoadBean.getAccessId());
+-      conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_BDOC_ACCESS_KEY, appLoadBean.getAccessKey());
+-      conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_PROXY_USER, appLoadBean.getProxyUser());
+-      // TODO check bdoc user
+-
+-      conf = client.bindArgs(conf, "upload", containerName);
+-      if (!client.isInState(Service.STATE.INITED)) {
+-        client.init(conf);
+-      }
+-      client.start();
+-
+-      // Get component string
+-      Set<String> components = client.getComponents(containerName);
+-      components.remove(SliderKeys.COMPONENT_AM);
+-      // Get container string for components
+-      List<ContainerInformation> containers = client.getContainers(containerName);
+-      Set<String> containerNameSet = new HashSet<String>();
+-      for(ContainerInformation info : containers) {
+-        if(components.contains(info.component)){
+-          containerNameSet.add(info.containerId);
+-        }
+-      }
+-
+-      ActionUploadArgs actionUploadArgs = new ActionUploadArgs();
+-      actionUploadArgs.inputFile = appLoadBean.getAppHdfsPath();
+-      actionUploadArgs.components = new ArrayList<String>(components);
+-      actionUploadArgs.containers = new ArrayList<String>(containerNameSet);
+-
+-      int result = client.actionUpload(client.getServiceArgs().getClusterName(), actionUploadArgs);
+-      if(result == EXIT_SUCCESS) {
+-        return true;
+-      } else {
+-        return false;
+-      }
+-    }catch (Exception e) {
+-      if (e instanceof IOException) {
+-        throw new ClientIOException("IOException occured when upload webapp.", e);
+-      } else if (e instanceof YarnException) {
+-        throw new YarnServiceException("Internal yarn service error.", e);
+-      } else {
+-        throw new ClientArgBindException(e.getMessage() ,e);
+-      }
+-    }
+-  }
+-
+-  @Override
+-  public boolean unLoadApp(RouterService routerService, BdocAuthBean authBean, String containerName, String appName) {
+-    try {
+-      SliderClient client = new SliderClient();
+-      Configuration conf = new Configuration();
+-      conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_BDOC_ACCESS_ID, authBean.getAccessId());
+-      conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_BDOC_ACCESS_KEY, authBean.getAccessKey());
+-      conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_PROXY_USER, authBean.getProxyUser());
+-      // TODO check bdoc user
+-
+-      conf = client.bindArgs(conf, "delete", containerName);
+-      if (!client.isInState(Service.STATE.INITED)) {
+-        client.init(conf);
+-      }
+-      client.start();
+-
+-      // Get component string
+-      Set<String> components = client.getComponents(containerName);
+-      components.remove(SliderKeys.COMPONENT_AM);
+-      // Get container string for components
+-      List<ContainerInformation> containers = client.getContainers(containerName);
+-      Set<String> containerNameSet = new HashSet<String>();
+-      for(ContainerInformation info : containers) {
+-        if(components.contains(info.component)){
+-          containerNameSet.add(info.containerId);
+-        }
+-      }
+-
+-      ActionDeleteArgs actionDeleteArgs = new ActionDeleteArgs();
+-      actionDeleteArgs.removeFile = appName + WAR_SUFFIX;
+-      actionDeleteArgs.components = new ArrayList<String>(components);
+-      actionDeleteArgs.containers = new ArrayList<String>(containerNameSet);
+-
+-      int result = client.actionDelete(client.getServiceArgs().getClusterName(), actionDeleteArgs);
+-      if(result == EXIT_SUCCESS) {
+-        return true;
+-      } else {
+-        return false;
+-      }
+-    }catch (Exception e) {
+-      if (e instanceof IOException) {
+-        throw new ClientIOException("IOException occured when unLoad webapp.", e);
+-      } else if (e instanceof YarnException) {
+-        throw new YarnServiceException("Internal yarn service error.", e);
+-      } else {
+-        throw new ClientArgBindException(e.getMessage() ,e);
+-      }
+-    }
+-  }
+-
+-  @Override
+   public boolean unRegisterApp(RouterService routerService, BdocAuthBean authBean, String containerName, String appEndpoint) {
+     try {
+       routerService.unregister(appEndpoint, containerName);

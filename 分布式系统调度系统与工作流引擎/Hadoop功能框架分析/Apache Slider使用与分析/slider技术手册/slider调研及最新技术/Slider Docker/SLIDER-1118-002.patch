@@ -1,0 +1,37 @@
+diff --git a/slider-agent/src/main/python/agent/YarnDockerManager.py b/slider-agent/src/main/python/agent/YarnDockerManager.py
+index abdb2fb..7570c44 100644
+--- a/slider-agent/src/main/python/agent/YarnDockerManager.py
++++ b/slider-agent/src/main/python/agent/YarnDockerManager.py
+@@ -21,6 +21,7 @@ limitations under the License.
+ import logging
+ import os
+ import subprocess
++import socket
+ import Constants
+ import time
+ import traceback
+@@ -228,20 +229,12 @@ class YarnDockerManager(Script):
+       }
+     
+     #query the ip and hostname of the docker container where the agent is running
+-    ip_query_command = "ip addr show dev eth0 | grep \'inet \' | awk \'{print $2}\' | cut -d / -f 1"
+-    proc = subprocess.Popen(ip_query_command, stdout = subprocess.PIPE, shell=True)
+-    ip, err = proc.communicate()
+-    if err is not None:
+-        logger.error("error when retrieving ip: " + err)
+-    
+-    hostname_query_command = "hostname"
+-    proc = subprocess.Popen(hostname_query_command, stdout = subprocess.PIPE, shell=True)
+-    hostname, err = proc.communicate()
+-    if err is not None:
+-        logger.error("error when retrieving hostname: " + err)
+-    
++    ip = socket.gethostbyname(socket.gethostname())
++    hostname = socket.getfqdn()
+     config['ip'] = ip.rstrip()
+     config['hostname'] = hostname.rstrip()
++    logger.info('ip fetched: ' + ip)
++    logger.info('hostname fetched: ' + hostname)
+     
+     logger.info('response from getconfig: ' + str(config))
+     return config

@@ -1,0 +1,26 @@
+1.SliderAppMaster的启动过程
+   SliderClient -> YARN -> SliderAppMaster
+
+2.SliderAppMaster与YARN通信
+   container的申请
+   container的placement策略：初次和多次启动，包括RoleHistory的作用
+
+3.Container中Agent的启动，注册和心跳机制
+
+4.SliderAppMaster对Container的操作，根据Heartbeat
+   QueueAccess
+
+4.SliderAppMaster的对外机制
+   SliderAppMaster使用yarn registry向服务中注册
+   REST实现  || SliderAMWebApp
+   export
+   config等信息的获取和发布
+
+5.SliderAppMaster的metrics
+
+
+6.SliderAppMaster对Docker的支持
+
+7.安全机制
+
+

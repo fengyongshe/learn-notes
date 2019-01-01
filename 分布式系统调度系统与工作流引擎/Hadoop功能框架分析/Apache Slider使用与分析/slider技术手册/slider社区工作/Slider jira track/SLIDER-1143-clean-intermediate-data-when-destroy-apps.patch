@@ -1,0 +1,231 @@
+diff --git a/app-packages/storm/metainfo.xml b/app-packages/storm/metainfo.xml
+index cc96628..e0e9067 100644
+--- a/app-packages/storm/metainfo.xml
++++ b/app-packages/storm/metainfo.xml
+@@ -23,6 +23,7 @@
+     <comment>Apache Hadoop Stream processing framework</comment>
+     <version>${pkg.version}</version>
+     <exportedConfigs>storm-site</exportedConfigs>
++    <cleanClass>org.apache.slider.core.clean.StormApplicationCleaner</cleanClass>
+ 
+     <exportGroups>
+       <exportGroup>
+diff --git a/slider-core/src/main/java/org/apache/slider/client/SliderClient.java b/slider-core/src/main/java/org/apache/slider/client/SliderClient.java
+index dd90e46..7074731 100644
+--- a/slider-core/src/main/java/org/apache/slider/client/SliderClient.java
++++ b/slider-core/src/main/java/org/apache/slider/client/SliderClient.java
+@@ -116,6 +116,7 @@ import org.apache.slider.common.tools.SliderUtils;
+ import org.apache.slider.common.tools.SliderVersionInfo;
+ import org.apache.slider.core.build.InstanceBuilder;
+ import org.apache.slider.core.build.InstanceIO;
++import org.apache.slider.core.clean.ApplicationCleaner;
+ import org.apache.slider.core.conf.AggregateConf;
+ import org.apache.slider.core.conf.ConfTree;
+ import org.apache.slider.core.conf.ConfTreeOperations;
+@@ -161,6 +162,8 @@ import org.apache.slider.core.zk.ZKPathBuilder;
+ import org.apache.slider.providers.AbstractClientProvider;
+ import org.apache.slider.providers.SliderProviderFactory;
+ import org.apache.slider.providers.agent.AgentKeys;
++import org.apache.slider.providers.agent.AgentUtils;
++import org.apache.slider.providers.agent.application.metadata.Metainfo;
+ import org.apache.slider.providers.slideram.SliderAMClientProvider;
+ import org.apache.slider.server.appmaster.SliderAppMaster;
+ import org.apache.slider.server.appmaster.rpc.RpcBinder;
+@@ -242,6 +245,7 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
+   public static final String E_NO_RESOURCE_MANAGER = "No valid Resource Manager address provided";
+   public static final String E_PACKAGE_EXISTS = "Package exists";
+   private static PrintStream clientOutputStream = System.out;
++  public static final String APPCLEAN_DEFAULT_CLASS = "org.apache.slider.core.clean.DefaultApplicationCleaner";
+ 
+   // value should not be changed without updating string find in slider.py
+   private static final String PASSWORD_PROMPT = "Enter password for";
+@@ -639,6 +643,25 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
+     // delete the directory;
+     FileSystem fs = sliderFileSystem.getFileSystem();
+     boolean exists = fs.exists(clusterDirectory);
++
++    // clean specified app info, eg: hbase zk path
++    AggregateConf instanceDefinition =
++        InstanceIO.loadInstanceDefinitionUnresolved(sliderFileSystem,clusterDirectory);
++    String appDef = SliderUtils.getApplicationDefinitionPath(instanceDefinition.getAppConfOperations());
++    Metainfo metaInfo = AgentUtils.getApplicationMetainfo(sliderFileSystem, appDef, false);
++    String cleanerClass = metaInfo.getApplication().getCleanClass();
++    if (cleanerClass == null){
++      cleanerClass = APPCLEAN_DEFAULT_CLASS;
++    }
++    ApplicationCleaner cleaner = null;
++    try {
++      cleaner = (ApplicationCleaner)Class.forName(cleanerClass).newInstance();
++    } catch(Exception e){
++      log.error("Cleaner class initial error",e);
++    }
++    cleaner.initialize(instanceDefinition, getZkClient(clustername,getUsername()));
++    cleaner.clean();
++
+     if (exists) {
+       log.debug("Application Instance {} found at {}: destroying", clustername, clusterDirectory);
+       if (!forceDestroy) {
+diff --git a/slider-core/src/main/java/org/apache/slider/core/clean/ApplicationCleaner.java b/slider-core/src/main/java/org/apache/slider/core/clean/ApplicationCleaner.java
+new file mode 100644
+index 0000000..b7b7dd8
+--- /dev/null
++++ b/slider-core/src/main/java/org/apache/slider/core/clean/ApplicationCleaner.java
+@@ -0,0 +1,15 @@
++package org.apache.slider.core.clean;
++
++import org.apache.slider.core.conf.AggregateConf;
++import org.apache.slider.core.zk.ZKIntegration;
++
++/**
++ * Interface which must be implemented to act as a cleaner
++ * used when app destroyed
++ */
++
++public interface ApplicationCleaner {
++
++  public void initialize(AggregateConf appConfig,ZKIntegration zkClient);
++  public void clean();
++}
+diff --git a/slider-core/src/main/java/org/apache/slider/core/clean/DefaultApplicationCleaner.java b/slider-core/src/main/java/org/apache/slider/core/clean/DefaultApplicationCleaner.java
+new file mode 100644
+index 0000000..f220f9e
+--- /dev/null
++++ b/slider-core/src/main/java/org/apache/slider/core/clean/DefaultApplicationCleaner.java
+@@ -0,0 +1,21 @@
++package org.apache.slider.core.clean;
++
++import org.apache.slider.core.conf.AggregateConf;
++import org.apache.slider.core.zk.ZKIntegration;
++
++/**
++ * Default Cleaner when not define or not generated Intermediate data
++ * when app running
++ */
++public class DefaultApplicationCleaner implements ApplicationCleaner{
++
++  @Override
++  public void initialize(AggregateConf appConfig, ZKIntegration zkClient) {
++
++  }
++
++  @Override
++  public void clean() {
++
++  }
++}
+diff --git a/slider-core/src/main/java/org/apache/slider/core/clean/StormApplicationCleaner.java b/slider-core/src/main/java/org/apache/slider/core/clean/StormApplicationCleaner.java
+new file mode 100644
+index 0000000..7608755
+--- /dev/null
++++ b/slider-core/src/main/java/org/apache/slider/core/clean/StormApplicationCleaner.java
+@@ -0,0 +1,39 @@
++package org.apache.slider.core.clean;
++
++import org.apache.slider.core.conf.AggregateConf;
++import org.apache.slider.core.zk.ZKIntegration;
++import org.apache.zookeeper.KeeperException;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++
++/**
++ * Clean storm Intermediate data when destroy
++ */
++public class StormApplicationCleaner implements ApplicationCleaner{
++
++  private static final Logger log = LoggerFactory.getLogger(StormApplicationCleaner.class);
++
++  private AggregateConf appConfig;
++  private ZKIntegration zkClient;
++
++  private static String STORM_ZK_PARENT = "site.storm-site.storm.zookeeper.root";
++  @Override
++  public void initialize(AggregateConf appConfig, ZKIntegration zkClient) {
++    this.appConfig = appConfig;
++    this.zkClient = zkClient;
++  }
++
++  @Override
++  public void clean() {
++    // delete storm zk path ,created when storm start
++    String zkPath = appConfig.getAppConf().global.get(STORM_ZK_PARENT);
++    try {
++      zkClient.deleteRecursive(zkPath);
++    } catch (KeeperException e) {
++      log.error("storm clean error",e);
++    } catch (InterruptedException e) {
++      log.error("storm clean error",e);
++    }
++  }
++
++}
+diff --git a/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/Application.java b/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/Application.java
+index 63546a4..78748a4 100644
+--- a/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/Application.java
++++ b/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/Application.java
+@@ -30,6 +30,7 @@ import java.util.List;
+  */
+ public class Application extends AbstractMetainfoSchema {
+   String exportedConfigs;
++  String cleanClass;
+   List<ExportGroup> exportGroups = new ArrayList<>();
+   List<OSSpecific> osSpecifics = new ArrayList<>();
+   List<CommandOrder> commandOrders = new ArrayList<>();
+@@ -71,6 +72,14 @@ public class Application extends AbstractMetainfoSchema {
+     this.exportedConfigs = exportedConfigs;
+   }
+ 
++  public String getCleanClass() {
++    return cleanClass;
++  }
++
++  public void setCleanClass(String cleanClass) {
++    this.cleanClass = cleanClass;
++  }
++
+   public void addConfigFile(ConfigFile configFile) {
+     this.configFiles.add(configFile);
+   }
+diff --git a/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/MetainfoParser.java b/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/MetainfoParser.java
+index a6f0e9d..f9ae4c4 100644
+--- a/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/MetainfoParser.java
++++ b/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/MetainfoParser.java
+@@ -32,6 +32,7 @@ public class MetainfoParser extends AbstractMetainfoParser{
+     digester.addBeanPropertySetter("*/application/comment");
+     digester.addBeanPropertySetter("*/application/version");
+     digester.addBeanPropertySetter("*/application/exportedConfigs");
++    digester.addBeanPropertySetter("*/application/cleanClass");
+ 
+     digester.addObjectCreate("*/commandOrder", CommandOrder.class);
+     digester.addBeanPropertySetter("*/commandOrder/command");
+diff --git a/slider-core/src/test/java/org/apache/slider/providers/agent/TestAgentProviderService.java b/slider-core/src/test/java/org/apache/slider/providers/agent/TestAgentProviderService.java
+index 9fbb3d0..6dbaeb7 100644
+--- a/slider-core/src/test/java/org/apache/slider/providers/agent/TestAgentProviderService.java
++++ b/slider-core/src/test/java/org/apache/slider/providers/agent/TestAgentProviderService.java
+@@ -128,6 +128,7 @@ public class TestAgentProviderService {
+                                                + "      <type>YARN-APP</type>\n"
+                                                + "      <minHadoopVersion>2.1.0</minHadoopVersion>\n"
+                                                + "      <exportedConfigs>hbase-site,global</exportedConfigs>\n"
++                                               + "      <cleanClass>org.apache.slider.common.appclean.HBaseApplicationCleaner</cleanClass> \n"
+                                                + "      <exportGroups>\n"
+                                                + "        <exportGroup>\n"
+                                                + "          <name>QuickLinks</name>\n"
+diff --git a/slider-core/src/test/java/org/apache/slider/providers/agent/application/metadata/TestMetainfoParser.java b/slider-core/src/test/java/org/apache/slider/providers/agent/application/metadata/TestMetainfoParser.java
+index 30283d1..17319cc 100644
+--- a/slider-core/src/test/java/org/apache/slider/providers/agent/application/metadata/TestMetainfoParser.java
++++ b/slider-core/src/test/java/org/apache/slider/providers/agent/application/metadata/TestMetainfoParser.java
+@@ -74,6 +74,7 @@ public class TestMetainfoParser {
+                             + "\"schemaVersion\":\"2.2\",\n"
+                             + "\"application\":{\n"
+                             +     "\"name\": \"MEMCACHED\","
++                            +     "\"cleanClass\":DEFAULT_APPCLEANER_CLASS\","
+                             +     "\"exportGroups\": ["
+                             +        "{"
+                             +          "\"name\": \"Servers\","
+@@ -131,6 +132,7 @@ public class TestMetainfoParser {
+ 
+     Assert.assertEquals("MEMCACHED", app.getName());
+     List<ExportGroup> egs = app.getExportGroups();
++    Assert.assertEquals("DEFAULT_APPCLEANER_CLASS",app.getCleanClass());
+     Assert.assertEquals(1, egs.size());
+     ExportGroup eg = egs.get(0);
+     Assert.assertEquals("Servers", eg.getName());

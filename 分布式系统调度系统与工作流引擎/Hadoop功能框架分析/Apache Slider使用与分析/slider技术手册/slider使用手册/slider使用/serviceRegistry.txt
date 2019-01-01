@@ -1,0 +1,111 @@
+{
+    "type": "JSONServiceRecord",
+    "description": "Slider Application Master",
+    "external": [
+        {
+            "api": "classpath:org.apache.slider.appmaster.ipc",
+            "addressType": "host/port",
+            "protocolType": "hadoop/IPC",
+            "addresses": [
+                {
+                    "port": "1024",
+                    "host": "compute-32-12.local"
+                }
+            ]
+        },
+        {
+            "api": "http://",
+            "addressType": "uri",
+            "protocolType": "webui",
+            "addresses": [
+                {
+                    "uri": "http://compute-32-12.local:1025"
+                }
+            ]
+        },
+        {
+            "api": "classpath:org.apache.slider.client.rest",
+            "addressType": "uri",
+            "protocolType": "webui",
+            "addresses": [
+                {
+                    "uri": "http://compute-32-12.local:1025"
+                }
+            ]
+        },
+        {
+            "api": "classpath:org.apache.slider.management",
+            "addressType": "uri",
+            "protocolType": "REST",
+            "addresses": [
+                {
+                    "uri": "http://compute-32-12.local:1025/ws/v1/slider/mgmt"
+                }
+            ]
+        },
+        {
+            "api": "classpath:org.apache.slider.publisher",
+            "addressType": "uri",
+            "protocolType": "REST",
+            "addresses": [
+                {
+                    "uri": "http://compute-32-12.local:1025/ws/v1/slider/publisher"
+                }
+            ]
+        },
+        {
+            "api": "classpath:org.apache.slider.registry",
+            "addressType": "uri",
+            "protocolType": "REST",
+            "addresses": [
+                {
+                    "uri": "http://compute-32-12.local:1025/ws/v1/slider/registry"
+                }
+            ]
+        },
+        {
+            "api": "classpath:org.apache.slider.publisher.configurations",
+            "addressType": "uri",
+            "protocolType": "REST",
+            "addresses": [
+                {
+                    "uri": "http://compute-32-12.local:1025/ws/v1/slider/publisher/slider"
+                }
+            ]
+        },
+        {
+            "api": "classpath:org.apache.slider.publisher.exports",
+            "addressType": "uri",
+            "protocolType": "REST",
+            "addresses": [
+                {
+                    "uri": "http://compute-32-12.local:1025/ws/v1/slider/publisher/exports"
+                }
+            ]
+        }
+    ],
+    "internal": [
+        {
+            "api": "classpath:org.apache.slider.agents.secure",
+            "addressType": "uri",
+            "protocolType": "REST",
+            "addresses": [
+                {
+                    "uri": "https://compute-32-12.local:55819/ws/v1/slider/agents"
+                }
+            ]
+        },
+        {
+            "api": "classpath:org.apache.slider.agents.oneway",
+            "addressType": "uri",
+            "protocolType": "REST",
+            "addresses": [
+                {
+                    "uri": "https://compute-32-12.local:34924/ws/v1/slider/agents"
+                }
+            ]
+        }
+    ],
+    "yarn:persistence": "application",
+    "yarn:id": "application_1431676684485_0007"
+}

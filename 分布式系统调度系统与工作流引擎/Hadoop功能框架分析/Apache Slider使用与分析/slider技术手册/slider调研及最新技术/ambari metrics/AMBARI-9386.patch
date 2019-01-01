@@ -1,0 +1,559 @@
+86dc9394c90e282b2e2dd562193dedb995e3000a
+diff --git a/contrib/views/slider/src/main/java/org/apache/ambari/view/slider/SliderAppsViewController.java b/contrib/views/slider/src/main/java/org/apache/ambari/view/slider/SliderAppsViewController.java
+index 694a434..a574d2d 100644
+--- a/contrib/views/slider/src/main/java/org/apache/ambari/view/slider/SliderAppsViewController.java
++++ b/contrib/views/slider/src/main/java/org/apache/ambari/view/slider/SliderAppsViewController.java
+@@ -39,8 +39,9 @@ public interface SliderAppsViewController {
+   public static final String PARAM_VIEW_PRINCIPAL_KEYTAB= "view.kerberos.principal.keytab";
+ 
+   public static final String PROPERTY_SLIDER_ZK_QUORUM = "slider.zookeeper.quorum";
+-  public static final String PROPERTY_GANGLIA_SERVER_HOSTNAME = "ganglia.server.hostname";
+-  public static final String PROPERTY_GANGLIA_CUSTOM_CLUSTERS = "ganglia.additional.clusters";
++  public static final String PROPERTY_METRICS_SERVER_HOSTNAME = "site.global.metric_collector_host";
++  public static final String PROPERTY_METRICS_SERVER_PORT = "site.global.metric_collector_port";
++  public static final String PROPERTY_METRICS_LIBRARY_PATH = "site.global.metric_collector_lib";
+   public static final String PROPERTY_YARN_RM_WEBAPP_URL = "yarn.rm.webapp.url";
+   public static final String PROPERTY_SLIDER_USER = "view.slider.user";
+   public static final String PROPERTY_JAVA_HOME = "java.home";
+diff --git a/contrib/views/slider/src/main/java/org/apache/ambari/view/slider/SliderAppsViewControllerImpl.java b/contrib/views/slider/src/main/java/org/apache/ambari/view/slider/SliderAppsViewControllerImpl.java
+index ebd21d8..9a031e6 100644
+--- a/contrib/views/slider/src/main/java/org/apache/ambari/view/slider/SliderAppsViewControllerImpl.java
++++ b/contrib/views/slider/src/main/java/org/apache/ambari/view/slider/SliderAppsViewControllerImpl.java
+@@ -260,23 +260,26 @@ public class SliderAppsViewControllerImpl implements SliderAppsViewController {
+                   new ViewStatus.Validation(
+                       "ZooKeeper service is not installed"));
+             }
+-            if (cluster.getDesiredConfigs().containsKey("ganglia-env")) {
+-              Map<String, String> gangliaConfigs = ambariClient.getConfiguration(
+-                  cluster, "ganglia-env",
+-                  cluster.getDesiredConfigs().get("ganglia-env"));
+-              String clustersCsv = gangliaConfigs.get("additional_clusters");
+-              AmbariService gangliaService = ambariClient.getService(cluster,
+-                  "GANGLIA");
+-              List<AmbariHostComponent> hostsList = gangliaService
+-                  .getComponentsToHostComponentsMap().get("GANGLIA_SERVER");
++            if (cluster.getDesiredConfigs().containsKey("ams-site")) {
++              Map<String, String> amsConfigs = ambariClient.getConfiguration(cluster, "ams-site", cluster.getDesiredConfigs().get("ams-site"));
++              AmbariService amsService = ambariClient.getService(cluster, "AMS");
++              List<AmbariHostComponent> hostsList = amsService.getComponentsToHostComponentsMap().get("METRIC_COLLECTOR");
+               if (hostsList != null && hostsList.size() > 0) {
+-                String gangliaHostName = hostsList
+-                    .get(0).getHostName();
+-                newHadoopConfigs.put(PROPERTY_GANGLIA_SERVER_HOSTNAME, gangliaHostName);
+-                status.getParameters().put(PROPERTY_GANGLIA_SERVER_HOSTNAME, gangliaHostName);
++                String collectorHostName = hostsList.get(0).getHostName();
++                newHadoopConfigs.put(PROPERTY_METRICS_SERVER_HOSTNAME, collectorHostName);
++                status.getParameters().put(PROPERTY_METRICS_SERVER_HOSTNAME, collectorHostName);
+               }
+-              newHadoopConfigs.put(PROPERTY_GANGLIA_CUSTOM_CLUSTERS, clustersCsv);
+-              status.getParameters().put(PROPERTY_GANGLIA_CUSTOM_CLUSTERS, clustersCsv);
++              if (amsConfigs != null && amsConfigs.containsKey("timeline.metrics.service.webapp.address")) {
++                String portString = amsConfigs.get("timeline.metrics.service.webapp.address");
++                int sepIndex = portString.indexOf(':');
++                if (sepIndex > -1) {
++                  portString = portString.substring(sepIndex + 1);
++                }
++                newHadoopConfigs.put(PROPERTY_METRICS_SERVER_PORT, portString);
++                status.getParameters().put(PROPERTY_METRICS_SERVER_PORT, portString);
++              }
++              newHadoopConfigs.put(PROPERTY_METRICS_LIBRARY_PATH, "file:///usr/lib/ambari-metrics-hadoop-sink/ambari-metrics-hadoop-sink.jar");
++              status.getParameters().put(PROPERTY_METRICS_LIBRARY_PATH, "file:///usr/lib/ambari-metrics-hadoop-sink/ambari-metrics-hadoop-sink.jar");
+             }
+             Validation validateHDFSAccess = validateHDFSAccess(newHadoopConfigs, hdfsServiceInfo);
+             if (validateHDFSAccess != null) {
+diff --git a/contrib/views/slider/src/main/resources/ui/app/controllers/createAppWizard/step3_controller.js b/contrib/views/slider/src/main/resources/ui/app/controllers/createAppWizard/step3_controller.js
+index dce84e5..b01a927 100644
+--- a/contrib/views/slider/src/main/resources/ui/app/controllers/createAppWizard/step3_controller.js
++++ b/contrib/views/slider/src/main/resources/ui/app/controllers/createAppWizard/step3_controller.js
+@@ -34,11 +34,11 @@ App.CreateAppWizardStep3Controller = Ember.ObjectController.extend({
+    * predefined settings of configuration properties
+    */
+   configSettings: {
+-    'site.global.ganglia_server_id': {
+-      viewType: 'select'
++    'site.global.metric_collector_host': {
+     },
+-    'site.global.ganglia_server_port': {
+-      readOnly: true
++    'site.global.metric_collector_port': {
++    },
++    'site.global.metric_collector_lib': {
+     }
+   },
+ 
+@@ -76,24 +76,13 @@ App.CreateAppWizardStep3Controller = Ember.ObjectController.extend({
+    */
+   configsSet: [
+     {
+-      name: 'ganglia_metrics',
++      name: 'ams_metrics',
+       trigger: {value: false, label: Em.I18n.t('configs.enable.metrics'), viewType: 'checkbox'},
+       isSet: true,
+       section: 'global',
+-      configNames: ["site.global.ganglia_server_host", "site.global.ganglia_server_id", "site.global.ganglia_server_port"],
++      configNames: ["site.global.metric_collector_host", "site.global.metric_collector_port", "site.global.metric_collector_lib"],
+       configs: [],
+-      dependencies: [
+-        {
+-          name: 'App.gangliaClusters',
+-          map: [],
+-          mapFunction: function (origin, dependent) {
+-            if (!origin || !dependent) return false;
+-            dependent.set('value', this.map.findBy('name', origin.get('value')).port);
+-          },
+-          origin: "site.global.ganglia_server_id",
+-          dependent: "site.global.ganglia_server_port"
+-        }
+-      ]
++      dependencies: []
+     }
+   ],
+ 
+@@ -118,8 +107,7 @@ App.CreateAppWizardStep3Controller = Ember.ObjectController.extend({
+       configs = Em.A(),
+       configsSet = $.extend(true, [], this.get('configsSet')),
+       allSetConfigs = {},
+-      configSettings = this.get('configSettings'),
+-      gangliaClusters = App.get('gangliaClusters');
++      configSettings = this.get('configSettings');
+ 
+     configsSet.forEach(function (item) {
+       item.configNames.forEach(function (configName) {
+@@ -140,16 +128,16 @@ App.CreateAppWizardStep3Controller = Ember.ObjectController.extend({
+         configSetting.value = App.get('javaHome');
+       }
+ 
+-      if (key === "site.global.ganglia_server_host" && !!setDefaults && App.get('gangliaHost')) {
+-        configSetting.value = App.get('gangliaHost');
++      if (key === "site.global.metric_collector_host" && !!setDefaults && App.get('metricsHost')) {
++        configSetting.value = App.get('metricsHost');
+       }
+ 
+-      if (key === "site.global.ganglia_server_id" && gangliaClusters) {
+-        configSetting.options = gangliaClusters.mapProperty('name');
+-        configSetting.value = gangliaClusters.mapProperty('name')[0];
++      if (key === "site.global.metric_collector_port" && !!setDefaults && App.get('metricsPort')) {
++        configSetting.value = App.get('metricsPort');
+       }
+-      if (key === "site.global.ganglia_server_port" && gangliaClusters) {
+-        configSetting.value = gangliaClusters.mapProperty('port')[0];
++
++      if (key === "site.global.metric_collector_lib" && !!setDefaults && App.get('metricsLibPath')) {
++        configSetting.value = App.get('metricsLibPath');
+       }
+ 
+       if (allSetConfigs[key]) {
+@@ -162,9 +150,6 @@ App.CreateAppWizardStep3Controller = Ember.ObjectController.extend({
+     configsSet.forEach(function (configSet) {
+       if (configSet.configs.length === configSet.configNames.length) {
+         delete configSet.configNames;
+-        if (configSet.name === 'ganglia_metrics') {
+-          configSet.trigger.readOnly = (!App.get('gangliaClusters') || App.get('gangliaClusters').length === 0);
+-        }
+         configSet.trigger = App.ConfigProperty.create(configSet.trigger);
+         this.initConfigSetDependencies(configSet);
+         configs.unshift(configSet);
+@@ -239,12 +224,12 @@ App.CreateAppWizardStep3Controller = Ember.ObjectController.extend({
+    */
+   saveConfigs: function () {
+     var configsToSet = this.get('configsObject');
+-    if (configsToSet['site.global.ganglia_enabled']!=null) {
+-      if (configsToSet['site.global.ganglia_server_host']!=null &&
+-          configsToSet['site.global.ganglia_server_id']!=null) {
+-        configsToSet['site.global.ganglia_enabled'] = "true";
++    if (configsToSet['site.global.metrics_enabled']!=null) {
++      if (configsToSet['site.global.metric_collector_host']!=null &&
++          configsToSet['site.global.metric_collector_port']!=null) {
++        configsToSet['site.global.metrics_enabled'] = "true";
+       } else {
+-        configsToSet['site.global.ganglia_enabled'] = "false";
++        configsToSet['site.global.metrics_enabled'] = "false";
+       }
+     }
+     this.set('newAppConfigs', configsToSet);
+diff --git a/contrib/views/slider/src/main/resources/ui/app/controllers/slider_controller.js b/contrib/views/slider/src/main/resources/ui/app/controllers/slider_controller.js
+index c64dc94..6e2590d 100644
+--- a/contrib/views/slider/src/main/resources/ui/app/controllers/slider_controller.js
++++ b/contrib/views/slider/src/main/resources/ui/app/controllers/slider_controller.js
+@@ -104,43 +104,22 @@ App.SliderController = Ember.Controller.extend(App.RunPeriodically, {
+         && properties['java.home'] != App.get('javaHome')) {
+       App.set('javaHome', properties['java.home']);
+     }
+-    this.initGangliaProperties();
++    this.initMetricsServerProperties();
+     this.finishSliderConfiguration(data);
+   },
+ 
+   /**
+-   * initialize properties of GANGLIA that required by Slider View
+-   * @method initGangliaProperties
++   * initialize properties of Metrics Server that are required by Slider View
++   * @method initMetricsServerProperties
+    */
+-  initGangliaProperties: function () {
++  initMetricsServerProperties: function () {
+     var sliderConfigs = App.SliderApp.store.all('sliderConfig'),
+-      gangliaClusters = sliderConfigs.findBy('viewConfigName', 'ganglia.additional.clusters'),
+-      gangliaHost = sliderConfigs.findBy('viewConfigName', 'ganglia.server.hostname');
+-    App.set('gangliaClusters', this.formatGangliaClusters(gangliaClusters.get('value')));
+-    App.set('gangliaHost', gangliaHost.get('value'));
+-  },
+-
+-  /**
+-   * Format value for <code>gangliaClusters</code>
+-   * @param {string} prop
+-   * @returns {Array}
+-   * @method formatGangliaClusters
+-   */
+-  formatGangliaClusters: function(prop) {
+-    var gangliaCustomClusters = [];
+-    //parse CSV string with cluster names and ports
+-    if (!Em.isNone(prop)) {
+-      prop.replace(/\'/g, "").split(',').forEach(function(item){
+-        var splits = item.split(':');
+-        if (splits.length > 1) {
+-          gangliaCustomClusters.push({
+-            name: splits[0],
+-            port: splits[1]
+-          })
+-        }
+-      });
+-    }
+-    return gangliaCustomClusters;
++      metricsPort = sliderConfigs.findBy('viewConfigName', 'site.global.metric_collector_port'),
++      metricsHost = sliderConfigs.findBy('viewConfigName', 'site.global.metric_collector_host'),
++      metricsLibPath = sliderConfigs.findBy('viewConfigName', 'site.global.metric_collector_lib');
++    App.set('metricsHost', metricsHost.get('value'));
++    App.set('metricsPort', metricsPort.get('value'));
++    App.set('metricsLibPath', metricsLibPath.get('value'));
+   },
+ 
+   /**
+diff --git a/contrib/views/slider/src/main/resources/ui/app/initialize.js b/contrib/views/slider/src/main/resources/ui/app/initialize.js
+index 205322b..a0dd9a0 100755
+--- a/contrib/views/slider/src/main/resources/ui/app/initialize.js
++++ b/contrib/views/slider/src/main/resources/ui/app/initialize.js
+@@ -103,16 +103,16 @@ App.initializer({
+       viewErrors: [],
+ 
+       /**
+-       * Host with Ganglia Server
++       * Host with Metrics Server (AMS)
+        * @type {string|null}
+        */
+-      gangliaHost: null,
++      metricsHost: null,
+ 
+       /**
+-       * List of Ganglia clusters
++       * Port of Metrics Server (AMS port)
+        * @type {array|null}
+        */
+-      gangliaClusters: null,
++      metricsPort: null,
+ 
+       /**
+        * Last time when mapper ran
+diff --git a/contrib/views/slider/src/main/resources/ui/app/models/slider_app.js b/contrib/views/slider/src/main/resources/ui/app/models/slider_app.js
+index c669744..de31dfc 100644
+--- a/contrib/views/slider/src/main/resources/ui/app/models/slider_app.js
++++ b/contrib/views/slider/src/main/resources/ui/app/models/slider_app.js
+@@ -167,7 +167,7 @@ App.SliderApp = DS.Model.extend({
+    */
+   showMetrics: function () {
+     if (!this.get('supportedMetricNames.length')) return false;
+-    if (App.get('gangliaHost') != null) {
++    if (App.get('metricsHost') != null) {
+       return true;
+     }
+     return App.SliderApp.Status.running === this.get('status');
+diff --git a/contrib/views/slider/src/main/resources/ui/app/routes/main.js b/contrib/views/slider/src/main/resources/ui/app/routes/main.js
+index e5d6efa..fc83860 100644
+--- a/contrib/views/slider/src/main/resources/ui/app/routes/main.js
++++ b/contrib/views/slider/src/main/resources/ui/app/routes/main.js
+@@ -52,9 +52,10 @@ App.SliderAppsRoute = Ember.Route.extend({
+ 
+     // Load sliderConfigs to storage
+     App.SliderApp.store.pushMany('sliderConfig', Em.A([
+-      Em.Object.create({id: 1, required: false, viewConfigName: 'ganglia.server.hostname', displayName: 'gangliaServer'}),
+-      Em.Object.create({id: 2, required: false, viewConfigName: 'ganglia.additional.clusters', displayName: 'gangliaClusters'}),
+-      Em.Object.create({id: 3, required: false, viewConfigName: 'yarn.rm.webapp.url', displayName: 'yarnRmWebappUrl'})
++      Em.Object.create({id: 1, required: false, viewConfigName: 'site.global.metric_collector_host', displayName: 'metricsServer'}),
++      Em.Object.create({id: 2, required: false, viewConfigName: 'site.global.metric_collector_port', displayName: 'metricsPort'}),
++      Em.Object.create({id: 3, required: false, viewConfigName: 'site.global.metric_collector_lib', displayName: 'metricsLib'}),
++      Em.Object.create({id: 4, required: false, viewConfigName: 'yarn.rm.webapp.url', displayName: 'yarnRmWebappUrl'})
+     ]));
+   },
+ 
+diff --git a/contrib/views/slider/src/main/resources/ui/app/templates/slider_app/summary.hbs b/contrib/views/slider/src/main/resources/ui/app/templates/slider_app/summary.hbs
+index 506fdf1..28597dc 100644
+--- a/contrib/views/slider/src/main/resources/ui/app/templates/slider_app/summary.hbs
++++ b/contrib/views/slider/src/main/resources/ui/app/templates/slider_app/summary.hbs
+@@ -123,13 +123,6 @@
+   <div {{bind-attr class="view.graphsNotEmpty:visible:hidden :panel :panel-default"}}>
+     <div class="panel-heading">
+       {{t common.metrics}}
+-      <div class="btn-group pull-right panel-link">
+-        <a class="btn btn-default btn-sm" target="_blank" rel="tooltip"
+-          {{translateAttr title="sliderApp.summary.go_to_ganglia"}}
+-          {{bind-attr href="view.gangliaUrl"}}>
+-          <i class="icon-link"></i>
+-        </a>
+-      </div>
+     </div>
+     <div class="panel-body">
+       <div class="row">
+diff --git a/contrib/views/slider/src/main/resources/ui/app/translations.js b/contrib/views/slider/src/main/resources/ui/app/translations.js
+index 98734f5..2d06490 100644
+--- a/contrib/views/slider/src/main/resources/ui/app/translations.js
++++ b/contrib/views/slider/src/main/resources/ui/app/translations.js
+@@ -103,7 +103,6 @@ Em.I18n.translations = {
+   'sliderApp.flex.message': 'Update the number of desired instances for each component of this application',
+ 
+   'sliderApp.summary.go_to_nagios': 'Go to Nagios',
+-  'sliderApp.summary.go_to_ganglia': 'Go to Ganglia',
+   'sliderApp.summary.no.components': 'No components are currently running',
+ 
+   'sliderApp.alerts.no.status': 'No component statuses are currently available',
+diff --git a/contrib/views/slider/src/main/resources/ui/app/views/slider_app/summary_view.js b/contrib/views/slider/src/main/resources/ui/app/views/slider_app/summary_view.js
+index 90631fd..2c88608 100644
+--- a/contrib/views/slider/src/main/resources/ui/app/views/slider_app/summary_view.js
++++ b/contrib/views/slider/src/main/resources/ui/app/views/slider_app/summary_view.js
+@@ -53,20 +53,6 @@ App.SliderAppSummaryView = Ember.View.extend({
+   }.property('graphs.@each.dataExists'),
+ 
+   /**
+-   * Ganglia url
+-   * If <code>model.quickLinks</code> has `app.ganglia` element, it's used
+-   * Otherwise - <code>App.gangliaHost</code> is used
+-   * @type {string}
+-   */
+-  gangliaUrl: function () {
+-    var g = this.get('controller.model.quickLinks').findBy('label', 'app.ganglia');
+-    if (g) {
+-      return g.get('url');
+-    }
+-    return 'http://' + App.get('gangliaHost') + '/ganglia';
+-  }.property('App.gangliaHost', 'controller.model.quickLinks.@each.url'),
+-
+-  /**
+    * Update <code>graphs</code>-list when <code>model</code> is updated
+    * New metrics are pushed to <code>graphs</code> (not set new list to <code>graphs</code>!) to prevent page flickering
+    * @method updateGraphs
+diff --git a/contrib/views/slider/src/main/resources/ui/test/integration/pages/index_test.js b/contrib/views/slider/src/main/resources/ui/test/integration/pages/index_test.js
+index aa3a5c7..2b63506 100644
+--- a/contrib/views/slider/src/main/resources/ui/test/integration/pages/index_test.js
++++ b/contrib/views/slider/src/main/resources/ui/test/integration/pages/index_test.js
+@@ -54,7 +54,7 @@ test('sliderConfigs', function () {
+ 
+   visit('/');
+   // configs count may be changed by adding new slider-configs
+-  equal(App.SliderApp.store.all('sliderConfig').content.length, 3, 'slider configs should be set');
++  equal(App.SliderApp.store.all('sliderConfig').content.length, 4, 'slider configs should be set');
+ 
+ });
+ 
+diff --git a/contrib/views/slider/src/main/resources/ui/test/integration/processes/create_new_app_test.js b/contrib/views/slider/src/main/resources/ui/test/integration/processes/create_new_app_test.js
+index 7b6ca9b..1d0469e 100644
+--- a/contrib/views/slider/src/main/resources/ui/test/integration/processes/create_new_app_test.js
++++ b/contrib/views/slider/src/main/resources/ui/test/integration/processes/create_new_app_test.js
+@@ -57,9 +57,9 @@ var appTypes = {
+         "package_list": "files/hbase-0.96.1-hadoop2-bin.tar.gz",
+         "site.core-site.fs.defaultFS": "${NN_URI}",
+         "site.global.app_install_dir": "${AGENT_WORK_ROOT}/app/install",
+-        "site.global.ganglia_server_host": "${NN_HOST}",
+-        "site.global.ganglia_server_id": "Application1",
+-        "site.global.ganglia_server_port": "8667",
++        "site.global.metric_collector_host": "${NN_HOST}",
++        "site.global.metric_collector_port": "6118",
++        "site.global.metric_collector_lib": "file:///usr/lib/ambari-metrics-hadoop-sink/ambari-metrics-hadoop-sink.jar",
+         "site.global.hbase_master_heapsize": "1024m",
+         "site.global.hbase_regionserver_heapsize": "1024m",
+         "site.global.security_enabled": "false",
+diff --git a/contrib/views/slider/src/main/resources/ui/test/unit/controllers/slider_controller_test.js b/contrib/views/slider/src/main/resources/ui/test/unit/controllers/slider_controller_test.js
+index 69982f7..308f455 100644
+--- a/contrib/views/slider/src/main/resources/ui/test/unit/controllers/slider_controller_test.js
++++ b/contrib/views/slider/src/main/resources/ui/test/unit/controllers/slider_controller_test.js
+@@ -20,8 +20,9 @@ moduleFor('controller:slider', 'App.SliderController', {
+ 
+   setup: function () {
+     App.setProperties({
+-      gangliaHost: null,
+-      gangliaClusters: null
++      metricsHost: null,
++      metricsPort: null,
++      metricsLibPath: null
+     });
+     Ember.run(App, App.advanceReadiness);
+   },
+@@ -34,12 +35,16 @@ moduleFor('controller:slider', 'App.SliderController', {
+ 
+ var properties = [
+   Em.Object.create({
+-    viewConfigName: 'ganglia.additional.clusters',
+-    value: 'h0:8080,h1:3333'
++    viewConfigName: 'site.global.metric_collector_lib',
++    value: 'file:///usr/lib/ambari-metrics-hadoop-sink/ambari-metrics-hadoop-sink.jar'
+   }),
+   Em.Object.create({
+-    viewConfigName: 'ganglia.server.hostname',
++    viewConfigName: 'site.global.metric_collector_host',
+     value: 'h2'
++  }),
++  Em.Object.create({
++    viewConfigName: 'site.global.metric_collector_port',
++    value: '6188'
+   })
+ ];
+ 
+@@ -76,30 +81,23 @@ test('getParametersFromViewPropertiesSuccessCallback', function () {
+     };
+     controller.getParametersFromViewPropertiesSuccessCallback({
+       parameters: {
+-        'ganglia.additional.clusters': 'h0:8080,h1:3333',
+-        'ganglia.server.hostname': 'h2'
++        'site.global.metric_collector_lib': 'file:///usr/lib/ambari-metrics-hadoop-sink/ambari-metrics-hadoop-sink.jar',
++        'site.global.metric_collector_host': 'h2',
++        'site.global.metric_collector_port': '6188',
+       },
+       validations: [{}, {}]
+     });
+   });
+ 
+-  deepEqual(App.get('gangliaClusters'), [
+-    {
+-      name: 'h0',
+-      port: '8080'
+-    },
+-    {
+-      name: 'h1',
+-      port: '3333'
+-    }
+-  ], 'should set gangliaClusters');
+-  equal(App.get('gangliaHost'), 'h2', 'should set gangliaHost');
++  equal(App.get('metricsHost'), 'h2', 'should set metrics server host');
++  equal(App.get('metricsPort'), '6188', 'should set metrics server port');
++  equal(App.get('metricsLibPath'), 'file:///usr/lib/ambari-metrics-hadoop-sink/ambari-metrics-hadoop-sink.jar', 'should set metrics lib path');
+ 
+   App.SliderApp.store.set('all', storeAll);
+ 
+ });
+ 
+- test('initGangliaProperties', function () {
++ test('initMetricsServerProperties', function () {
+ 
+    var storeAll = App.SliderApp.store.all,
+      controller = this.subject();
+@@ -108,73 +106,17 @@ test('getParametersFromViewPropertiesSuccessCallback', function () {
+      App.SliderApp.store.all = function () {
+        return properties;
+      };
+-     controller.initGangliaProperties();
++     controller.initMetricsServerProperties();
+    });
+ 
+-   deepEqual(App.get('gangliaClusters'), [
+-     {
+-       name: 'h0',
+-       port: '8080'
+-     },
+-     {
+-       name: 'h1',
+-       port: '3333'
+-     }
+-   ], 'should set gangliaClusters');
+-   equal(App.get('gangliaHost'), 'h2', 'should set gangliaHost');
++   equal(App.get('metricsHost'), 'h2', 'should set metrics server host');
++   equal(App.get('metricsPort'), '6188', 'should set metrics server port');
++   equal(App.get('metricsLibPath'), 'file:///usr/lib/ambari-metrics-hadoop-sink/ambari-metrics-hadoop-sink.jar', 'should set metrics lib path');
+ 
+    App.SliderApp.store.set('all', storeAll);
+ 
+  });
+ 
+-test('formatGangliaClusters', function () {
+-
+-  var cases = [
+-      {
+-        prop: null,
+-        gangliaCustomClusters: [],
+-        title: 'empty value'
+-      },
+-      {
+-        prop: 'h0',
+-        gangliaCustomClusters: [],
+-        title: 'no port specified'
+-      },
+-      {
+-        prop: 'h1:8080,h2:3333',
+-        gangliaCustomClusters: [
+-          {
+-            name: 'h1',
+-            port: '8080'
+-          },
+-          {
+-            name: 'h2',
+-            port: '3333'
+-          }
+-        ],
+-        title: 'two items with ports'
+-      },
+-      {
+-        prop: '\'h3\':8080',
+-        gangliaCustomClusters: [
+-          {
+-            name: 'h3',
+-            port: '8080'
+-          }
+-        ],
+-        title: 'remove apostrophes'
+-      }
+-    ],
+-    controller = this.subject();
+-
+-  cases.forEach(function (item) {
+-
+-    deepEqual(controller.formatGangliaClusters(item.prop), item.gangliaCustomClusters, item.title);
+-
+-  });
+-
+-});
+-
+ test('finishSliderConfiguration', function () {
+ 
+   var cases = [
+diff --git a/contrib/views/slider/src/main/resources/ui/test/unit/models/slider_app_test.js b/contrib/views/slider/src/main/resources/ui/test/unit/models/slider_app_test.js
+index 06ff0da..2a7b56e 100644
+--- a/contrib/views/slider/src/main/resources/ui/test/unit/models/slider_app_test.js
++++ b/contrib/views/slider/src/main/resources/ui/test/unit/models/slider_app_test.js
+@@ -27,11 +27,11 @@ moduleForModel('sliderApp', 'App.SliderApp', {
+   ],
+ 
+   setup: function () {
+-    App.set('gangliaHost', null);
++    App.set('metricsHost', null);
+   },
+ 
+   teardown: function () {
+-    App.set('gangliaHost', null);
++    App.set('metricsHost', null);
+   }
+ 
+ });
+@@ -56,13 +56,13 @@ test('showMetrics', function () {
+   equal(sliderApp.get('showMetrics'), false, 'should be false if supportedMetricNames is not provided');
+ 
+   Em.run(function () {
+-    App.set('gangliaHost', 'some_host');
++    App.set('metricsHost', 'some_host');
+     sliderApp.set('supportedMetricNames', 'some');
+   });
+-  equal(sliderApp.get('showMetrics'), true, 'should be true if App.gangliaHost is provided');
++  equal(sliderApp.get('showMetrics'), true, 'should be true if App.metricsHost is provided');
+ 
+   Em.run(function () {
+-    App.set('gangliaHost', null);
++    App.set('metricsHost', null);
+     sliderApp.set('status', App.SliderApp.Status.running);
+   });
+   equal(sliderApp.get('showMetrics'), true, 'should be true if status is RUNNING');

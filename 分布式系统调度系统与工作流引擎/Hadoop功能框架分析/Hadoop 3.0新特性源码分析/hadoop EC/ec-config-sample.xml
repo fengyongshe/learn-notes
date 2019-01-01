@@ -1,0 +1,24 @@
+<configuration>
+<schemas>
+	<schema id="HHk6m3">
+		<codec>HH</codec>
+		<k>6</k>
+		<m>3</m>
+	</schema>
+	<schema id="RSk12m4">
+		<codec>RS</codec>
+		<k>12</k>
+		<m>4</m>
+	</schema>
+</schemas>	
+<policies>
+	<policy>
+		<schema>HHk6m3</schema>
+		<cellsize>128k</cellsize>
+	</policy>
+	<policy>
+		<schema>RSk12m4</schema>
+		<cellsize>256k</cellsize>
+	</policy>
+</policies>	
+</configuration>

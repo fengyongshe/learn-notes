@@ -1,0 +1,26 @@
+https://issues.apache.org/jira/browse/SLIDER-875
+
+Title:
+	Ability to create an Uber application package with capability to deploy and manage as a single business app
+
+Description：
+A business application as we typically refer to, is one that provides value to an end user. Few examples will be, a CRM application, an online advertising application, and a trucking application (to monitor driving habits of truck drivers).
+An end user does not understand (or care about) the numerous application components like HBase, Storm, Spark, Kakfa, Tomcat, MySql, Memcached, or Nodejs that are required to build such a business application.
+Several such business applications are hosted by cloud vendors like AWS, GCE, Azure, and others. From a cluster management point of view, the IT administrator would benefit from an Uber control of the business application as a whole. The business application owner understands the different components (like Tomcat, Memcached, HBase, etc.) of her/his Uber application. As much as they need fine-grain control of each of these individual applications (which is supported today), they would also benefit from a management control for the Uber app. With Docker becoming popular every day, this will provide a platform to the application owners to define a business application as a conglomeration of Docker containers.
+Slider currently is viewed (and used) to package individual applications like HBase, Storm, Kafka, Memcached, and Tomcat. Slider should be able to expose the concept of an Uber application package definition. This Uber definition will be composed of config and resource specifications of the individual application components. Additionally, it will have definitions for Uber management and control, like -
+Stop, start and flex of the Uber app
+Dependency specification between the individual applications such that flex of certain components of an application can automatically trigger proportional flex of components in another application
+Cruise control of the Uber app, on top of what SLIDER-868 will provide for an individual app. Ability to define a skyline for the Uber app, over time and other dimensions.
+Resource requirements and planning for the Uber app as a whole. Most of the time, an Uber app is functional only when all (or minimum viable) application components are deployed and available. Tomcat running with MySql, Memcached and HBase still waiting for containers, is a useless business application. Slider should be able to do resource calculation and negotiation for the Uber app as a whole. It can work with YARN to get the minimal viable applications of the Uber app running or not bother to run anything (I smell SLAs for vendors and savings for application owners).
+Ability to define and use multiple YARN labels for the Uber application (in addition to the fine grained label definitions for the individual sub-components of a single app)
+I am sure, there are several other benefits which are not identified yet, but this is a start.
+
+描述：
+	一个商业应用，例如CRM 应用，在线广告应用或者卡车应用（监控司机的行为），这些应用为终端用户提供资源。但是一个终端用户不可能理解（关心）应用包含哪些组成部分，例如hbase,storm,spark,kafka,Tomcat,Mysql、Memcached及Nodejs等,在AWS,GCE,Azuer平台上可以看到这些应用。
+	从集群管理角度讲，将商业应用当成一个整体来管理，可以减轻IT管理员的负担。从应用的所有者来讲，他们理解Uber application的不同组件，例如TOMCAT,Memcached、HBASE等，他们需要对不同的应用进行细粒度的控制，通过Uber app对他们也很益处。当前Docker越来越火，通过Docker作为平台来托管这些应用是一个很好的方式。
+	目前，Slider仅能支持单个应用，例如HBase,Storm,Kafka,Memcached及Tomcat等,Slider应该提供Uber application package定义的概念。User definition由单个应用的components的config和resources组成。另外，Uber management应该提供以下部分：
+	1) Uber app的stop,start及flex操作
+	2) 应用之间的依赖关系，如一个应用的component的flex操作自动触发另外application的成比例的flex
+	3) Uber app的Cruise 控制，为Uber app根据时间或者其他维度定义skyline
+	4) 将Uber app定义一个整体来申请资源和管理，对于Uber app来说，只有所有的app都启动了Uber才能提供服务。例如Tomcat和Mysql的组合，只能两个服务都启动了，才是一个正常的应用。Slider应该能够实现将Uber app作为一个整体进行resource calculation和negotions。该部分工作应该和YARN协同实现
+	5) 实现细粒度的label定义，这样可以为Uber application定义多个YARN labels

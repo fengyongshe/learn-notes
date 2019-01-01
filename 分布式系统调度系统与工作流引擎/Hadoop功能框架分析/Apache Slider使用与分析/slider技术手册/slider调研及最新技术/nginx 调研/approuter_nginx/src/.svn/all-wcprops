@@ -1,0 +1,59 @@
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/svn/omae/!svn/ver/5329/runtime/trunk/dev/approuter_nginx/src
+END
+router_env.sh
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/svn/omae/!svn/ver/5846/runtime/trunk/dev/approuter_nginx/src/router_env.sh
+END
+compile-redis.sh
+K 25
+svn:wc:ra_dav:version-url
+V 78
+/svn/omae/!svn/ver/5336/runtime/trunk/dev/approuter_nginx/src/compile-redis.sh
+END
+compile-nginx-server.sh
+K 25
+svn:wc:ra_dav:version-url
+V 85
+/svn/omae/!svn/ver/5846/runtime/trunk/dev/approuter_nginx/src/compile-nginx-server.sh
+END
+compile-all.sh
+K 25
+svn:wc:ra_dav:version-url
+V 76
+/svn/omae/!svn/ver/5798/runtime/trunk/dev/approuter_nginx/src/compile-all.sh
+END
+compile-openresty.sh
+K 25
+svn:wc:ra_dav:version-url
+V 82
+/svn/omae/!svn/ver/5846/runtime/trunk/dev/approuter_nginx/src/compile-openresty.sh
+END
+control.sh
+K 25
+svn:wc:ra_dav:version-url
+V 72
+/svn/omae/!svn/ver/5844/runtime/trunk/dev/approuter_nginx/src/control.sh
+END
+init_hosts.sh
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/svn/omae/!svn/ver/5330/runtime/trunk/dev/approuter_nginx/src/init_hosts.sh
+END
+init_redis_persist.pl
+K 25
+svn:wc:ra_dav:version-url
+V 83
+/svn/omae/!svn/ver/5378/runtime/trunk/dev/approuter_nginx/src/init_redis_persist.pl
+END
+restart_router.sh
+K 25
+svn:wc:ra_dav:version-url
+V 79
+/svn/omae/!svn/ver/5336/runtime/trunk/dev/approuter_nginx/src/restart_router.sh
+END

@@ -1,0 +1,256 @@
+From 07a4520987cbc75da237c3a9878f72bc95b3a7dc Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?G=C3=A1bor=20Lipt=C3=A1k?= <gliptak@gmail.com>
+Date: Mon, 20 Jul 2015 20:51:11 -0400
+Subject: [PATCH] YARN-3645 Add helper method to read configuration field text
+
+---
+ .../fair/AllocationFileLoaderService.java          | 130 ++++++++++++---------
+ .../fair/TestAllocationFileLoaderService.java      |  22 +++-
+ 2 files changed, 97 insertions(+), 55 deletions(-)
+
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-resourcemanager/src/main/java/org/apache/hadoop/yarn/server/resourcemanager/scheduler/fair/AllocationFileLoaderService.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-resourcemanager/src/main/java/org/apache/hadoop/yarn/server/resourcemanager/scheduler/fair/AllocationFileLoaderService.java
+index dab6d9f..51fd84e 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-resourcemanager/src/main/java/org/apache/hadoop/yarn/server/resourcemanager/scheduler/fair/AllocationFileLoaderService.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-resourcemanager/src/main/java/org/apache/hadoop/yarn/server/resourcemanager/scheduler/fair/AllocationFileLoaderService.java
+@@ -202,7 +202,8 @@ public synchronized void setReloadListener(Listener reloadListener) {
+    * @throws SAXException if config file is malformed.
+    */
+   public synchronized void reloadAllocations() throws IOException,
+-      ParserConfigurationException, SAXException, AllocationConfigurationException {
++      ParserConfigurationException, SAXException,
++      AllocationConfigurationException {
+     if (allocFile == null) {
+       return;
+     }
+@@ -277,61 +278,62 @@ public synchronized void reloadAllocations() throws IOException,
+               continue;
+             Element field = (Element) fieldNode;
+             if ("maxRunningApps".equals(field.getTagName())) {
+-              String text = ((Text)field.getFirstChild()).getData().trim();
+-              int val = Integer.parseInt(text);
++              String text = readFieldText(field, "maxRunningApps");
++              int val = Integer.parseInt(text.trim());
+               userMaxApps.put(userName, val);
+             }
+           }
+         } else if ("userMaxAppsDefault".equals(element.getTagName())) {
+-          String text = ((Text)element.getFirstChild()).getData().trim();
+-          int val = Integer.parseInt(text);
+-          userMaxAppsDefault = val;
++          String text = readFieldText(element, "userMaxAppsDefault");
++          userMaxAppsDefault = Integer.parseInt(text.trim());
+         } else if ("defaultFairSharePreemptionTimeout"
+             .equals(element.getTagName())) {
+-          String text = ((Text)element.getFirstChild()).getData().trim();
+-          long val = Long.parseLong(text) * 1000L;
+-          defaultFairSharePreemptionTimeout = val;
++          String text = readFieldText(element,
++              "defaultFairSharePreemptionTimeout");
++          defaultFairSharePreemptionTimeout =
++              Long.parseLong(text.trim()) * 1000L;
+         } else if ("fairSharePreemptionTimeout".equals(element.getTagName())) {
+           if (defaultFairSharePreemptionTimeout == Long.MAX_VALUE) {
+-            String text = ((Text)element.getFirstChild()).getData().trim();
+-            long val = Long.parseLong(text) * 1000L;
+-            defaultFairSharePreemptionTimeout = val;
++            String text = readFieldText(element, "fairSharePreemptionTimeout");
++            defaultFairSharePreemptionTimeout =
++                Long.parseLong(text.trim()) * 1000L;
+           }
+         } else if ("defaultMinSharePreemptionTimeout"
+             .equals(element.getTagName())) {
+-          String text = ((Text)element.getFirstChild()).getData().trim();
+-          long val = Long.parseLong(text) * 1000L;
+-          defaultMinSharePreemptionTimeout = val;
++          String text = readFieldText(element,
++              "defaultMinSharePreemptionTimeout");
++          defaultMinSharePreemptionTimeout =
++              Long.parseLong(text.trim()) * 1000L;
+         } else if ("defaultFairSharePreemptionThreshold"
+             .equals(element.getTagName())) {
+-          String text = ((Text)element.getFirstChild()).getData().trim();
+-          float val = Float.parseFloat(text);
++          String text = readFieldText(element,
++              "defaultFairSharePreemptionThreshold");
++          float val = Float.parseFloat(text.trim());
+           val = Math.max(Math.min(val, 1.0f), 0.0f);
+           defaultFairSharePreemptionThreshold = val;
+         } else if ("queueMaxAppsDefault".equals(element.getTagName())) {
+-          String text = ((Text)element.getFirstChild()).getData().trim();
+-          int val = Integer.parseInt(text);
+-          queueMaxAppsDefault = val;
++          String text = readFieldText(element, "queueMaxAppsDefault");
++          queueMaxAppsDefault = Integer.parseInt(text.trim());
+         } else if ("queueMaxAMShareDefault".equals(element.getTagName())) {
+-          String text = ((Text)element.getFirstChild()).getData().trim();
+-          float val = Float.parseFloat(text);
+-          val = Math.min(val, 1.0f);
+-          queueMaxAMShareDefault = val;
++          String text = readFieldText(element, "queueMaxAMShareDefault");
++          float val = Float.parseFloat(text.trim());
++          queueMaxAMShareDefault = Math.min(val, 1.0f);
+         } else if ("defaultQueueSchedulingPolicy".equals(element.getTagName())
+             || "defaultQueueSchedulingMode".equals(element.getTagName())) {
+-          String text = ((Text)element.getFirstChild()).getData().trim();
+-          defaultSchedPolicy = SchedulingPolicy.parse(text);
++          String text = readFieldText(element,
++              "defaultQueueSchedulingPolicy or defaultQueueSchedulingMode");
++          defaultSchedPolicy = SchedulingPolicy.parse(text.trim());
+         } else if ("queuePlacementPolicy".equals(element.getTagName())) {
+           placementPolicyElement = element;
+         } else if ("reservation-planner".equals(element.getTagName())) {
+-          String text = ((Text) element.getFirstChild()).getData().trim();
+-          planner = text;
++          String text = readFieldText(element, "reservation-planner");
++          planner = text.trim();
+         } else if ("reservation-agent".equals(element.getTagName())) {
+-          String text = ((Text) element.getFirstChild()).getData().trim();
+-          reservationAgent = text;
++          String text = readFieldText(element, "reservation-agent");
++          reservationAgent = text.trim();
+         } else if ("reservation-policy".equals(element.getTagName())) {
+-          String text = ((Text) element.getFirstChild()).getData().trim();
+-          reservationAdmissionPolicy = text;
++          String text = readFieldText(element, "reservation-policy");
++          reservationAdmissionPolicy = text.trim();
+         } else {
+           LOG.warn("Bad element in allocations file: " + element.getTagName());
+         }
+@@ -409,9 +411,26 @@ public synchronized void reloadAllocations() throws IOException,
+ 
+     reloadListener.onReload(info);
+   }
+-  
++
++  /**
++   * Read field text checking for nulls.
++   *
++   * @throws AllocationConfigurationException if config file parsing fails
++   */
++  private String readFieldText(Element field, String tagName)
++      throws AllocationConfigurationException {
++    Text firstChild = (Text) field.getFirstChild();
++    if (firstChild==null){
++      throw new AllocationConfigurationException(
++          "Bad fair scheduler config, invalid tag "+tagName);
++    }
++    return firstChild.getData();
++  }
++
+   /**
+-   * Loads a queue from a queue element in the configuration file
++   * Loads a queue from a queue element in the configuration file.
++   *
++   * @throws AllocationConfigurationException if config file parsing fails
+    */
+   private void loadQueue(String parentName, Element element,
+       Map<String, Resource> minQueueResources,
+@@ -453,49 +472,52 @@ private void loadQueue(String parentName, Element element,
+         continue;
+       Element field = (Element) fieldNode;
+       if ("minResources".equals(field.getTagName())) {
+-        String text = ((Text)field.getFirstChild()).getData().trim();
+-        Resource val = FairSchedulerConfiguration.parseResourceConfigValue(text);
++        String text = readFieldText(field, "minResources");
++        Resource val = FairSchedulerConfiguration.
++            parseResourceConfigValue(text.trim());
+         minQueueResources.put(queueName, val);
+       } else if ("maxResources".equals(field.getTagName())) {
+-        String text = ((Text)field.getFirstChild()).getData().trim();
+-        Resource val = FairSchedulerConfiguration.parseResourceConfigValue(text);
++        String text = readFieldText(field, "maxResources");
++        Resource val = FairSchedulerConfiguration.
++            parseResourceConfigValue(text.trim());
+         maxQueueResources.put(queueName, val);
+       } else if ("maxRunningApps".equals(field.getTagName())) {
+-        String text = ((Text)field.getFirstChild()).getData().trim();
+-        int val = Integer.parseInt(text);
++        String text = readFieldText(field, "maxRunningApps");
++        int val = Integer.parseInt(text.trim());
+         queueMaxApps.put(queueName, val);
+       } else if ("maxAMShare".equals(field.getTagName())) {
+-        String text = ((Text)field.getFirstChild()).getData().trim();
+-        float val = Float.parseFloat(text);
++        String text = readFieldText(field, "maxAMShare");
++        float val = Float.parseFloat(text.trim());
+         val = Math.min(val, 1.0f);
+         queueMaxAMShares.put(queueName, val);
+       } else if ("weight".equals(field.getTagName())) {
+-        String text = ((Text)field.getFirstChild()).getData().trim();
+-        double val = Double.parseDouble(text);
++        String text = readFieldText(field, "weight");
++        double val = Double.parseDouble(text.trim());
+         queueWeights.put(queueName, new ResourceWeights((float)val));
+       } else if ("minSharePreemptionTimeout".equals(field.getTagName())) {
+-        String text = ((Text)field.getFirstChild()).getData().trim();
+-        long val = Long.parseLong(text) * 1000L;
++        String text = readFieldText(field, "minSharePreemptionTimeout");
++        long val = Long.parseLong(text.trim()) * 1000L;
+         minSharePreemptionTimeouts.put(queueName, val);
+       } else if ("fairSharePreemptionTimeout".equals(field.getTagName())) {
+-        String text = ((Text)field.getFirstChild()).getData().trim();
+-        long val = Long.parseLong(text) * 1000L;
++        String text = readFieldText(field, "fairSharePreemptionTimeout");
++        long val = Long.parseLong(text.trim()) * 1000L;
+         fairSharePreemptionTimeouts.put(queueName, val);
+       } else if ("fairSharePreemptionThreshold".equals(field.getTagName())) {
+-        String text = ((Text)field.getFirstChild()).getData().trim();
+-        float val = Float.parseFloat(text);
++        String text = readFieldText(field, "fairSharePreemptionThreshold");
++        float val = Float.parseFloat(text.trim());
+         val = Math.max(Math.min(val, 1.0f), 0.0f);
+         fairSharePreemptionThresholds.put(queueName, val);
+       } else if ("schedulingPolicy".equals(field.getTagName())
+           || "schedulingMode".equals(field.getTagName())) {
+-        String text = ((Text)field.getFirstChild()).getData().trim();
+-        SchedulingPolicy policy = SchedulingPolicy.parse(text);
++        String text = readFieldText(field,
++            "schedulingPolicy or schedulingMode");
++        SchedulingPolicy policy = SchedulingPolicy.parse(text.trim());
+         queuePolicies.put(queueName, policy);
+       } else if ("aclSubmitApps".equals(field.getTagName())) {
+-        String text = ((Text)field.getFirstChild()).getData();
++        String text = readFieldText(field, "aclSubmitApps");
+         acls.put(QueueACL.SUBMIT_APPLICATIONS, new AccessControlList(text));
+       } else if ("aclAdministerApps".equals(field.getTagName())) {
+-        String text = ((Text)field.getFirstChild()).getData();
++        String text = readFieldText(field, "aclAdministerApps");
+         acls.put(QueueACL.ADMINISTER_QUEUE, new AccessControlList(text));
+       } else if ("reservation".equals(field.getTagName())) {
+         isLeaf = false;
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-resourcemanager/src/test/java/org/apache/hadoop/yarn/server/resourcemanager/scheduler/fair/TestAllocationFileLoaderService.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-resourcemanager/src/test/java/org/apache/hadoop/yarn/server/resourcemanager/scheduler/fair/TestAllocationFileLoaderService.java
+index 202eb09..c9f98d8 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-resourcemanager/src/test/java/org/apache/hadoop/yarn/server/resourcemanager/scheduler/fair/TestAllocationFileLoaderService.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-resourcemanager/src/test/java/org/apache/hadoop/yarn/server/resourcemanager/scheduler/fair/TestAllocationFileLoaderService.java
+@@ -333,7 +333,27 @@ public void testAllocationFileParsing() throws Exception {
+     assertEquals(DominantResourceFairnessPolicy.NAME,
+         queueConf.getSchedulingPolicy("root.newqueue").getName());
+   }
+-  
++
++  @Test(expected = AllocationConfigurationException.class)
++  public void testAllocationFileParsingFail() throws Exception {
++    Configuration conf = new Configuration();
++    conf.set(FairSchedulerConfiguration.ALLOCATION_FILE, ALLOC_FILE);
++    AllocationFileLoaderService allocLoader = new AllocationFileLoaderService();
++    PrintWriter out = new PrintWriter(new FileWriter(ALLOC_FILE));
++    out.println("<?xml version=\"1.0\"?>");
++    out.println("<allocations>");
++    out.println("<queue name=\"mr\">");
++    out.println("<aclSubmitApps></aclSubmitApps>");
++    out.println("</queue>");
++    out.println("</allocations>");
++    out.close();
++
++    allocLoader.init(conf);
++    ReloadListener confHolder = new ReloadListener();
++    allocLoader.setReloadListener(confHolder);
++    allocLoader.reloadAllocations();
++  }
++
+   @Test
+   public void testBackwardsCompatibleAllocationFileParsing() throws Exception {
+     Configuration conf = new Configuration();
+-- 
+2.1.4
+

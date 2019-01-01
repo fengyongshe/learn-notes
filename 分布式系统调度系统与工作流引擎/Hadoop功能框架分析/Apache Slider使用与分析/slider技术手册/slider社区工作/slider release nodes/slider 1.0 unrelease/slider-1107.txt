@@ -1,0 +1,15 @@
+https://issues.apache.org/jira/browse/SLIDER-1107
+
+Title:
+	Generate app configuration files in AM
+
+Description:
+	Currently, each container generates its own application configuration files. Instead, we could do this in the AM and have YARN localize the configuration files. Having some basic config generation in the AM may allow us to simplify the config generation code in the app packages. Also, it would be much better in the case of Docker containers, where we would prefer not to have to execute our own code inside the container
+
+描述：
+	当前，每个Container都生成自己的app conf文件。应该在AM中实现这个工作，然后让YARN来实现conf file的localize。在AM中完成基本的config generation可以让我们简化app package中的config生成代码。这么做对于Docker Containers来说更好，这样就不用在containers中执行前期的命令。	
+
+
+可以仿照下实现Artifact
+SliderClient#actionResource
+	https://git-wip-us.apache.org/repos/asf?p=incubator-slider.git;a=blobdiff;f=slider-core/src/main/java/org/apache/slider/client/SliderClient.java;h=f332a6668e9c44ac8ac2fbfff02eec52c62958ed;hp=dd90e4688f81b824018f89695015d9934f3947ef;hb=84fee8a;hpb=1b833e55abe4d6524171db636a5b570fe9148213

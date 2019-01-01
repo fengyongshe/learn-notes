@@ -1,0 +1,2008 @@
+diff --git a/src/app-packages/jstorm/README.txt b/src/app-packages/jstorm/README.txt
+new file mode 100644
+index 0000000..8d9b772
+--- /dev/null
++++ b/src/app-packages/jstorm/README.txt
+@@ -0,0 +1,36 @@
++<!---
++   Licensed to the Apache Software Foundation (ASF) under one or more
++   contributor license agreements.  See the NOTICE file distributed with
++   this work for additional information regarding copyright ownership.
++   The ASF licenses this file to You under the Apache License, Version 2.0
++   (the "License"); you may not use this file except in compliance with
++   the License.  You may obtain a copy of the License at
++
++       http://www.apache.org/licenses/LICENSE-2.0
++
++   Unless required by applicable law or agreed to in writing, software
++   distributed under the License is distributed on an "AS IS" BASIS,
++   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++   See the License for the specific language governing permissions and
++   limitations under the License.
++-->
++
++How to create a Slider app package for Storm?
++
++To create the app package you will need the Storm tarball and invoke mvn command
++with appropriate parameters.
++
++Command:
++mvn clean package -Pjstorm-app-package -Dpkg.version=<version>
++   -Dpkg.name=<file name of app tarball> -Dpkg.src=<folder location where the pkg is available>
++
++Example:
++mvn clean package -Pjstorm-app-package -Dpkg.version=2.1.1
++   -Dpkg.name=jstorm-2.1.1.zip -Dpkg.src=/Users/user1/Downloads
++
++App package can be found in
++  app-packages/jstorm/target/slider-jstorm-app-package-${pkg.version}.zip
++
++appConfig-default.json and resources-default.json are not required to be packaged.
++These files are included as reference configuration for Slider apps and are suitable
++for a one-node cluster.
+diff --git a/src/app-packages/jstorm/appConfig-default.json b/src/app-packages/jstorm/appConfig-default.json
+new file mode 100644
+index 0000000..6b4591a
+--- /dev/null
++++ b/src/app-packages/jstorm/appConfig-default.json
+@@ -0,0 +1,43 @@
++{
++  "schema": "http://example.org/specification/v2.0.0",
++  "metadata": {
++  },
++  "global": {
++    "application.def": ".slider/package/STORM/slider-jstorm-app-package-${pkg.version}.zip",
++    "java_home": "/usr/jdk64/jdk1.7.0_67",
++    "create.default.zookeeper.node": "true",
++    "application.resources": "hdfs://localhost:8020/tmp/jstorm-ui-${jstorm.version}.war",
++
++    "site.global.app_user": "${USER_NAME}",
++    "site.global.app_version": "${jstorm.version}",
++    "site.global.app_root": "${AGENT_WORK_ROOT}/app/install/",
++    "site.global.user_group": "hadoop",
++
++    "site.storm-site.jstorm.log.dir" : "${AGENT_LOG_ROOT}",
++    "site.storm-site.storm.zookeeper.servers": "['${ZK_HOST}']",
++    "site.storm-site.storm.local.dir": "${AGENT_WORK_ROOT}/app/tmp/jstorm",
++    "site.storm-site.transactional.zookeeper.root": "/transactional",
++    "site.storm-site.storm.zookeeper.port": "2181",
++    "site.storm-site.nimbus.childopts": " -Xms4g -Xmx4g -Xmn1536m -XX:PermSize=256m  -XX:SurvivorRatio=4 -XX:+UseConcMarkSweepGC  -XX:+UseCMSInitiatingOccupancyOnly -XX:CMSInitiatingOccupancyFraction=70 -XX:CMSFullGCsBeforeCompaction=5 -XX:+HeapDumpOnOutOfMemoryError -verbose:gc -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=5 -XX:GCLogFileSize=100M -XX:+UseCMSCompactAtFullCollection -XX:CMSMaxAbortablePrecleanTime=5000 ",
++    "site.storm-site.supervisor.childopts": " -Xms1g -Xmx1g -Xmn512m -XX:PermSize=64m -XX:+UseConcMarkSweepGC  -XX:+UseCMSInitiatingOccupancyOnly -XX:CMSInitiatingOccupancyFraction=70 -XX:CMSFullGCsBeforeCompaction=5 -XX:+HeapDumpOnOutOfMemoryError -verbose:gc -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=5 -XX:GCLogFileSize=100M -XX:+UseCMSCompactAtFullCollection -XX:CMSMaxAbortablePrecleanTime=5000 ",
++    "site.storm-site.ui.childopts": "-Xmx768m",
++    "site.storm-site.worker.childopts": "-Xmx768m",
++    "site.storm-site.dev.zookeeper.path": "${AGENT_WORK_ROOT}/app/tmp/dev-storm-zookeeper",
++    "site.storm-site.drpc.invocations.port": "0",
++    "site.storm-site.storm.zookeeper.root": "${DEFAULT_ZK_PATH}",
++    "site.storm-site.transactional.zookeeper.port": "null",
++    "site.storm-site.nimbus.host": "${NIMBUS_HOST}",
++    "site.storm-site.nimbus.thrift.port": "${NIMBUS.ALLOCATED_PORT}",
++    "site.storm-site.supervisor.slots.ports": "[${SUPERVISOR.ALLOCATED_PORT}{PER_CONTAINER},${SUPERVISOR.ALLOCATED_PORT}{PER_CONTAINER}]",
++    "site.storm-site.logviewer.port": "${SUPERVISOR.ALLOCATED_PORT}{PER_CONTAINER}",
++
++    "site.global.xmx_val": "1g",
++    "site.global.xms_val": "128m",
++    "site.global.memory_val": "200M",
++    "site.server-xml.http.port":"${WEBUI.ALLOCATED_PORT}{PER_CONTAINER}",
++    "site.server-xml.connection.timeout":"20000",
++    "site.tomcat-users-xml.ui_user": "tomcat",
++    "site.tomcat-users-xml.ui_password": "password",
++    "agent.python.exec.path": "/usr/bin/python"
++  }
++}
+diff --git a/src/app-packages/jstorm/configuration/server-xml.xml b/src/app-packages/jstorm/configuration/server-xml.xml
+new file mode 100644
+index 0000000..665d86b
+--- /dev/null
++++ b/src/app-packages/jstorm/configuration/server-xml.xml
+@@ -0,0 +1,8 @@
++<?xml version="1.0"?>
++<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
++<configuration>
++  <property>
++    <name>http.port</name>
++    <value>855</value>
++  </property>
++</configuration>
+\ No newline at end of file
+diff --git a/src/app-packages/jstorm/configuration/storm-site.xml b/src/app-packages/jstorm/configuration/storm-site.xml
+new file mode 100644
+index 0000000..9f21add
+--- /dev/null
++++ b/src/app-packages/jstorm/configuration/storm-site.xml
+@@ -0,0 +1,579 @@
++<?xml version="1.0"?>
++<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
++<!--
++/**
++ * Licensed to the Apache Software Foundation (ASF) under one
++ * or more contributor license agreements.  See the NOTICE file
++ * distributed with this work for additional information
++ * regarding copyright ownership.  The ASF licenses this file
++ * to you under the Apache License, Version 2.0 (the
++ * "License"); you may not use this file except in compliance
++ * with the License.  You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++-->
++
++<configuration>
++  <property>
++    <name>java.library.path</name>
++    <value>/usr/local/lib:/opt/local/lib:/usr/lib</value>
++    <description>This value is passed to spawned JVMs (e.g., Nimbus, Supervisor, and Workers)
++       for the java.library.path value. java.library.path tells the JVM where
++       to look for native libraries. It is necessary to set this config correctly</description>
++  </property>
++  <property>
++    <name>storm.local.dir</name>
++    <value>/hadoop/jstorm</value>
++    <description>A directory on the local filesystem used by Jstorm for any local
++       filesystem usage it needs. The directory must exist and the JStorm daemons must
++       have permission to read/write from this location.</description>
++  </property>
++  <property>
++    <name>storm.zookeeper.servers</name>
++    <value>['localhost']</value>
++    <description>A list of hosts of ZooKeeper servers used to manage the cluster.</description>
++  </property>
++  <property>
++    <name>storm.zookeeper.port</name>
++    <value>2181</value>
++    <description>The port Storm will use to connect to each of the ZooKeeper servers.</description>
++  </property>
++  <property>
++    <name>storm.zookeeper.root</name>
++    <value>/jstorm</value>
++    <description>The root location at which Storm stores data in ZooKeeper.</description>
++  </property>
++  <property>
++    <name>storm.zookeeper.session.timeout</name>
++    <value>20000</value>
++    <description>The session timeout for clients to ZooKeeper.</description>
++  </property>
++  <property>
++    <name>storm.zookeeper.connection.timeout</name>
++    <value>15000</value>
++    <description>The connection timeout for clients to ZooKeeper.</description>
++  </property>
++  <property>
++    <name>storm.zookeeper.retry.times</name>
++    <value>5</value>
++    <description>The number of times to retry a Zookeeper operation.</description>
++  </property>
++  <property>
++    <name>storm.zookeeper.retry.interval</name>
++    <value>1000</value>
++    <description>The interval between retries of a Zookeeper operation.</description>
++  </property>
++  <property>
++    <name>storm.zookeeper.retry.intervalceiling.millis</name>
++    <value>30000</value>
++    <description>The ceiling of the interval between retries of a Zookeeper operation.</description>
++  </property>
++  <property>
++    <name>storm.cluster.mode</name>
++    <value>distributed</value>
++    <description>The mode this Storm cluster is running in. Either "distributed" or "local".</description>
++  </property>
++  <property>
++    <name>storm.local.mode.zmq</name>
++    <value>false</value>
++    <description>Whether or not to use ZeroMQ for messaging in local mode. If this is set
++       to false, then Storm will use a pure-Java messaging system. The purpose
++       of this flag is to make it easy to run Storm in local mode by eliminating
++       the need for native dependencies, which can be difficult to install.
++    </description>
++  </property>
++  <property>
++    <name>storm.thrift.transport</name>
++    <value>backtype.storm.security.auth.SimpleTransportPlugin</value>
++    <description>The transport plug-in for Thrift client/server communication.</description>
++  </property>
++  <property>
++    <name>storm.messaging.transport</name>
++    <value>com.alibaba.jstorm.message.netty.NettyContext</value>
++    <description>The transporter for communication among JStorm tasks.</description>
++  </property>
++  <property>
++    <name>nimbus.host</name>
++    <value>localhost</value>
++    <description>The host that the master server is running on.</description>
++  </property>
++  <property>
++    <name>nimbus.thrift.port</name>
++    <value>6627</value>
++    <description> Which port the Thrift interface of Nimbus should run on. Clients should
++       connect to this port to upload jars and submit topologies.</description>
++  </property>
++  <property>
++    <name>nimbus.thrift.max_buffer_size</name>
++    <value>1048576</value>
++    <description>The maximum buffer size thrift should use when reading messages.</description>
++  </property>
++  <property>
++    <name>nimbus.childopts</name>
++    <value>-Xms4g -Xmx4g -Xmn1536m -XX:PermSize=256m  -XX:SurvivorRatio=4 -XX:+UseConcMarkSweepGC  -XX:+UseCMSInitiatingOccupancyOnly -XX:CMSInitiatingOccupancyFraction=70 -XX:CMSFullGCsBeforeCompaction=5 -XX:+HeapDumpOnOutOfMemoryError -verbose:gc -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=5 -XX:GCLogFileSize=100M -XX:+UseCMSCompactAtFullCollection -XX:CMSMaxAbortablePrecleanTime=5000</value>
++    <description>This parameter is used by the storm-deploy project to configure the jvm options for the nimbus daemon.</description>
++  </property>
++  <property>
++    <name>nimbus.task.timeout.secs</name>
++    <value>30</value>
++    <description>How long without heartbeating a task can go before nimbus will consider the task dead and reassign it to another location.</description>
++  </property>
++  <property>
++    <name>nimbus.supervisor.timeout.secs</name>
++    <value>60</value>
++    <description>How long before a supervisor can go without heartbeating before nimbus considers it dead and stops assigning new work to it.</description>
++  </property>
++  <property>
++    <name>nimbus.monitor.freq.secs</name>
++    <value>10</value>
++    <description>
++      How often nimbus should wake up to check heartbeats and do reassignments. Note
++       that if a machine ever goes down Nimbus will immediately wake up and take action.
++       This parameter is for checking for failures when there's no explicit event like that occuring.
++    </description>
++  </property>
++  <property>
++    <name>nimbus.cleanup.inbox.freq.secs</name>
++    <value>600</value>
++    <description>How often nimbus should wake the cleanup thread to clean the inbox.</description>
++  </property>
++  <property>
++    <name>nimbus.inbox.jar.expiration.secs</name>
++    <value>3600</value>
++    <description>
++      The length of time a jar file lives in the inbox before being deleted by the cleanup thread.
++
++       Probably keep this value greater than or equal to NIMBUS_CLEANUP_INBOX_JAR_EXPIRATION_SECS.
++       Note that the time it takes to delete an inbox jar file is going to be somewhat more than
++       NIMBUS_CLEANUP_INBOX_JAR_EXPIRATION_SECS (depending on how often NIMBUS_CLEANUP_FREQ_SECS is set to).
++      </description>
++  </property>
++  <property>
++    <name>nimbus.task.launch.secs</name>
++    <value>120</value>
++    <description>A special timeout used when a task is initially launched. During launch, this is the timeout
++       used until the first heartbeat, overriding nimbus.task.timeout.secs.</description>
++  </property>
++  <property>
++    <name>nimbus.reassign</name>
++    <value>true</value>
++    <description>Whether or not nimbus should reassign tasks if it detects that a task goes down.
++       Defaults to true, and it's not recommended to change this value.</description>
++  </property>
++  <property>
++    <name>nimbus.file.copy.expiration.secs</name>
++    <value>600</value>
++    <description>During upload/download with the master, how long an upload or download connection is idle
++       before nimbus considers it dead and drops the connection.</description>
++  </property>
++  <property>
++    <name>nimbus.topology.validator</name>
++    <value>backtype.storm.nimbus.DefaultTopologyValidator</value>
++    <description>A custom class that implements ITopologyValidator that is run whenever a
++       topology is submitted. Can be used to provide business-specific logic for
++       whether topologies are allowed to run or not.</description>
++  </property>
++  <property>
++    <name>ui.port</name>
++    <value>8744</value>
++    <description>Storm UI binds to this port.</description>
++  </property>
++  <property>
++    <name>ui.childopts</name>
++    <value>-Xmx768m</value>
++    <description>Childopts for Storm UI Java process.</description>
++  </property>
++  <property>
++    <name>logviewer.port</name>
++    <value>8000</value>
++    <description>HTTP UI port for log viewer.</description>
++  </property>
++  <property>
++    <name>logviewer.childopts</name>
++    <value>-Xmx128m</value>
++    <description>Childopts for log viewer java process.</description>
++  </property>
++  <property>
++    <name>logviewer.appender.name</name>
++    <value>A1</value>
++    <description>Appender name used by log viewer to determine log directory.</description>
++  </property>
++  <property>
++    <name>drpc.port</name>
++    <value>3772</value>
++    <description>This port is used by Storm DRPC for receiving DPRC requests from clients.</description>
++  </property>
++  <property>
++    <name>drpc.worker.threads</name>
++    <value>64</value>
++    <description>DRPC thrift server worker threads.</description>
++  </property>
++  <property>
++    <name>drpc.queue.size</name>
++    <value>128</value>
++    <description>DRPC thrift server queue size.</description>
++  </property>
++  <property>
++    <name>drpc.invocations.port</name>
++    <value>3773</value>
++    <description>This port on Storm DRPC is used by DRPC topologies to receive function invocations and send results back.</description>
++  </property>
++  <property>
++    <name>drpc.request.timeout.secs</name>
++    <value>600</value>
++    <description>The timeout on DRPC requests within the DRPC server. Defaults to 10 minutes. Note that requests can also
++       timeout based on the socket timeout on the DRPC client, and separately based on the topology message
++       timeout for the topology implementing the DRPC function.</description>
++  </property>
++  <property>
++    <name>drpc.childopts</name>
++    <value>-Xmx768m</value>
++    <description>Childopts for Storm DRPC Java process.</description>
++  </property>
++  <property>
++    <name>transactional.zookeeper.root</name>
++    <value>/transactional</value>
++    <description>The root directory in ZooKeeper for metadata about TransactionalSpouts.</description>
++  </property>
++  <property>
++    <name>transactional.zookeeper.servers</name>
++    <value>null</value>
++    <description>The list of zookeeper servers in which to keep the transactional state. If null (which is default),
++       will use storm.zookeeper.servers</description>
++  </property>
++  <property>
++    <name>transactional.zookeeper.port</name>
++    <value>null</value>
++    <description>The port to use to connect to the transactional zookeeper servers. If null (which is default),
++       will use storm.zookeeper.port</description>
++  </property>
++  <property>
++    <name>supervisor.slots.ports</name>
++    <value>[6700, 6701]</value>
++    <description>A list of ports that can run workers on this supervisor. Each worker uses one port, and
++       the supervisor will only run one worker per port. Use this configuration to tune
++       how many workers run on each machine.</description>
++  </property>
++  <property>
++    <name>supervisor.childopts</name>
++    <value>-Xmx256m</value>
++    <description>This parameter is used by the jstorm-deploy project to configure the jvm options for the supervisor daemon.</description>
++  </property>
++  <property>
++    <name>supervisor.worker.start.timeout.secs</name>
++    <value>120</value>
++    <description>How long a worker can go without heartbeating during the initial launch before
++       the supervisor tries to restart the worker process. This value override
++       supervisor.worker.timeout.secs during launch because there is additional
++       overhead to starting and configuring the JVM on launch.</description>
++  </property>
++  <property>
++    <name>supervisor.worker.timeout.secs</name>
++    <value>30</value>
++    <description>How long a worker can go without heartbeating before the supervisor tries to restart the worker process.</description>
++  </property>
++  <property>
++    <name>supervisor.monitor.frequency.secs</name>
++    <value>3</value>
++    <description>How often the supervisor checks the worker heartbeats to see if any of them need to be restarted.</description>
++  </property>
++  <property>
++    <name>supervisor.heartbeat.frequency.secs</name>
++    <value>5</value>
++    <description>How often the supervisor sends a heartbeat to the master.</description>
++  </property>
++  <property>
++    <name>worker.childopts</name>
++    <value>-Xmx768m </value>
++    <description>The jvm opts provided to workers launched by this supervisor. All \"%ID%\" substrings are replaced with an identifier for this worker.</description>
++  </property>
++  <property>
++    <name>worker.heartbeat.frequency.secs</name>
++    <value>1</value>
++    <description>How often this worker should heartbeat to the supervisor.</description>
++  </property>
++  <property>
++    <name>task.heartbeat.frequency.secs</name>
++    <value>3</value>
++    <description>How often a task should heartbeat its status to the master.</description>
++  </property>
++  <property>
++    <name>task.refresh.poll.secs</name>
++    <value>10</value>
++    <description>How often a task should sync its connections with other tasks (if a task is
++       reassigned, the other tasks sending messages to it need to refresh their connections).
++       In general though, when a reassignment happens other tasks will be notified
++       almost immediately. This configuration is here just in case that notification doesn't
++       come through.</description>
++  </property>
++  <property>
++    <name>zmq.threads</name>
++    <value>1</value>
++    <description>The number of threads that should be used by the zeromq context in each worker process.</description>
++  </property>
++  <property>
++    <name>zmq.linger.millis</name>
++    <value>5000</value>
++    <description>How long a connection should retry sending messages to a target host when
++       the connection is closed. This is an advanced configuration and can almost
++       certainly be ignored.</description>
++  </property>
++  <property>
++    <name>zmq.hwm</name>
++    <value>0</value>
++    <description>The high water for the ZeroMQ push sockets used for networking. Use this config to prevent buffer explosion
++       on the networking layer.</description>
++  </property>
++  <property>
++    <name>storm.messaging.netty.server_worker_threads</name>
++    <value>1</value>
++    <description>Netty based messaging: The # of worker threads for the server.</description>
++  </property>
++  <property>
++    <name>storm.messaging.netty.client_worker_threads</name>
++    <value>1</value>
++    <description>Netty based messaging: The # of worker threads for the client.</description>
++  </property>
++  <property>
++    <name>storm.messaging.netty.buffer_size</name>
++    <value>5242880</value>
++    <description>Netty based messaging: The buffer size for send/recv buffer.</description>
++  </property>
++  <property>
++    <name>storm.messaging.netty.max_retries</name>
++    <value>30</value>
++    <description>Netty based messaging: The max # of retries that a peer will perform when a remote is not accessible.</description>
++  </property>
++  <property>
++    <name>storm.messaging.netty.max_wait_ms</name>
++    <value>1000</value>
++    <description>Netty based messaging: The max # of milliseconds that a peer will wait.</description>
++  </property>
++  <property>
++    <name>storm.messaging.netty.min_wait_ms</name>
++    <value>100</value>
++    <description>Netty based messaging: The min # of milliseconds that a peer will wait.</description>
++  </property>
++  <property>
++    <name>topology.enable.message.timeouts</name>
++    <value>true</value>
++    <description>True if Storm should timeout messages or not. Defaults to true. This is meant to be used
++       in unit tests to prevent tuples from being accidentally timed out during the test.</description>
++  </property>
++  <property>
++    <name>topology.debug</name>
++    <value>false</value>
++    <description>When set to true, Storm will log every message that's emitted.</description>
++  </property>
++  <property>
++    <name>topology.optimize</name>
++    <value>true</value>
++    <description>Whether or not the master should optimize topologies by running multiple tasks in a single thread where appropriate.</description>
++  </property>
++  <property>
++    <name>topology.workers</name>
++    <value>1</value>
++    <description>How many processes should be spawned around the cluster to execute this
++       topology. Each process will execute some number of tasks as threads within
++       them. This parameter should be used in conjunction with the parallelism hints
++       on each component in the topology to tune the performance of a topology.</description>
++  </property>
++  <property>
++    <name>topology.acker.executors</name>
++    <value>null</value>
++    <description>How many executors to spawn for ackers.
++
++      If this is set to 0, then Storm will immediately ack tuples as soon
++       as they come off the spout, effectively disabling reliability.
++    </description>
++  </property>
++  <property>
++    <name>topology.message.timeout.secs</name>
++    <value>30</value>
++    <description>The maximum amount of time given to the topology to fully process a message
++       emitted by a spout. If the message is not acked within this time frame, Storm
++       will fail the message on the spout. Some spouts implementations will then replay
++       the message at a later time.</description>
++  </property>
++  <property>
++    <name>topology.skip.missing.kryo.registrations</name>
++    <value>false</value>
++    <description> Whether or not Storm should skip the loading of kryo registrations for which it
++       does not know the class or have the serializer implementation. Otherwise, the task will
++       fail to load and will throw an error at runtime. The use case of this is if you want to
++       declare your serializations on the storm.yaml files on the cluster rather than every single
++       time you submit a topology. Different applications may use different serializations and so
++       a single application may not have the code for the other serializers used by other apps.
++       By setting this config to true, Storm will ignore that it doesn't have those other serializations
++       rather than throw an error.</description>
++  </property>
++  <property>
++    <name>topology.max.task.parallelism</name>
++    <value>null</value>
++    <description>The maximum parallelism allowed for a component in this topology. This configuration is
++       typically used in testing to limit the number of threads spawned in local mode.</description>
++  </property>
++  <property>
++    <name>topology.max.spout.pending</name>
++    <value>null</value>
++    <description>The maximum number of tuples that can be pending on a spout task at any given time.
++       This config applies to individual tasks, not to spouts or topologies as a whole.
++
++       A pending tuple is one that has been emitted from a spout but has not been acked or failed yet.
++       Note that this config parameter has no effect for unreliable spouts that don't tag
++       their tuples with a message id.</description>
++  </property>
++  <property>
++    <name>topology.state.synchronization.timeout.secs</name>
++    <value>60</value>
++    <description>The maximum amount of time a component gives a source of state to synchronize before it requests
++       synchronization again.</description>
++  </property>
++  <property>
++    <name>topology.stats.sample.rate</name>
++    <value>0.05</value>
++    <description>The percentage of tuples to sample to produce stats for a task.</description>
++  </property>
++  <property>
++    <name>topology.builtin.metrics.bucket.size.secs</name>
++    <value>60</value>
++    <description>The time period that builtin metrics data in bucketed into.</description>
++  </property>
++  <property>
++    <name>topology.fall.back.on.java.serialization</name>
++    <value>true</value>
++    <description>Whether or not to use Java serialization in a topology.</description>
++  </property>
++  <property>
++    <name>topology.worker.childopts</name>
++    <value>null</value>
++    <description>Topology-specific options for the worker child process. This is used in addition to WORKER_CHILDOPTS.</description>
++  </property>
++  <property>
++    <name>topology.executor.receive.buffer.size</name>
++    <value>1024</value>
++    <description>The size of the Disruptor receive queue for each executor. Must be a power of 2.</description>
++  </property>
++  <property>
++    <name>topology.executor.send.buffer.size</name>
++    <value>1024</value>
++    <description>The size of the Disruptor send queue for each executor. Must be a power of 2.</description>
++  </property>
++  <property>
++    <name>topology.receiver.buffer.size</name>
++    <value>8</value>
++    <description>The maximum number of messages to batch from the thread receiving off the network to the
++       executor queues. Must be a power of 2.</description>
++  </property>
++  <property>
++    <name>topology.transfer.buffer.size</name>
++    <value>1024</value>
++    <description>The size of the Disruptor transfer queue for each worker.</description>
++  </property>
++  <property>
++    <name>topology.tick.tuple.freq.secs</name>
++    <value>null</value>
++    <description>How often a tick tuple from the "__system" component and "__tick" stream should be sent
++       to tasks. Meant to be used as a component-specific configuration.</description>
++  </property>
++  <property>
++    <name>topology.worker.shared.thread.pool.size</name>
++    <value>4</value>
++    <description>The size of the shared thread pool for worker tasks to make use of. The thread pool can be accessed
++       via the TopologyContext.</description>
++  </property>
++  <property>
++    <name>topology.disruptor.wait.strategy</name>
++    <value>com.lmax.disruptor.BlockingWaitStrategy</value>
++    <description>Configure the wait strategy used for internal queuing. Can be used to tradeoff latency
++       vs. throughput.</description>
++  </property>
++  <property>
++    <name>topology.executor.send.buffer.size</name>
++    <value>1024</value>
++    <description>The size of the Disruptor send queue for each executor. Must be a power of 2.</description>
++  </property>
++  <property>
++    <name>topology.receiver.buffer.size</name>
++    <value>8</value>
++    <description>The maximum number of messages to batch from the thread receiving off the network to the
++       executor queues. Must be a power of 2.</description>
++  </property>
++  <property>
++    <name>topology.transfer.buffer.size</name>
++    <value>1024</value>
++    <description>The size of the Disruptor transfer queue for each worker.</description>
++  </property>
++  <property>
++    <name>topology.tick.tuple.freq.secs</name>
++    <value>null</value>
++    <description>How often a tick tuple from the "__system" component and "__tick" stream should be sent
++       to tasks. Meant to be used as a component-specific configuration.</description>
++  </property>
++  <property>
++    <name>topology.worker.shared.thread.pool.size</name>
++    <value>4</value>
++    <description>The size of the shared thread pool for worker tasks to make use of. The thread pool can be accessed
++       via the TopologyContext.</description>
++  </property>
++  <property>
++    <name>topology.spout.wait.strategy</name>
++    <value>backtype.storm.spout.SleepSpoutWaitStrategy</value>
++    <description>A class that implements a strategy for what to do when a spout needs to wait. Waiting is
++       triggered in one of two conditions:
++
++       1. nextTuple emits no tuples
++       2. The spout has hit maxSpoutPending and can't emit any more tuples</description>
++  </property>
++  <property>
++    <name>topology.sleep.spout.wait.strategy.time.ms</name>
++    <value>1</value>
++    <description>The amount of milliseconds the SleepEmptyEmitStrategy should sleep for.</description>
++  </property>
++  <property>
++    <name>topology.error.throttle.interval.secs</name>
++    <value>10</value>
++    <description>The interval in seconds to use for determining whether to throttle error reported to Zookeeper. For example,
++       an interval of 10 seconds with topology.max.error.report.per.interval set to 5 will only allow 5 errors to be
++       reported to Zookeeper per task for every 10 second interval of time.</description>
++  </property>
++  <property>
++    <name>topology.max.error.report.per.interval</name>
++    <value>5</value>
++    <description>The interval in seconds to use for determining whether to throttle error reported to Zookeeper. For example,
++       an interval of 10 seconds with topology.max.error.report.per.interval set to 5 will only allow 5 errors to be
++       reported to Zookeeper per task for every 10 second interval of time.</description>
++  </property>
++  <property>
++    <name>topology.kryo.factory</name>
++    <value>backtype.storm.serialization.DefaultKryoFactory</value>
++    <description>Class that specifies how to create a Kryo instance for serialization. Storm will then apply
++       topology.kryo.register and topology.kryo.decorators on top of this. The default implementation
++       implements topology.fall.back.on.java.serialization and turns references off.</description>
++  </property>
++  <property>
++    <name>topology.tuple.serializer</name>
++    <value>backtype.storm.serialization.types.ListDelegateSerializer</value>
++    <description>The serializer class for ListDelegate (tuple payload).
++       The default serializer will be ListDelegateSerializer</description>
++  </property>
++  <property>
++    <name>topology.trident.batch.emit.interval.millis</name>
++    <value>500</value>
++    <description>How often a batch can be emitted in a Trident topology.</description>
++  </property>
++  <property>
++    <name>dev.zookeeper.path</name>
++    <value>/tmp/dev-storm-zookeeper</value>
++    <description>The path to use as the zookeeper dir when running a zookeeper server via
++       "storm dev-zookeeper". This zookeeper instance is only intended for development;
++       it is not a production grade zookeeper setup.</description>
++  </property>
++</configuration>
+diff --git a/src/app-packages/jstorm/configuration/tomcat-users-xml.xml b/src/app-packages/jstorm/configuration/tomcat-users-xml.xml
+new file mode 100644
+index 0000000..4874f1e
+--- /dev/null
++++ b/src/app-packages/jstorm/configuration/tomcat-users-xml.xml
+@@ -0,0 +1,8 @@
++<?xml version="1.0"?>
++<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
++<configuration>
++  <property>
++    <name>ui_user</name>
++    <value>tomcat</value>
++  </property>
++</configuration>
+\ No newline at end of file
+diff --git a/src/app-packages/jstorm/metainfo.xml b/src/app-packages/jstorm/metainfo.xml
+new file mode 100644
+index 0000000..f6ec74a
+--- /dev/null
++++ b/src/app-packages/jstorm/metainfo.xml
+@@ -0,0 +1,147 @@
++<?xml version="1.0"?>
++<!--
++   Licensed to the Apache Software Foundation (ASF) under one or more
++   contributor license agreements.  See the NOTICE file distributed with
++   this work for additional information regarding copyright ownership.
++   The ASF licenses this file to You under the Apache License, Version 2.0
++   (the "License"); you may not use this file except in compliance with
++   the License.  You may obtain a copy of the License at
++
++       http://www.apache.org/licenses/LICENSE-2.0
++
++   Unless required by applicable law or agreed to in writing, software
++   distributed under the License is distributed on an "AS IS" BASIS,
++   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++   See the License for the specific language governing permissions and
++   limitations under the License.
++-->
++
++<metainfo>
++  <schemaVersion>2.0</schemaVersion>
++  <application>
++    <name>JSTORM</name>
++    <comment>Apache Hadoop Stream processing framework</comment>
++    <version>${pkg.version}</version>
++    <exportedConfigs>storm-site,server-xml</exportedConfigs>
++
++    <exportGroups>
++      <exportGroup>
++        <name>QuickLinks</name>
++        <exports>
++          <export>
++            <name>nimbus.host_port</name>
++            <value>http://${NIMBUS_HOST}:${site.storm-site.nimbus.thrift.port}</value>
++          </export>
++          <export>
++            <name>webui</name>
++            <value>http://${WEBUI_HOST}:${site.server-xml.http.port}</value>
++          </export>
++        </exports>
++      </exportGroup>
++    </exportGroups>
++
++    <commandOrders>
++      <commandOrder>
++        <command>NIMBUS-START</command>
++        <requires>SUPERVISOR-INSTALLED</requires>
++      </commandOrder>
++      <commandOrder>
++        <command>SUPERVISOR-START</command>
++        <requires>NIMBUS-STARTED</requires>
++      </commandOrder>
++      <commandOrder>
++        <command>WEBUI-START</command>
++        <requires>NIMBUS-STARTED</requires>
++      </commandOrder>
++    </commandOrders>
++
++    <components>
++      <component>
++        <name>NIMBUS</name>
++        <category>MASTER</category>
++        <publishConfig>true</publishConfig>
++        <autoStartOnFailure>true</autoStartOnFailure>
++        <appExports>QuickLinks-nimbus.host_port</appExports>
++        <maxInstanceCount>1</maxInstanceCount>
++        <commandScript>
++          <script>scripts/nimbus.py</script>
++          <scriptType>PYTHON</scriptType>
++          <timeout>600</timeout>
++        </commandScript>
++      </component>
++
++      <component>
++        <name>SUPERVISOR</name>
++        <category>SLAVE</category>
++        <autoStartOnFailure>true</autoStartOnFailure>
++        <componentExports>
++          <componentExport>
++            <name>log_viewer_port</name>
++            <value>${THIS_HOST}:${site.storm-site.logviewer.port}</value>
++          </componentExport>
++        </componentExports>
++        <commandScript>
++          <script>scripts/supervisor.py</script>
++          <scriptType>PYTHON</scriptType>
++          <timeout>600</timeout>
++        </commandScript>
++      </component>
++
++      <component>
++        <name>WEBUI</name>
++        <category>MASTER</category>
++        <appExports>QuickLinks-webui</appExports>
++        <componentExports>
++          <componentExport>
++            <name>webui</name>
++            <value>${TOMCAT_HOST}:${site.server-xml.http.port}</value>
++          </componentExport>
++        </componentExports>>
++        <commandScript>
++          <script>scripts/tomcat.py</script>
++          <scriptType>PYTHON</scriptType>
++        </commandScript>
++      </component>
++    </components>
++
++    <osSpecifics>
++      <osSpecific>
++        <osType>any</osType>
++        <packages>
++          <package>
++            <type>tarball</type>
++            <name>files/jstorm-${pkg.version}.zip</name>
++          </package>
++        </packages>
++      </osSpecific>
++      <osSpecific>
++        <osType>any</osType>
++        <packages>
++          <package>
++            <type>tarball</type>
++            <name>files/tomcat-${tomcat.version}.tar.gz</name>
++          </package>
++        </packages>
++      </osSpecific>
++    </osSpecifics>
++
++    <configFiles>
++      <configFile>
++        <type>yaml</type>
++        <fileName>storm.yaml</fileName>
++        <dictionaryName>storm-site</dictionaryName>
++      </configFile>
++      <configFile>
++        <type>env</type>
++        <fileName>server.xml</fileName>
++        <dictionaryName>server-xml</dictionaryName>
++      </configFile>
++      <configFile>
++        <type>env</type>
++        <fileName>tomcat-users.xml</fileName>
++        <dictionaryName>tomcat-users-xml</dictionaryName>
++      </configFile>
++    </configFiles>
++
++  </application>
++</metainfo>
+diff --git a/src/app-packages/jstorm/package/scripts/nimbus.py b/src/app-packages/jstorm/package/scripts/nimbus.py
+new file mode 100644
+index 0000000..c7c3120
+--- /dev/null
++++ b/src/app-packages/jstorm/package/scripts/nimbus.py
+@@ -0,0 +1,55 @@
++#!/usr/bin/env python
++"""
++Licensed to the Apache Software Foundation (ASF) under one
++or more contributor license agreements.  See the NOTICE file
++distributed with this work for additional information
++regarding copyright ownership.  The ASF licenses this file
++to you under the Apache License, Version 2.0 (the
++"License"); you may not use this file except in compliance
++with the License.  You may obtain a copy of the License at
++
++    http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++
++"""
++
++import sys
++from resource_management import *
++from storm import storm
++from service import service
++
++class Nimbus(Script):
++  def install(self, env):
++    self.install_packages(env)
++
++  def configure(self, env):
++    import params
++    env.set_params(params)
++
++    storm()
++
++  def start(self, env):
++    import params
++    env.set_params(params)
++    self.configure(env)
++
++    service("nimbus", action="start")
++
++  def stop(self, env):
++    import params
++    env.set_params(params)
++
++    service("nimbus", action="stop")
++
++  def status(self, env):
++    import status_params
++    env.set_params(status_params)
++    check_process_status(status_params.pid_nimbus)
++
++if __name__ == "__main__":
++  Nimbus().execute()
+diff --git a/src/app-packages/jstorm/package/scripts/params.py b/src/app-packages/jstorm/package/scripts/params.py
+new file mode 100644
+index 0000000..c450bc6
+--- /dev/null
++++ b/src/app-packages/jstorm/package/scripts/params.py
+@@ -0,0 +1,81 @@
++#!/usr/bin/env python
++"""
++Licensed to the Apache Software Foundation (ASF) under one
++or more contributor license agreements.  See the NOTICE file
++distributed with this work for additional information
++regarding copyright ownership.  The ASF licenses this file
++to you under the Apache License, Version 2.0 (the
++"License"); you may not use this file except in compliance
++with the License.  You may obtain a copy of the License at
++
++    http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++
++"""
++
++from resource_management import *
++import status_params
++
++# server configurations
++config = Script.get_config()
++#Jstorm Web Ui
++TOMCAT_DIRECTORY_NAME = 'apache-tomcat-7.0.62'
++JSTORM_DIRECTORY_NAME = "jstorm-2.1.1"
++app_root = config['configurations']['global']['app_root']
++storm_install_dir = format("{app_root}/{JSTORM_DIRECTORY_NAME}")
++storm_conf_dir = format("{app_root}/{JSTORM_DIRECTORY_NAME}/conf")
++tomcat_install_dir = format("{app_root}/{TOMCAT_DIRECTORY_NAME}")
++tomcat_conf_dir = format("{app_root}/{TOMCAT_DIRECTORY_NAME}/conf")
++
++app_version = config['configurations']['global']['app_version']
++app_name = config['clusterName']
++
++storm_user = config['configurations']['global']['app_user']
++log_dir = config['configurations']['global']['app_log_dir']
++pid_dir = status_params.pid_dir
++local_dir = config['configurations']['storm-site']['storm.local.dir']
++user_group = config['configurations']['global']['user_group']
++java64_home = config['hostLevelParams']['java_home']
++nimbus_host = config['configurations']['storm-site']['nimbus.host']
++nimbus_port = config['configurations']['storm-site']['nimbus.thrift.port']
++rest_api_conf_file = format("{storm_conf_dir}/config.yaml")
++rest_lib_dir = format("{storm_install_dir}/external/storm-rest")
++storm_bin = format("{storm_install_dir}/bin/jstorm")
++storm_env_sh_template = config['configurations']['storm-env']['content']
++
++http_port = config['configurations']['server-xml']['http.port']
++connection_timeout = config['configurations']['server-xml']['connection.timeout']
++ui_user = config['configurations']['tomcat-users-xml']['ui_user']
++ui_password = config['configurations']['tomcat-users-xml']['ui_password']
++
++metric_collector_host = default('/configurations/global/metric_collector_host', '')
++metric_collector_port = default('/configurations/global/metric_collector_port', '')
++metric_collector_lib = default('/configurations/global/metric_collector_lib', '')
++metric_collector_app_id = format("{app_name}")
++
++has_metric_collector = 1
++if not metric_collector_lib:
++  has_metric_collector = 0
++
++security_enabled = config['configurations']['global']['security_enabled']
++
++if security_enabled:
++  _hostname_lowercase = config['hostname'].lower()
++  _kerberos_domain = config['configurations']['storm-env']['kerberos_domain']
++  _storm_client_principal_name = config['configurations']['storm-env']['storm_client_principal_name']
++  _storm_server_principal_name = config['configurations']['storm-env']['storm_server_principal_name']
++
++  storm_jaas_client_principal = _storm_client_principal_name.replace('_HOST', _hostname_lowercase)
++  storm_client_keytab_path = config['configurations']['storm-env']['storm_client_keytab']
++  storm_jaas_server_principal = _storm_server_principal_name.replace('_HOST',nimbus_host.lower())
++  storm_jaas_stormclient_servicename = storm_jaas_server_principal.split("/")[0]
++  storm_server_keytab_path = config['configurations']['storm-env']['storm_server_keytab']
++  kinit_path_local = functions.get_kinit_path(["/usr/bin", "/usr/kerberos/bin", "/usr/sbin"])
++
++metric_collector_sink_jar = "/usr/lib/storm/lib/ambari-metrics-storm-sink*.jar"
++storm_lib_dir = format("{app_root}/lib")
+diff --git a/src/app-packages/jstorm/package/scripts/service.py b/src/app-packages/jstorm/package/scripts/service.py
+new file mode 100644
+index 0000000..40eca9f
+--- /dev/null
++++ b/src/app-packages/jstorm/package/scripts/service.py
+@@ -0,0 +1,97 @@
++#!/usr/bin/env python
++"""
++Licensed to the Apache Software Foundation (ASF) under one
++or more contributor license agreements.  See the NOTICE file
++distributed with this work for additional information
++regarding copyright ownership.  The ASF licenses this file
++to you under the Apache License, Version 2.0 (the
++"License"); you may not use this file except in compliance
++with the License.  You may obtain a copy of the License at
++
++    http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++
++"""
++
++
++from resource_management import *
++import time
++import os
++import sys
++
++"""
++Slider package uses jps as pgrep does not list the whole process start command
++"""
++def service(
++    name,
++    action='start'):
++  import params
++  import status_params
++
++  python_binary = os.environ['PYTHON_EXE'] if 'PYTHON_EXE' in os.environ else sys.executable
++  pid_file = status_params.pid_files[name]
++  container_id = status_params.container_id
++  no_op_test = format("ls {pid_file} >/dev/null 2>&1 && ps `cat {pid_file}` >/dev/null 2>&1")
++
++  jps_path = format("{java64_home}/bin/jps")
++  grep_and_awk = format("| grep {container_id}") + " | awk '{print $1}'"
++
++  if name == 'ui':
++    crt_pid_cmd = format("{jps_path} -vl | grep \"^[0-9 ]*org.apache.storm.ui.core\" {grep_and_awk}  > {pid_file}")
++  elif name == "rest_api":
++    rest_process_cmd = format("{java64_home}/bin/java -jar {rest_lib_dir}/`ls {rest_lib_dir} | grep -wE storm-rest-[0-9.-]+\.jar` server")
++    crt_pid_cmd = format("pgrep -f \"{rest_process_cmd}\" > {pid_file}")
++  else:
++    crt_pid_cmd = format("{jps_path} -vl | grep \"^[0-9 ]*com.alibaba.jstorm.daemon.{name}\" {grep_and_awk}  > {pid_file}")
++
++  if action == "start":
++    if name == "rest_api":
++      cmd = format("{rest_process_cmd} {rest_api_conf_file} > {log_dir}/restapi.log")
++    else:
++      cmd = format("env JAVA_HOME={java64_home} PATH={java64_home}/bin:$PATH STORM_BASE_DIR={app_root} STORM_CONF_DIR={storm_conf_dir} {python_binary} {storm_bin} {name} > {log_dir}/{name}.out 2>&1")
++
++    Execute(cmd,
++            not_if=no_op_test,
++            logoutput=False,
++            wait_for_finish=False
++    )
++
++    if name == "rest_api":
++      Execute(crt_pid_cmd,
++              logoutput=True,
++              tries=6,
++              try_sleep=10
++      )
++    else:
++      content = None
++      for i in xrange(12):
++        Execute(crt_pid_cmd,
++                logoutput=True
++        )
++        with open(pid_file) as f:
++          content = f.readline().strip()
++        if content.isdigit():
++          break;
++        File(pid_file, action="delete")
++        time.sleep(10)
++        pass
++
++      if not content.isdigit():
++        raise Fail(format("Unable to start {name}"))
++
++  elif action == "stop":
++    process_dont_exist = format("! ({no_op_test})")
++    pid = format("`cat {pid_file}` >/dev/null 2>&1")
++    Execute(format("kill {pid}"),
++            not_if=process_dont_exist
++    )
++    Execute(format("kill -9 {pid}"),
++            not_if=format("sleep 2; {process_dont_exist} || sleep 20; {process_dont_exist}"),
++            ignore_failures=True
++    )
++    Execute(format("rm -f {pid_file}"))
+diff --git a/src/app-packages/jstorm/package/scripts/status_params.py b/src/app-packages/jstorm/package/scripts/status_params.py
+new file mode 100644
+index 0000000..7433cc7
+--- /dev/null
++++ b/src/app-packages/jstorm/package/scripts/status_params.py
+@@ -0,0 +1,31 @@
++#!/usr/bin/env python
++"""
++Licensed to the Apache Software Foundation (ASF) under one
++or more contributor license agreements.  See the NOTICE file
++distributed with this work for additional information
++regarding copyright ownership.  The ASF licenses this file
++to you under the Apache License, Version 2.0 (the
++"License"); you may not use this file except in compliance
++with the License.  You may obtain a copy of the License at
++
++    http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++
++"""
++from resource_management import *
++
++config = Script.get_config()
++
++container_id = config['configurations']['global']['app_container_id']
++pid_dir = config['configurations']['global']['app_pid_dir']
++pid_nimbus = format("{pid_dir}/nimbus.pid")
++pid_supervisor = format("{pid_dir}/supervisor.pid")
++pid_webui = format("{pid_dir}/catalina.pid")
++pid_files = {"nimbus": pid_nimbus,
++             "supervisor": pid_supervisor,
++             "webui":pid_webui}
+\ No newline at end of file
+diff --git a/src/app-packages/jstorm/package/scripts/storm.py b/src/app-packages/jstorm/package/scripts/storm.py
+new file mode 100644
+index 0000000..7d629ab
+--- /dev/null
++++ b/src/app-packages/jstorm/package/scripts/storm.py
+@@ -0,0 +1,53 @@
++#!/usr/bin/env python
++"""
++Licensed to the Apache Software Foundation (ASF) under one
++or more contributor license agreements.  See the NOTICE file
++distributed with this work for additional information
++regarding copyright ownership.  The ASF licenses this file
++to you under the Apache License, Version 2.0 (the
++"License"); you may not use this file except in compliance
++with the License.  You may obtain a copy of the License at
++
++    http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++
++"""
++
++from resource_management import *
++from yaml_config import yaml_config
++import sys
++
++def storm():
++  import params
++
++  Directory([params.log_dir, params.pid_dir, params.local_dir, params.storm_conf_dir],
++            owner=params.storm_user,
++            group=params.user_group,
++            recursive=True
++  )
++
++  yaml_config( "storm.yaml",
++               conf_dir = params.storm_conf_dir,
++               configurations = params.config['configurations']['storm-site'],
++               owner = params.storm_user,
++               group = params.user_group
++  )
++
++
++  if params.security_enabled:
++    File(format("{storm_conf_dir}/storm_jaas.conf"),
++              content=Template("storm_jaas.conf.j2"),
++              owner = params.storm_user,
++              group = params.user_group
++    )
++
++  if params.has_metric_collector:
++    Execute(format("ln -s {metric_collector_sink_jar} {storm_lib_dir}/ambari-metrics-storm-sink.jar"),
++            not_if=format("ls {storm_lib_dir}/ambari-metrics-storm-sink.jar"),
++            only_if=format("ls {metric_collector_sink_jar}")
++    )
+diff --git a/src/app-packages/jstorm/package/scripts/supervisor.py b/src/app-packages/jstorm/package/scripts/supervisor.py
+new file mode 100644
+index 0000000..a0fb8b0
+--- /dev/null
++++ b/src/app-packages/jstorm/package/scripts/supervisor.py
+@@ -0,0 +1,59 @@
++#!/usr/bin/env python
++"""
++Licensed to the Apache Software Foundation (ASF) under one
++or more contributor license agreements.  See the NOTICE file
++distributed with this work for additional information
++regarding copyright ownership.  The ASF licenses this file
++to you under the Apache License, Version 2.0 (the
++"License"); you may not use this file except in compliance
++with the License.  You may obtain a copy of the License at
++
++    http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++
++"""
++
++import sys
++from resource_management import *
++from yaml_config import yaml_config
++from storm import storm
++from service import service
++
++
++class Supervisor(Script):
++  def install(self, env):
++    self.install_packages(env)
++
++  def configure(self, env):
++    import params
++    env.set_params(params)
++    storm()
++
++  def start(self, env):
++    import params
++    env.set_params(params)
++    self.configure(env)
++
++    service("supervisor", action="start")
++
++  def stop(self, env):
++    import params
++    env.set_params(params)
++
++    service("supervisor", action="stop")
++
++  def status(self, env):
++    import status_params
++    env.set_params(status_params)
++
++    check_process_status(status_params.pid_supervisor)
++
++
++if __name__ == "__main__":
++  Supervisor().execute()
++
+diff --git a/src/app-packages/jstorm/package/scripts/tomcat.py b/src/app-packages/jstorm/package/scripts/tomcat.py
+new file mode 100644
+index 0000000..38315cc
+--- /dev/null
++++ b/src/app-packages/jstorm/package/scripts/tomcat.py
+@@ -0,0 +1,100 @@
++#!/usr/bin/env python
++"""
++Licensed to the Apache Software Foundation (ASF) under one
++or more contributor license agreements.  See the NOTICE file
++distributed with this work for additional information
++regarding copyright ownership.  The ASF licenses this file
++to you under the Apache License, Version 2.0 (the
++"License"); you may not use this file except in compliance
++with the License.  You may obtain a copy of the License at
++
++    http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++
++"""
++
++import os, shutil, sys
++from resource_management import *
++from storm import storm
++
++class Tomcat(Script):
++  def install(self, env):
++    self.install_packages(env)
++    pass
++
++  def configure(self, env):
++    import params
++    env.set_params(params)
++    File(format("{tomcat_conf_dir}/server.xml"), content=Template("server.xml.j2"))
++    File(format("{tomcat_conf_dir}/tomcat-users.xml"), content=Template("tomcat-users.xml.j2"))
++    storm()
++    webapps_dir = format("{tomcat_install_dir}/webapps/")
++    resources_path = format("{storm_install_dir}/jstorm-ui-2.1.1.war")
++    shutil.copy(resources_path,webapps_dir)
++    link_path = format("{webapps_dir}/ROOT")
++    shutil.rmtree(link_path)
++    jstorm_ui_path = format("{webapps_dir}/jstorm-ui-2.1.1")
++    os.symlink(jstorm_ui_path,link_path)
++    if not os.path.exists("/home/yarn/.jstorm"):
++      os.mkdirs("/home/yarn/.jstorm")
++    storm_yaml = format("{storm_install_dir}/conf/storm.yaml")
++    shutil.copy(storm_yaml,"/home/yarn/.jstorm/")
++
++    """
++    storm()
++    resources = format('{app_root}/../resources')
++    webapps_dir = format("{tomcat_install_dir}/webapps/")
++    for resource in os.listdir(resources):
++      full_resource_path = os.path.join(resources, resource)
++      if os.path.isfile(full_resource_path) and resource.endswith('.war'):
++        Logger.info("Copying %s to %s" % (full_resource_path, webapps_dir))
++        shutil.copy(full_resource_path, webapps_dir)
++      else:
++        Logger.info("Ignoring localized file that doesn't end in '.war': %s" % full_resource_path)
++    """
++
++  def start(self, env):
++    import params
++    import status_params
++    # implicit that the params/env are properly configured
++    self.configure(env)
++    tomcat_pid = status_params.pid_files["webui"]
++    process_cmd = format('env JAVA_HOME={java64_home} CATALINA_PID=' + tomcat_pid + ' {tomcat_install_dir}/bin/catalina.sh start')
++
++    Execute(process_cmd,
++        logoutput=False,
++        wait_for_finish=True,
++        pid_file=tomcat_pid,
++        poll_after = 15
++    )
++
++  def stop(self, env):
++    import params
++    import status_params
++    # Don't need to re-call configure()
++    env.set_params(params)
++    tomcat_pid = status_params.pid_files["webui"]
++    process_cmd = format('env JAVA_HOME={java64_home} CATALINA_PID=' + tomcat_pid + '{tomcat_install_dir}/bin/catalina.sh stop')
++
++    Execute(process_cmd,
++        logoutput=True,
++        wait_for_finish=True,
++        pid_file=tomcat_pid,
++        poll_after = 15
++    )
++
++  def status(self, env):
++    import params
++    import status_params
++    # Don't need to re-call configure()
++    env.set_params(params)
++    tomcat_pid = status_params.pid_files["webui"]
++    check_process_status(tomcat_pid)
++
++if __name__ == "__main__":
++  Tomcat().execute()
+diff --git a/src/app-packages/jstorm/package/scripts/yaml_config.py b/src/app-packages/jstorm/package/scripts/yaml_config.py
+new file mode 100644
+index 0000000..5f763cc
+--- /dev/null
++++ b/src/app-packages/jstorm/package/scripts/yaml_config.py
+@@ -0,0 +1,80 @@
++#!/usr/bin/env python
++"""
++Licensed to the Apache Software Foundation (ASF) under one
++or more contributor license agreements.  See the NOTICE file
++distributed with this work for additional information
++regarding copyright ownership.  The ASF licenses this file
++to you under the Apache License, Version 2.0 (the
++"License"); you may not use this file except in compliance
++with the License.  You may obtain a copy of the License at
++
++    http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++
++"""
++
++import re
++import socket
++from resource_management import *
++
++def escape_yaml_propetry(value):
++  # pre-process value for any "_HOST" tokens
++  value = value.replace('_HOST', socket.getfqdn())
++
++  unquouted = False
++  unquouted_values = ["null","Null","NULL","true","True","TRUE","false","False","FALSE","YES","Yes","yes","NO","No","no","ON","On","on","OFF","Off","off"]
++  
++  if value in unquouted_values:
++    unquouted = True
++
++  # if is list [a,b,c]
++  if re.match('^\w*\[.+\]\w*$', value):
++    unquouted = True
++
++  # if is map {'a':'b'}
++  if re.match('^\w*\{.+\}\w*$', value):
++    unquouted = True
++
++  try:
++    int(value)
++    unquouted = True
++  except ValueError:
++    pass
++  
++  try:
++    float(value)
++    unquouted = True
++  except ValueError:
++    pass
++  
++  if not unquouted:
++    value = value.replace("'","''")
++    value = "'"+value+"'"
++    
++  return value
++
++def yaml_inline_template(configurations):
++  return source.InlineTemplate('''{% for key, value in configurations_dict.items() %}{{ key }}: {{ escape_yaml_propetry(value) }}
++{% endfor %}''', configurations_dict=configurations, extra_imports=[escape_yaml_propetry])
++
++def yaml_config(
++  filename,
++  configurations = None,
++  conf_dir = None,
++  mode = None,
++  owner = None,
++  group = None
++):
++    config_content = yaml_inline_template(configurations)
++
++    File (format("{conf_dir}/{filename}"),
++      content = config_content,
++      owner = owner,
++      group = group,
++      mode = mode
++    )
+diff --git a/src/app-packages/jstorm/package/templates/config.yaml.j2 b/src/app-packages/jstorm/package/templates/config.yaml.j2
+new file mode 100644
+index 0000000..5294917
+--- /dev/null
++++ b/src/app-packages/jstorm/package/templates/config.yaml.j2
+@@ -0,0 +1,54 @@
++# Licensed to the Apache Software Foundation (ASF) under one or more
++# contributor license agreements.  See the NOTICE file distributed with
++# this work for additional information regarding copyright ownership.
++# The ASF licenses this file to You under the Apache License, Version 2.0
++# (the "License"); you may not use this file except in compliance with
++# the License.  You may obtain a copy of the License at
++#
++#     http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++
++nimbusHost: {{nimbus_host}}
++nimbusPort: {{nimbus_port}}
++
++{% if has_metric_collector %}
++enableGanglia: False
++
++ganglia:
++  reportInterval: 60
++
++enableMetricsSink: True
++
++metrics_collector:
++
++  reportInterval: 60
++  host: "{{metric_collector_host}}"
++  port: {{metric_collector_port}}
++  appId: "{{metric_collector_app_id}}"
++
++{% else %}
++enableGanglia: True
++
++# ganglia configuration (necessary if ganglia reporting is enabled)
++ganglia:
++
++  # how often to report to ganglia metrics (in seconds)
++  reportInterval: 60
++
++  # the hostname of the gmond server where storm cluster metrics will be sent
++  host: {{metric_collector_host}}
++  port: {{metric_collector_port}}
++
++  # address mode
++  # default is MULTICAST
++  addressMode: "UNICAST"
++
++  # an <IP>:<HOSTNAME> pair to spoof
++  # this allows us to simulate storm cluster metrics coming from a specific host
++  #spoof: "192.168.1.1:storm"
++{% endif %}
+diff --git a/src/app-packages/jstorm/package/templates/server.xml.j2 b/src/app-packages/jstorm/package/templates/server.xml.j2
+new file mode 100644
+index 0000000..54f50d5
+--- /dev/null
++++ b/src/app-packages/jstorm/package/templates/server.xml.j2
+@@ -0,0 +1,142 @@
++<?xml version='1.0' encoding='utf-8'?>
++<!--
++  Licensed to the Apache Software Foundation (ASF) under one or more
++  contributor license agreements.  See the NOTICE file distributed with
++  this work for additional information regarding copyright ownership.
++  The ASF licenses this file to You under the Apache License, Version 2.0
++  (the "License"); you may not use this file except in compliance with
++  the License.  You may obtain a copy of the License at
++
++      http://www.apache.org/licenses/LICENSE-2.0
++
++  Unless required by applicable law or agreed to in writing, software
++  distributed under the License is distributed on an "AS IS" BASIS,
++  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++  See the License for the specific language governing permissions and
++  limitations under the License.
++-->
++<!-- Note:  A "Server" is not itself a "Container", so you may not
++     define subcomponents such as "Valves" at this level.
++     Documentation at /docs/config/server.html
++ -->
++<!-- Disable the shutdown port -->
++<Server port="-1" shutdown="SHUTDOWN">
++  <Listener className="org.apache.catalina.startup.VersionLoggerListener" />
++  <!-- Security listener. Documentation at /docs/config/listeners.html
++  <Listener className="org.apache.catalina.security.SecurityListener" />
++  -->
++  <!--APR library loader. Documentation at /docs/apr.html -->
++  <Listener className="org.apache.catalina.core.AprLifecycleListener" SSLEngine="on" />
++  <!-- Prevent memory leaks due to use of particular java/javax APIs-->
++  <Listener className="org.apache.catalina.core.JreMemoryLeakPreventionListener" />
++  <Listener className="org.apache.catalina.mbeans.GlobalResourcesLifecycleListener" />
++  <Listener className="org.apache.catalina.core.ThreadLocalLeakPreventionListener" />
++
++  <!-- Global JNDI resources
++       Documentation at /docs/jndi-resources-howto.html
++  -->
++  <GlobalNamingResources>
++    <!-- Editable user database that can also be used by
++         UserDatabaseRealm to authenticate users
++    -->
++    <Resource name="UserDatabase" auth="Container"
++              type="org.apache.catalina.UserDatabase"
++              description="User database that can be updated and saved"
++              factory="org.apache.catalina.users.MemoryUserDatabaseFactory"
++              pathname="conf/tomcat-users.xml" />
++  </GlobalNamingResources>
++
++  <!-- A "Service" is a collection of one or more "Connectors" that share
++       a single "Container" Note:  A "Service" is not itself a "Container",
++       so you may not define subcomponents such as "Valves" at this level.
++       Documentation at /docs/config/service.html
++   -->
++  <Service name="Catalina">
++
++    <!--The connectors can use a shared executor, you can define one or more named thread pools-->
++    <!--
++    <Executor name="tomcatThreadPool" namePrefix="catalina-exec-"
++        maxThreads="150" minSpareThreads="4"/>
++    -->
++
++
++    <!-- A "Connector" represents an endpoint by which requests are received
++         and responses are returned. Documentation at :
++         Java HTTP Connector: /docs/config/http.html (blocking & non-blocking)
++         Java AJP  Connector: /docs/config/ajp.html
++         APR (HTTP/AJP) Connector: /docs/apr.html
++         Define a non-SSL HTTP/1.1 Connector on port 8080
++    -->
++    <Connector port="{{http_port}}" protocol="HTTP/1.1"
++               connectionTimeout="{{connection_timeout}}" />
++    <!-- A "Connector" using the shared thread pool-->
++    <!--
++    <Connector executor="tomcatThreadPool"
++               port="8080" protocol="HTTP/1.1"
++               connectionTimeout="20000"
++               redirectPort="8443" />
++    -->
++    <!-- Define a SSL HTTP/1.1 Connector on port 8443
++         This connector uses the NIO implementation that requires the JSSE
++         style configuration. When using the APR/native implementation, the
++         OpenSSL style configuration is required as described in the APR/native
++         documentation -->
++    <!--
++    <Connector port="8443" protocol="org.apache.coyote.http11.Http11NioProtocol"
++               maxThreads="150" SSLEnabled="true" scheme="https" secure="true"
++               clientAuth="false" sslProtocol="TLS" />
++    -->
++
++    <!-- Define an AJP 1.3 Connector on port 8009 -->
++    <!--Connector port="8009" protocol="AJP/1.3" redirectPort="8443" /-->
++
++
++    <!-- An Engine represents the entry point (within Catalina) that processes
++         every request.  The Engine implementation for Tomcat stand alone
++         analyzes the HTTP headers included with the request, and passes them
++         on to the appropriate Host (virtual host).
++         Documentation at /docs/config/engine.html -->
++
++    <!-- You should set jvmRoute to support load-balancing via AJP ie :
++    <Engine name="Catalina" defaultHost="localhost" jvmRoute="jvm1">
++    -->
++    <Engine name="Catalina" defaultHost="localhost">
++
++      <!--For clustering, please take a look at documentation at:
++          /docs/cluster-howto.html  (simple how to)
++          /docs/config/cluster.html (reference documentation) -->
++      <!--
++      <Cluster className="org.apache.catalina.ha.tcp.SimpleTcpCluster"/>
++      -->
++
++      <!-- Use the LockOutRealm to prevent attempts to guess user passwords
++           via a brute-force attack -->
++      <Realm className="org.apache.catalina.realm.LockOutRealm">
++        <!-- This Realm uses the UserDatabase configured in the global JNDI
++             resources under the key "UserDatabase".  Any edits
++             that are performed against this UserDatabase are immediately
++             available for use by the Realm.  -->
++        <Realm className="org.apache.catalina.realm.UserDatabaseRealm"
++               resourceName="UserDatabase"/>
++      </Realm>
++
++      <Host name="localhost"  appBase="webapps"
++            unpackWARs="true" autoDeploy="true">
++
++        <!-- SingleSignOn valve, share authentication between web applications
++             Documentation at: /docs/config/valve.html -->
++        <!--
++        <Valve className="org.apache.catalina.authenticator.SingleSignOn" />
++        -->
++
++        <!-- Access log processes all example.
++             Documentation at: /docs/config/valve.html
++             Note: The pattern used is equivalent to using pattern="common" -->
++        <Valve className="org.apache.catalina.valves.AccessLogValve" directory="logs"
++               prefix="localhost_access_log" suffix=".txt"
++               pattern="%h %l %u %t &quot;%r&quot; %s %b" />
++
++      </Host>
++    </Engine>
++  </Service>
++</Server>
+diff --git a/src/app-packages/jstorm/package/templates/storm_jaas.conf.j2 b/src/app-packages/jstorm/package/templates/storm_jaas.conf.j2
+new file mode 100644
+index 0000000..a1ba6ea
+--- /dev/null
++++ b/src/app-packages/jstorm/package/templates/storm_jaas.conf.j2
+@@ -0,0 +1,44 @@
++/*
++ * Licensed to the Apache Software Foundation (ASF) under one
++ *  or more contributor license agreements.  See the NOTICE file
++ *  distributed with this work for additional information
++ *  regarding copyright ownership.  The ASF licenses this file
++ *  to you under the Apache License, Version 2.0 (the
++ *  "License"); you may not use this file except in compliance
++ *  with the License.  You may obtain a copy of the License at
++ *
++ *       http://www.apache.org/licenses/LICENSE-2.0
++ *
++ *  Unless required by applicable law or agreed to in writing, software
++ *  distributed under the License is distributed on an "AS IS" BASIS,
++ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ *  See the License for the specific language governing permissions and
++ *  limitations under the License.
++ */
++StormServer {
++   com.sun.security.auth.module.Krb5LoginModule required
++   useKeyTab=true
++   keyTab="{{storm_server_keytab_path}}"
++   storeKey=true
++   useTicketCache=false
++   principal="{{storm_jaas_server_principal}}";
++};
++StormClient {
++   com.sun.security.auth.module.Krb5LoginModule required
++   useKeyTab=true
++   keyTab="{{storm_client_keytab_path}}"
++   storeKey=true
++   useTicketCache=false
++   serviceName="{{storm_jaas_stormclient_servicename}}"
++   debug=true
++   principal="{{storm_jaas_client_principal}}";
++};
++Client {
++   com.sun.security.auth.module.Krb5LoginModule required
++   useKeyTab=true
++   keyTab="{{storm_client_keytab_path}}"
++   storeKey=true
++   useTicketCache=false
++   serviceName="zookeeper"
++   principal="{{storm_jaas_client_principal}}";
++};
+diff --git a/src/app-packages/jstorm/package/templates/tomcat-users.xml.j2 b/src/app-packages/jstorm/package/templates/tomcat-users.xml.j2
+new file mode 100644
+index 0000000..1078a08
+--- /dev/null
++++ b/src/app-packages/jstorm/package/templates/tomcat-users.xml.j2
+@@ -0,0 +1,35 @@
++<?xml version='1.0' encoding='utf-8'?>
++<!--
++  Licensed to the Apache Software Foundation (ASF) under one or more
++  contributor license agreements.  See the NOTICE file distributed with
++  this work for additional information regarding copyright ownership.
++  The ASF licenses this file to You under the Apache License, Version 2.0
++  (the "License"); you may not use this file except in compliance with
++  the License.  You may obtain a copy of the License at
++
++      http://www.apache.org/licenses/LICENSE-2.0
++
++  Unless required by applicable law or agreed to in writing, software
++  distributed under the License is distributed on an "AS IS" BASIS,
++  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++  See the License for the specific language governing permissions and
++  limitations under the License.
++-->
++<tomcat-users xmlns="http://tomcat.apache.org/xml"
++              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
++              xsi:schemaLocation="http://tomcat.apache.org/xml tomcat-users.xsd"
++              version="1.0">
++<!--
++  NOTE:  By default, no user is included in the "manager-gui" role required
++  to operate the "/manager/html" web application.  If you wish to use this app,
++  you must define such a user - the username and password are arbitrary.
++-->
++<!--
++  NOTE:  The sample user and role entries below are wrapped in a comment
++  and thus are ignored when reading this file. Do not forget to remove
++  <!.. ..> that surrounds them.
++-->
++
++  <role rolename="manager-gui"/>
++  <user username="{{ui_user}}" password="{{ui_password}}" roles="manager-gui"/>
++</tomcat-users>
+diff --git a/src/app-packages/jstorm/pom.xml b/src/app-packages/jstorm/pom.xml
+new file mode 100644
+index 0000000..2e82854
+--- /dev/null
++++ b/src/app-packages/jstorm/pom.xml
+@@ -0,0 +1,100 @@
++<?xml version="1.0"?>
++<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
++         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
++  <!--
++   Licensed to the Apache Software Foundation (ASF) under one or more
++   contributor license agreements.  See the NOTICE file distributed with
++   this work for additional information regarding copyright ownership.
++   The ASF licenses this file to You under the Apache License, Version 2.0
++   (the "License"); you may not use this file except in compliance with
++   the License.  You may obtain a copy of the License at
++
++       http://www.apache.org/licenses/LICENSE-2.0
++
++   Unless required by applicable law or agreed to in writing, software
++   distributed under the License is distributed on an "AS IS" BASIS,
++   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++   See the License for the specific language governing permissions and
++   limitations under the License.
++-->
++  <parent>
++    <groupId>org.apache.slider.packages</groupId>
++    <artifactId>slider-app-packages</artifactId>
++    <version>0.91.0-bc1.3.2</version>
++    <relativePath>../pom.xml</relativePath>
++  </parent>
++  <modelVersion>4.0.0</modelVersion>
++  <artifactId>slider-jstorm-app-package</artifactId>
++  <packaging>pom</packaging>
++  <name>Slider JStorm App Package</name>
++  <description>Slider JStorm App Package</description>
++  <properties>
++    <work.dir>package-tmp</work.dir>
++    <app.package.name>${project.artifactId}-${pkg.version}</app.package.name>
++    <tomcat.version>7.0.62</tomcat.version>
++  </properties>
++
++  <profiles>
++    <profile>
++      <id>jstorm-app-package</id>
++      <build>
++        <plugins>
++
++          <plugin>
++            <groupId>org.apache.maven.plugins</groupId>
++            <artifactId>maven-antrun-plugin</artifactId>
++            <version>${maven-antrun-plugin.version}</version>
++            <executions>
++              <execution>
++                <id>copy</id>
++                <phase>validate</phase>
++                <configuration>
++                  <target name="copy and rename file">
++                    <copy file="${pkg.src}/${pkg.name}" tofile="${project.build.directory}/${pkg.name}" />
++                  </target>
++                </configuration>
++                <goals>
++                  <goal>run</goal>
++                </goals>
++              </execution>
++            </executions>
++          </plugin>
++          <plugin>
++            <groupId>org.apache.maven.plugins</groupId>
++            <artifactId>maven-assembly-plugin</artifactId>
++            <version>${maven-assembly-plugin.version}</version>
++            <configuration>
++              <tarLongFileMode>gnu</tarLongFileMode>
++              <descriptor>src/assembly/jstorm.xml</descriptor>
++              <appendAssemblyId>false</appendAssemblyId>
++              <finalName>${app.package.name}</finalName>
++            </configuration>
++            <executions>
++              <execution>
++                <id>build-tarball</id>
++                <phase>package</phase>
++                <goals>
++                  <goal>single</goal>
++                </goals>
++              </execution>
++            </executions>
++          </plugin>
++
++        </plugins>
++      </build>
++    </profile>
++  </profiles>
++
++  <build>
++  </build>
++
++  <dependencies>
++    <dependency>
++      <groupId>org.apache.tomcat</groupId>
++      <artifactId>tomcat</artifactId>
++      <version>${tomcat.version}</version>
++      <type>tar.gz</type>
++    </dependency>
++  </dependencies>
++
++</project>
+diff --git a/src/app-packages/jstorm/resources-default.json b/src/app-packages/jstorm/resources-default.json
+new file mode 100644
+index 0000000..a7cfaf1
+--- /dev/null
++++ b/src/app-packages/jstorm/resources-default.json
+@@ -0,0 +1,32 @@
++{
++  "schema" : "http://example.org/specification/v2.0.0",
++  "metadata" : {
++  },
++  "global" : {
++    "yarn.log.include.patterns": "",
++    "yarn.log.exclude.patterns": ""
++  },
++  "components": {
++    "slider-appmaster": {
++      "yarn.memory": "512"
++    },
++    "NIMBUS": {
++      "yarn.role.priority": "1",
++      "yarn.component.instances": "1",
++      "yarn.memory": "2048",
++      "yarn.vcores": "2"
++    },
++    "SUPERVISOR": {
++      "yarn.role.priority": "4",
++      "yarn.component.instances": "1",
++      "yarn.memory": "3072",
++      "yarn.vcores": "3"
++    },
++    "WEBUI": {
++      "yarn.role.priority": "4",
++      "yarn.component.instances": "1",
++      "yarn.memory": "1024",
++      "yarn.vcores": "1"
++    }
++  }
++}
+diff --git a/src/app-packages/jstorm/src/assembly/jstorm.xml b/src/app-packages/jstorm/src/assembly/jstorm.xml
+new file mode 100644
+index 0000000..5780e70
+--- /dev/null
++++ b/src/app-packages/jstorm/src/assembly/jstorm.xml
+@@ -0,0 +1,79 @@
++<!--
++  ~ Licensed to the Apache Software Foundation (ASF) under one
++  ~  or more contributor license agreements.  See the NOTICE file
++  ~  distributed with this work for additional information
++  ~  regarding copyright ownership.  The ASF licenses this file
++  ~  to you under the Apache License, Version 2.0 (the
++  ~  "License"); you may not use this file except in compliance
++  ~  with the License.  You may obtain a copy of the License at
++  ~
++  ~       http://www.apache.org/licenses/LICENSE-2.0
++  ~
++  ~  Unless required by applicable law or agreed to in writing, software
++  ~  distributed under the License is distributed on an "AS IS" BASIS,
++  ~  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++  ~  See the License for the specific language governing permissions and
++  ~  limitations under the License.
++  -->
++
++
++<assembly
++  xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.0"
++  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
++  xsi:schemaLocation="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.0 http://maven.apache.org/xsd/assembly-1.1.0.xsd">
++  <id>slider-jstorm-v${jstorm.version}</id>
++  <formats>
++    <format>zip</format>
++    <format>dir</format>
++  </formats>
++  <includeBaseDirectory>false</includeBaseDirectory>
++
++  <files>
++    <file>
++      <source>appConfig-default.json</source>
++      <outputDirectory>/</outputDirectory>
++      <filtered>true</filtered>
++      <fileMode>0755</fileMode>
++    </file>
++    <file>
++      <source>metainfo.xml</source>
++      <outputDirectory>/</outputDirectory>
++      <filtered>true</filtered>
++      <fileMode>0755</fileMode>
++    </file>
++    <file>
++      <source>${pkg.src}/${pkg.name}</source>
++      <outputDirectory>package/files</outputDirectory>
++      <filtered>false</filtered>
++      <fileMode>0755</fileMode>
++    </file>
++  </files>
++
++  <dependencySets>
++    <dependencySet>
++      <outputDirectory>package/files</outputDirectory>
++      <directoryMode>0755</directoryMode>
++      <fileMode>0644</fileMode>
++      <includes>
++        <include>org.apache.tomcat:tomcat:tar.gz</include>
++      </includes>
++    </dependencySet>
++  </dependencySets>
++
++  <fileSets>
++    <fileSet>
++      <directory>${project.basedir}</directory>
++      <outputDirectory>/</outputDirectory>
++      <excludes>
++        <exclude>pom.xml</exclude>
++        <exclude>src/**</exclude>
++        <exclude>target/**</exclude>
++        <exclude>appConfig-default.json</exclude>
++        <exclude>metainfo.xml</exclude>
++      </excludes>
++      <fileMode>0755</fileMode>
++      <directoryMode>0755</directoryMode>
++    </fileSet>
++
++  </fileSets>
++</assembly>
+diff --git a/src/slider-agent/src/main/python/resource_management/libraries/script/script.py b/src/slider-agent/src/main/python/resource_management/libraries/script/script.py
+index 8c53fb6..856f2ca 100644
+--- a/src/slider-agent/src/main/python/resource_management/libraries/script/script.py
++++ b/src/slider-agent/src/main/python/resource_management/libraries/script/script.py
+@@ -177,7 +177,11 @@ class Script(object):
+               basedir = env.config.basedir
+               tarball = os.path.join(basedir, name)
+             install_location = config['configurations']['global']['app_install_dir']
++
++            """
++            when define multi tarball package, this will recurse delete the before install tarball
+             Directory(install_location, action = "delete")
++            """
+             Directory(install_location)
+             Tarball(tarball, location=install_location)
+           elif type.lower() == "folder":

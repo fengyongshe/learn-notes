@@ -1,0 +1,54 @@
+Index: slider-core/src/main/java/org/apache/slider/common/params/ClientArgs.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/common/params/ClientArgs.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/common/params/ClientArgs.java	(working copy)
+@@ -72,8 +72,7 @@
+   private final ActionUpdateArgs actionUpdateArgs = new ActionUpdateArgs();
+   private final ActionVersionArgs actionVersionArgs = new ActionVersionArgs();
+   private final ActionUpgradeArgs actionUpgradeArgs = new ActionUpgradeArgs();
+-  private final ActionUploadArgs actionUploadArgs = new ActionUploadArgs();
+-  private final ActionDeleteArgs actionDeleteArgs = new ActionDeleteArgs();
++  private final ActionOperateArgs actionOperateArgs = new ActionOperateArgs();
+ 
+   public ClientArgs(String[] args) {
+     super(args);
+@@ -101,8 +100,7 @@
+         actionThawArgs,
+         actionUpdateArgs,
+         actionUpgradeArgs,
+-        actionUploadArgs,
+-        actionDeleteArgs,
++        actionOperateArgs,
+         actionDestroyArgs,
+         actionExistsArgs,
+         actionLookupArgs,
+@@ -166,10 +164,8 @@
+     return actionUpgradeArgs;
+   }
+ 
+-  public ActionUploadArgs getActionUploadArgs() { return actionUploadArgs; }
++  public ActionOperateArgs getActionOperateArgs() { return actionOperateArgs; }
+ 
+-  public ActionDeleteArgs getActionDeleteArgs() { return actionDeleteArgs; }
+-
+   public ActionCreateArgs getActionCreateArgs() {
+     return actionCreateArgs;
+   }
+@@ -300,13 +296,10 @@
+     } else if (SliderActions.ACTION_UPGRADE.equals(action)) {
+       bindCoreAction(actionUpgradeArgs);
+ 
+-    } else if (SliderActions.ACTION_UPLOAD.equals(action)){
+-      bindCoreAction(actionUploadArgs);
++    } else if (SliderActions.ACTION_OPERATE.equals(action)){
++      bindCoreAction(actionOperateArgs);
+ 
+-    } else if (SliderActions.ACTION_DELETE.equals(action)){
+-      bindCoreAction(actionDeleteArgs);
+-
+-    }else if (SliderActions.ACTION_VERSION.equals(action)) {
++    } else if (SliderActions.ACTION_VERSION.equals(action)) {
+       bindCoreAction(actionVersionArgs);
+ 
+     } else if (SliderUtils.isUnset(action)) {
+Index: slider-core/src/main/java/org/apache/slider/common/params/SliderActions.java

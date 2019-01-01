@@ -1,0 +1,186 @@
+diff --git a/hadoop-hdfs-project/hadoop-hdfs-rbf/src/main/java/org/apache/hadoop/hdfs/server/federation/router/RouterDelegrationSecretManager.java b/hadoop-hdfs-project/hadoop-hdfs-rbf/src/main/java/org/apache/hadoop/hdfs/server/federation/router/RouterDelegrationSecretManager.java
+new file mode 100644
+index 0000000..09b9a95
+--- /dev/null
++++ b/hadoop-hdfs-project/hadoop-hdfs-rbf/src/main/java/org/apache/hadoop/hdfs/server/federation/router/RouterDelegrationSecretManager.java
+@@ -0,0 +1,36 @@
++package org.apache.hadoop.hdfs.server.federation.router;
++
++import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
++import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenSecretManager;
++
++/**
++ *  * Created by luhua on 2018/9/8.
++ *   */
++public class RouterDelegrationSecretManager
++        extends AbstractDelegationTokenSecretManager<DelegationTokenIdentifier> {
++
++
++    /**
++ *      * Create a secret manager
++ *           *
++ *                * @param delegationKeyUpdateInterval        the number of milliseconds for rolling
++ *                     *                                           new secret keys.
++ *                          * @param delegationTokenMaxLifetime         the maximum lifetime of the delegation
++ *                               *                                           tokens in milliseconds
++ *                                    * @param delegationTokenRenewInterval       how often the tokens must be renewed
++ *                                         *                                           in milliseconds
++ *                                              * @param delegationTokenRemoverScanInterval how often the tokens are scanned
++ *                                                   */
++    public RouterDelegrationSecretManager(long delegationKeyUpdateInterval,
++           long delegationTokenMaxLifetime, long delegationTokenRenewInterval,
++           long delegationTokenRemoverScanInterval) {
++        super(delegationKeyUpdateInterval, delegationTokenMaxLifetime,
++                delegationTokenRenewInterval, delegationTokenRemoverScanInterval);
++    }
++
++    @Override //SecretManager
++    public DelegationTokenIdentifier createIdentifier() {
++        return new DelegationTokenIdentifier();
++    }
++}
++
+diff --git a/hadoop-hdfs-project/hadoop-hdfs-rbf/src/main/java/org/apache/hadoop/hdfs/server/federation/router/RouterRpcClient.java b/hadoop-hdfs-project/hadoop-hdfs-rbf/src/main/java/org/apache/hadoop/hdfs/server/federation/router/RouterRpcClient.java
+index a307e7a..50d0593 100644
+--- a/hadoop-hdfs-project/hadoop-hdfs-rbf/src/main/java/org/apache/hadoop/hdfs/server/federation/router/RouterRpcClient.java
++++ b/hadoop-hdfs-project/hadoop-hdfs-rbf/src/main/java/org/apache/hadoop/hdfs/server/federation/router/RouterRpcClient.java
+@@ -340,7 +340,7 @@ private Object invokeMethod(
+       final UserGroupInformation ugi,
+       final List<? extends FederationNamenodeContext> namenodes,
+       final Method method, final Object... params) throws IOException {
+-
++       LOG.warn(ugi.getAuthenticationMethod().toString()+"################################");
+     if (namenodes == null || namenodes.isEmpty()) {
+       throw new IOException("No namenodes to invoke " + method.getName() +
+           " with params " + Arrays.toString(params) + " from " + this.routerId);
+diff --git a/hadoop-hdfs-project/hadoop-hdfs-rbf/src/main/java/org/apache/hadoop/hdfs/server/federation/router/RouterRpcServer.java b/hadoop-hdfs-project/hadoop-hdfs-rbf/src/main/java/org/apache/hadoop/hdfs/server/federation/router/RouterRpcServer.java
+index a61b297..eff38c8 100644
+--- a/hadoop-hdfs-project/hadoop-hdfs-rbf/src/main/java/org/apache/hadoop/hdfs/server/federation/router/RouterRpcServer.java
++++ b/hadoop-hdfs-project/hadoop-hdfs-rbf/src/main/java/org/apache/hadoop/hdfs/server/federation/router/RouterRpcServer.java
+@@ -17,6 +17,13 @@
+  */
+ package org.apache.hadoop.hdfs.server.federation.router;
+ 
++import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
++import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_TOKEN_TRACKING_ID_DEFAULT;
++import java.util.concurrent.TimeUnit;
++import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenSecretManager;
++
++
++
+ import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_HANDLER_COUNT_DEFAULT;
+ import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_HANDLER_COUNT_KEY;
+ import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_HANDLER_QUEUE_SIZE_DEFAULT;
+@@ -196,6 +203,11 @@
+   /** If we use authentication for the connections. */
+   private final boolean serviceAuthEnabled;
+ 
++  private static final long DELEGATION_TOKEN_REMOVER_SCAN_INTERVAL =
++          TimeUnit.MILLISECONDS.convert(1, TimeUnit.HOURS);
++
++  private final  RouterDelegrationSecretManager routerDtSecretManager;
++
+ 
+ 
+   /**
+@@ -215,6 +227,8 @@ public RouterRpcServer(Configuration configuration, Router router,
+     this.router = router;
+     this.namenodeResolver = nnResolver;
+     this.subclusterResolver = fileResolver;
++    this.routerDtSecretManager = createRouterDelegrationSecretManager(conf);
++
+ 
+     // User and group for reporting
+     this.superUser = System.getProperty("user.name");
+@@ -265,6 +279,7 @@ public RouterRpcServer(Configuration configuration, Router router,
+         .setnumReaders(readerCount)
+         .setQueueSizePerHandler(handlerQueueSize)
+         .setVerbose(false)
++        .setSecretManager(routerDtSecretManager)
+         .build();
+     // Set service-level authorization security policy
+     this.serviceAuthEnabled = conf.getBoolean(
+@@ -306,6 +321,19 @@ public RouterRpcServer(Configuration configuration, Router router,
+     this.erasureCoding = new ErasureCoding(this);
+   }
+ 
++  private RouterDelegrationSecretManager createRouterDelegrationSecretManager(Configuration conf) {
++    return new RouterDelegrationSecretManager(
++            conf.getLong(DFS_NAMENODE_DELEGATION_KEY_UPDATE_INTERVAL_KEY,
++                    DFS_NAMENODE_DELEGATION_KEY_UPDATE_INTERVAL_DEFAULT),
++            conf.getLong(DFS_NAMENODE_DELEGATION_TOKEN_MAX_LIFETIME_KEY,
++                    DFS_NAMENODE_DELEGATION_TOKEN_MAX_LIFETIME_DEFAULT),
++            conf.getLong(DFS_NAMENODE_DELEGATION_TOKEN_RENEW_INTERVAL_KEY,
++                    DFS_NAMENODE_DELEGATION_TOKEN_RENEW_INTERVAL_DEFAULT),
++            DELEGATION_TOKEN_REMOVER_SCAN_INTERVAL
++          ) ;
++  }
++
++
+   @Override
+   protected void serviceInit(Configuration configuration) throws Exception {
+     this.conf = configuration;
+@@ -322,6 +350,7 @@ protected void serviceInit(Configuration configuration) throws Exception {
+   @Override
+   protected void serviceStart() throws Exception {
+     if (this.rpcServer != null) {
++      this.routerDtSecretManager.startThreads();
+       this.rpcServer.start();
+       LOG.info("Router RPC up at: {}", this.getRpcAddress());
+     }
+@@ -463,8 +492,25 @@ public boolean isInSafeMode() {
+   @Override // ClientProtocol
+   public Token<DelegationTokenIdentifier> getDelegationToken(Text renewer)
+       throws IOException {
+-    checkOperation(OperationCategory.WRITE, false);
+-    return null;
++//    checkOperation(OperationCategory.WRITE, false);
++//    return null;
++
++    Token<DelegationTokenIdentifier> token;
++   //checkOperation(OperationCategory.WRITE, false);
++    checkOperation(OperationCategory.WRITE);
++    UserGroupInformation ugi = getRemoteUser();
++    String user = ugi.getUserName();
++    Text owner = new Text(user);
++    Text realUser = null;
++    if (ugi.getRealUser() != null) {
++      realUser = new Text(ugi.getRealUser().getUserName());
++    }
++    DelegationTokenIdentifier dtId = new DelegationTokenIdentifier(owner,
++            renewer, realUser);
++    token = new Token<DelegationTokenIdentifier>(
++            dtId, routerDtSecretManager);
++    return token;
++
+   }
+ 
+   /**
+@@ -482,14 +528,24 @@ public boolean isInSafeMode() {
+   @Override // ClientProtocol
+   public long renewDelegationToken(Token<DelegationTokenIdentifier> token)
+       throws IOException {
+-    checkOperation(OperationCategory.WRITE, false);
+-    return 0;
++//    checkOperation(OperationCategory.WRITE, false);
++//    return 0;
++    long expiryTime;
++    checkOperation(OperationCategory.WRITE);
++    String renewer = getRemoteUser().getShortUserName();
++    expiryTime = routerDtSecretManager.renewToken(token, renewer);
++    return expiryTime;
+   }
+ 
+   @Override // ClientProtocol
+   public void cancelDelegationToken(Token<DelegationTokenIdentifier> token)
+       throws IOException {
+-    checkOperation(OperationCategory.WRITE, false);
++//    checkOperation(OperationCategory.WRITE, false);
++    checkOperation(OperationCategory.WRITE);
++    String canceller = getRemoteUser().getUserName();
++    DelegationTokenIdentifier id = routerDtSecretManager
++            .cancelToken(token, canceller);
++
+   }
+ 
+   @Override // ClientProtocol

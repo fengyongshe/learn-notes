@@ -1,0 +1,641 @@
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-api/src/main/java/org/apache/hadoop/yarn/api/records/ContainerStatus.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-api/src/main/java/org/apache/hadoop/yarn/api/records/ContainerStatus.java
+index 4f56535..e13c3b7 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-api/src/main/java/org/apache/hadoop/yarn/api/records/ContainerStatus.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-api/src/main/java/org/apache/hadoop/yarn/api/records/ContainerStatus.java
+@@ -25,6 +25,8 @@
+ import org.apache.hadoop.classification.InterfaceStability.Unstable;
+ import org.apache.hadoop.yarn.util.Records;
+ 
++import java.util.List;
++
+ /**
+  * {@code ContainerStatus} represents the current status of a
+  * {@code Container}.
+@@ -151,4 +153,28 @@ public static ContainerStatus newInstance(ContainerId containerId,
+   @Private
+   @Unstable
+   public abstract void setCapability(Resource capability);
++
++  /**
++   * Get all the IP addresses with which the container run.
++   * @return The IP address where the container runs.
++   */
++  @Public
++  @Unstable
++  public abstract List<String> getIPs();
++
++  @Private
++  @Unstable
++  public abstract void setIPs(List<String> IPs);
++
++  /**
++   * Get the hostname where the container runs.
++   * @return The hostname where the container runs.
++   */
++  @Public
++  @Unstable
++  public abstract String getHost();
++
++  @Private
++  @Unstable
++  public abstract void setHost(String host);
+ }
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-api/src/main/proto/yarn_protos.proto b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-api/src/main/proto/yarn_protos.proto
+index d9ce11f..8a6ae3f 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-api/src/main/proto/yarn_protos.proto
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-api/src/main/proto/yarn_protos.proto
+@@ -524,6 +524,7 @@ message ContainerStatusProto {
+   optional int32 exit_status = 4 [default = -1000];
+   optional ResourceProto capability = 5;
+   optional ExecutionTypeProto executionType = 6 [default = GUARANTEED];
++  repeated StringStringMapProto container_attributes = 7;
+ }
+ 
+ enum ContainerExitStatusProto {
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-common/src/main/java/org/apache/hadoop/yarn/api/records/impl/pb/ContainerStatusPBImpl.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-common/src/main/java/org/apache/hadoop/yarn/api/records/impl/pb/ContainerStatusPBImpl.java
+index f1fdae9..9ea4515 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-common/src/main/java/org/apache/hadoop/yarn/api/records/impl/pb/ContainerStatusPBImpl.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-common/src/main/java/org/apache/hadoop/yarn/api/records/impl/pb/ContainerStatusPBImpl.java
+@@ -21,11 +21,13 @@
+ 
+ import org.apache.hadoop.classification.InterfaceAudience.Private;
+ import org.apache.hadoop.classification.InterfaceStability.Unstable;
++import org.apache.hadoop.util.StringUtils;
+ import org.apache.hadoop.yarn.api.records.ContainerId;
+ import org.apache.hadoop.yarn.api.records.ContainerState;
+ import org.apache.hadoop.yarn.api.records.ContainerStatus;
+ import org.apache.hadoop.yarn.api.records.ExecutionType;
+ import org.apache.hadoop.yarn.api.records.Resource;
++import org.apache.hadoop.yarn.proto.YarnProtos;
+ import org.apache.hadoop.yarn.proto.YarnProtos.ResourceProto;
+ import org.apache.hadoop.yarn.proto.YarnProtos.ContainerIdProto;
+ import org.apache.hadoop.yarn.proto.YarnProtos.ExecutionTypeProto;
+@@ -33,7 +35,11 @@
+ import org.apache.hadoop.yarn.proto.YarnProtos.ContainerStatusProto;
+ import org.apache.hadoop.yarn.proto.YarnProtos.ContainerStatusProtoOrBuilder;
+ 
+-import com.google.protobuf.TextFormat;
++import java.util.Arrays;
++import java.util.HashMap;
++import java.util.Iterator;
++import java.util.List;
++import java.util.Map;
+ 
+ @Private
+ @Unstable
+@@ -43,8 +49,11 @@
+   boolean viaProto = false;
+   
+   private ContainerId containerId = null;
+-  
+-  
++  private static final String HOST = "HOST";
++  private static final String IPs = "IPs";
++  private Map<String, String> containerAttributes = new HashMap<>();
++
++
+   public ContainerStatusPBImpl() {
+     builder = ContainerStatusProto.newBuilder();
+   }
+@@ -94,6 +103,9 @@ private void mergeLocalToBuilder() {
+     if (containerId != null) {
+       builder.setContainerId(convertToProtoFormat(this.containerId));
+     }
++    if (containerAttributes != null && !containerAttributes.isEmpty()) {
++      addContainerAttributesToProto();
++    }
+   }
+ 
+   private synchronized void mergeLocalToProto() {
+@@ -111,6 +123,58 @@ private synchronized void maybeInitBuilder() {
+     viaProto = false;
+   }
+ 
++  private void addContainerAttributesToProto() {
++    maybeInitBuilder();
++    builder.clearContainerAttributes();
++    if (containerAttributes == null)
++      return;
++    Iterable<YarnProtos.StringStringMapProto> iterable =
++        new Iterable<YarnProtos.StringStringMapProto>() {
++
++          @Override
++          public Iterator<YarnProtos.StringStringMapProto> iterator() {
++            return new Iterator<YarnProtos.StringStringMapProto>() {
++
++              Iterator<String> keyIter = containerAttributes.keySet().iterator();
++
++              @Override
++              public void remove() {
++                throw new UnsupportedOperationException();
++              }
++
++              @Override
++              public YarnProtos.StringStringMapProto next() {
++                String key = keyIter.next();
++                String value = containerAttributes.get(key);
++
++                if (value == null) {
++                  value = "";
++                }
++
++                return YarnProtos.StringStringMapProto.newBuilder().setKey(key)
++                    .setValue((value)).build();
++              }
++
++              @Override
++              public boolean hasNext() {
++                return keyIter.hasNext();
++              }
++            };
++          }
++        };
++    builder.addAllContainerAttributes(iterable);
++  }
++
++  private void initContainerAttributes() {
++    ContainerStatusProtoOrBuilder p = viaProto ? proto : builder;
++    List<YarnProtos.StringStringMapProto> list = p.getContainerAttributesList();
++    for (YarnProtos.StringStringMapProto c : list) {
++      if (!containerAttributes.containsKey(c.getKey())) {
++        this.containerAttributes.put(c.getKey(), c.getValue());
++      }
++    }
++  }
++
+   @Override
+   public synchronized ExecutionType getExecutionType() {
+     ContainerStatusProtoOrBuilder p = viaProto ? proto : builder;
+@@ -211,6 +275,44 @@ public synchronized void setCapability(Resource capability) {
+     builder.setCapability(convertToProtoFormat(capability));
+   }
+ 
++  @Override
++  public synchronized List<String> getIPs() {
++    if (containerAttributes.get(IPs) == null) {
++      initContainerAttributes();
++    }
++    String ips = containerAttributes.get((IPs));
++    return Arrays.asList(ips.split(","));
++  }
++
++  @Override
++  public synchronized void setIPs(List<String> IPs) {
++    maybeInitBuilder();
++    if (IPs == null) {
++      containerAttributes.remove(ContainerStatusPBImpl.IPs);
++      return;
++    }
++    containerAttributes
++        .put(ContainerStatusPBImpl.IPs, StringUtils.join(",", IPs));
++  }
++
++  @Override
++  public synchronized String getHost() {
++    if (containerAttributes.get(HOST) == null) {
++      initContainerAttributes();
++    }
++    return containerAttributes.get(HOST);
++  }
++
++  @Override
++  public synchronized void setHost(String host) {
++    maybeInitBuilder();
++    if (host == null) {
++      containerAttributes.remove(HOST);
++      return;
++    }
++    containerAttributes.put(HOST, host);
++  }
++
+   private ContainerStateProto convertToProtoFormat(ContainerState e) {
+     return ProtoUtils.convertToProtoFormat(e);
+   }
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-common/src/test/java/org/apache/hadoop/yarn/server/api/protocolrecords/TestProtocolRecords.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-common/src/test/java/org/apache/hadoop/yarn/server/api/protocolrecords/TestProtocolRecords.java
+index 27bdfff..1102fc2 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-common/src/test/java/org/apache/hadoop/yarn/server/api/protocolrecords/TestProtocolRecords.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-common/src/test/java/org/apache/hadoop/yarn/server/api/protocolrecords/TestProtocolRecords.java
+@@ -35,9 +35,11 @@
+ import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
+ import org.apache.hadoop.yarn.api.records.ContainerId;
+ import org.apache.hadoop.yarn.api.records.ContainerState;
++import org.apache.hadoop.yarn.api.records.ContainerStatus;
+ import org.apache.hadoop.yarn.api.records.NodeId;
+ import org.apache.hadoop.yarn.api.records.Priority;
+ import org.apache.hadoop.yarn.api.records.Resource;
++import org.apache.hadoop.yarn.api.records.impl.pb.ContainerStatusPBImpl;
+ import org.apache.hadoop.yarn.server.api.protocolrecords.impl.pb.NMContainerStatusPBImpl;
+ 
+ import org.apache.hadoop.yarn.server.api.protocolrecords.impl.pb
+@@ -161,4 +163,16 @@ public void testNodeHeartBeatRequest() throws IOException {
+     Assert.assertEquals(321,
+         pb.getNodeStatus().getQueuedContainersStatus().getWaitQueueLength());
+   }
++
++  @Test
++  public void testContainerStatus() {
++    ContainerStatus status = Records.newRecord(ContainerStatus.class);
++    List<String> ips = Arrays.asList("127.0.0.1", "139.5.25.2");
++    status.setIPs(ips);
++    status.setHost("locahost123");
++    ContainerStatusPBImpl pb =
++        new ContainerStatusPBImpl(((ContainerStatusPBImpl) status).getProto());
++    Assert.assertEquals(ips, pb.getIPs());
++    Assert.assertEquals("locahost123", pb.getHost());
++  }
+ }
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/ContainerExecutor.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/ContainerExecutor.java
+index f08db5a..d7ce06d 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/ContainerExecutor.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/ContainerExecutor.java
+@@ -22,6 +22,8 @@
+ import java.io.IOException;
+ import java.io.OutputStream;
+ import java.io.PrintStream;
++import java.net.InetAddress;
++import java.net.UnknownHostException;
+ import java.util.ArrayList;
+ import java.util.Arrays;
+ import java.util.HashSet;
+@@ -626,6 +628,20 @@ public void activateContainer(ContainerId containerId, Path pidFilePath) {
+     }
+   }
+ 
++  // LinuxContainerExecutor overrides this method and behaves differently.
++  public String[] getIpAndHost(Container container) {
++    String[] ipAndHost = new String[2];
++    try {
++      InetAddress address = InetAddress.getLocalHost();
++      ipAndHost[0] = address.getHostAddress();
++      ipAndHost[1] = address.getHostName();
++    } catch (UnknownHostException e) {
++      LOG.error("Unable to get Local hostname and ip for " + container
++          .getContainerId());
++    }
++    return ipAndHost;
++  }
++
+   /**
+    * Mark the container as inactive. For inactive containers this
+    * method has no effect.
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/LinuxContainerExecutor.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/LinuxContainerExecutor.java
+index 8f5ee6b..37ce91b 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/LinuxContainerExecutor.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/LinuxContainerExecutor.java
+@@ -463,6 +463,11 @@ public int launchContainer(ContainerStartContext ctx) throws IOException {
+   }
+ 
+   @Override
++  public String[] getIpAndHost(Container container) {
++    return linuxContainerRuntime.getIpAndHost(container);
++  }
++
++  @Override
+   public int reacquireContainer(ContainerReacquisitionContext ctx)
+       throws IOException, InterruptedException {
+     ContainerId containerId = ctx.getContainerId();
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/container/Container.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/container/Container.java
+index 2278786..84d3cb2 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/container/Container.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/container/Container.java
+@@ -68,6 +68,8 @@
+ 
+   void setLogDir(String logDir);
+ 
++  void setIpAndHost(String[] ipAndHost);
++
+   String toString();
+ 
+   Priority getPriority();
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/container/ContainerImpl.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/container/ContainerImpl.java
+index 193dfea..622f2e8 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/container/ContainerImpl.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/container/ContainerImpl.java
+@@ -22,6 +22,7 @@
+ import java.net.URISyntaxException;
+ import java.nio.ByteBuffer;
+ import java.util.ArrayList;
++import java.util.Arrays;
+ import java.util.Collection;
+ import java.util.EnumSet;
+ import java.util.HashMap;
+@@ -115,6 +116,8 @@
+   private int remainingRetryAttempts;
+   private String workDir;
+   private String logDir;
++  private String host;
++  private String IPs;
+ 
+   /** The NM-wide configuration - not specific to this container */
+   private final Configuration daemonConf;
+@@ -507,9 +510,12 @@ public ContainerLaunchContext getLaunchContext() {
+   public ContainerStatus cloneAndGetContainerStatus() {
+     this.readLock.lock();
+     try {
+-      return BuilderUtils.newContainerStatus(this.containerId,
++      ContainerStatus status = BuilderUtils.newContainerStatus(this.containerId,
+           getCurrentState(), diagnostics.toString(), exitCode, getResource(),
+           this.containerTokenIdentifier.getExecutionType());
++      status.setIPs(IPs == null ? null : Arrays.asList(IPs.split(",")));
++      status.setHost(host);
++      return status;
+     } finally {
+       this.readLock.unlock();
+     }
+@@ -567,6 +573,12 @@ public void setWorkDir(String workDir) {
+   }
+ 
+   @Override
++  public void setIpAndHost(String[] ipAndHost) {
++    this.IPs = ipAndHost[0];
++    this.host = ipAndHost[1];
++  }
++
++  @Override
+   public String getLogDir() {
+     return logDir;
+   }
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/linux/privileged/PrivilegedOperationExecutor.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/linux/privileged/PrivilegedOperationExecutor.java
+index f865c14..1d874a7 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/linux/privileged/PrivilegedOperationExecutor.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/linux/privileged/PrivilegedOperationExecutor.java
+@@ -157,13 +157,15 @@ public String executePrivilegedOperation(List<String> prefixCommands,
+       }
+     } catch (ExitCodeException e) {
+       if (operation.isFailureLoggingEnabled()) {
+-
+         StringBuilder logBuilder = new StringBuilder("Shell execution returned "
+             + "exit code: ")
+             .append(exec.getExitCode())
+-            .append(". Privileged Execution Operation Output: ")
+-            .append(System.lineSeparator()).append(exec.getOutput());
+-
++            .append(". Privileged Execution Operation Stderr: ")
++            .append(System.lineSeparator())
++            .append(e.getMessage())
++            .append(System.lineSeparator())
++            .append("Stdout: " + exec.getOutput())
++            .append(System.lineSeparator());
+         logBuilder.append("Full command array for failed execution: ")
+             .append(System.lineSeparator());
+         logBuilder.append(Arrays.toString(fullCommandArray));
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/linux/runtime/DefaultLinuxContainerRuntime.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/linux/runtime/DefaultLinuxContainerRuntime.java
+index e78f460..8314b84 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/linux/runtime/DefaultLinuxContainerRuntime.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/linux/runtime/DefaultLinuxContainerRuntime.java
+@@ -33,6 +33,8 @@
+ import org.apache.hadoop.yarn.server.nodemanager.containermanager.runtime.ContainerExecutionException;
+ import org.apache.hadoop.yarn.server.nodemanager.containermanager.runtime.ContainerRuntimeContext;
+ 
++import java.net.InetAddress;
++import java.net.UnknownHostException;
+ import java.util.List;
+ 
+ import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.LinuxContainerRuntimeConstants.*;
+@@ -148,4 +150,18 @@ public void reapContainer(ContainerRuntimeContext ctx)
+       throws ContainerExecutionException {
+ 
+   }
++
++  @Override
++  public String[] getIpAndHost(Container container) {
++    String[] ipAndHost = new String[2];
++    try {
++      InetAddress address = InetAddress.getLocalHost();
++      ipAndHost[0] = address.getHostAddress();
++      ipAndHost[1] = address.getHostName();
++    } catch (UnknownHostException e) {
++      LOG.error("Unable to get Local hostname and ip for " + container
++          .getContainerId());
++    }
++    return ipAndHost;
++  }
+ }
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/linux/runtime/DelegatingLinuxContainerRuntime.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/linux/runtime/DelegatingLinuxContainerRuntime.java
+index 975bb9b..c7f45aa 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/linux/runtime/DelegatingLinuxContainerRuntime.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/linux/runtime/DelegatingLinuxContainerRuntime.java
+@@ -106,4 +106,10 @@ public void reapContainer(ContainerRuntimeContext ctx)
+ 
+     runtime.reapContainer(ctx);
+   }
++
++  @Override
++  public String[] getIpAndHost(Container container) {
++    LinuxContainerRuntime runtime = pickContainerRuntime(container);
++    return runtime.getIpAndHost(container);
++  }
+ }
+\ No newline at end of file
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/linux/runtime/DockerLinuxContainerRuntime.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/linux/runtime/DockerLinuxContainerRuntime.java
+index 0cfdd05..0f848f6 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/linux/runtime/DockerLinuxContainerRuntime.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/linux/runtime/DockerLinuxContainerRuntime.java
+@@ -40,6 +40,7 @@
+ import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.CGroupsHandler;
+ import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.ResourceHandlerModule;
+ import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.docker.DockerClient;
++import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.docker.DockerInspectCommand;
+ import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.docker.DockerRunCommand;
+ import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.docker.DockerStopCommand;
+ import org.apache.hadoop.yarn.server.nodemanager.containermanager.runtime.ContainerExecutionException;
+@@ -490,4 +491,35 @@ public void reapContainer(ContainerRuntimeContext ctx)
+       throws ContainerExecutionException {
+ 
+   }
++
++
++  @Override
++  public String[] getIpAndHost(Container container) {
++    String containerId = container.getContainerId().toString();
++    DockerInspectCommand inspectCommand =
++        new DockerInspectCommand(containerId).getIpAndHost();
++    try {
++      String commandFile = dockerClient.writeCommandToTempFile(inspectCommand,
++          containerId);
++      PrivilegedOperation privOp = new PrivilegedOperation(
++          PrivilegedOperation.OperationType.RUN_DOCKER_CMD);
++      privOp.appendArgs(commandFile);
++      String output = privilegedOperationExecutor
++          .executePrivilegedOperation(null, privOp, null,
++              container.getLaunchContext().getEnvironment(), true, false);
++      LOG.info("Docker inspect output for " + containerId + ": " + output);
++      int index = output.lastIndexOf(',');
++      String ips = output.substring(0, index);
++      String host = output.substring(index+1);
++      String[] ipAndHost = new String[2];
++      ipAndHost[0] = ips;
++      ipAndHost[1] = host;
++      return ipAndHost;
++    } catch (ContainerExecutionException e) {
++      LOG.error("Error when writing command to temp file", e);
++    } catch (PrivilegedOperationException e) {
++      LOG.error("Error when executing command.", e);
++    }
++    return null;
++  }
+ }
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/linux/runtime/docker/DockerInspectCommand.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/linux/runtime/docker/DockerInspectCommand.java
+index 94b87b7..812a35f 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/linux/runtime/docker/DockerInspectCommand.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/linux/runtime/docker/DockerInspectCommand.java
+@@ -38,4 +38,14 @@ public DockerInspectCommand getContainerStatus() {
+     super.addCommandArguments(containerName);
+     return this;
+   }
++
++  public DockerInspectCommand getIpAndHost() {
++    // Be sure to not use space in the argument, otherwise the
++    // extract_values_delim method in container-executor binary
++    // cannot parse the arguments correctly.
++    super.addCommandArguments("--format='{{range(.NetworkSettings.Networks)}}"
++        + "{{.IPAddress}},{{end}}{{.Config.Hostname}}'");
++    super.addCommandArguments(containerName);
++    return this;
++  }
+ }
+\ No newline at end of file
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/monitor/ContainersMonitorImpl.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/monitor/ContainersMonitorImpl.java
+index e6a66bd..fb8cfc4 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/monitor/ContainersMonitorImpl.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/monitor/ContainersMonitorImpl.java
+@@ -18,10 +18,8 @@
+ 
+ package org.apache.hadoop.yarn.server.nodemanager.containermanager.monitor;
+ 
+-import java.util.Map;
+-import java.util.Map.Entry;
+-import java.util.concurrent.ConcurrentHashMap;
+-
++import com.google.common.annotations.VisibleForTesting;
++import com.google.common.base.Preconditions;
+ import org.apache.commons.logging.Log;
+ import org.apache.commons.logging.LogFactory;
+ import org.apache.hadoop.classification.InterfaceAudience.Private;
+@@ -45,8 +43,10 @@
+ import org.apache.hadoop.yarn.util.ResourceCalculatorPlugin;
+ import org.apache.hadoop.yarn.util.ResourceCalculatorProcessTree;
+ 
+-import com.google.common.annotations.VisibleForTesting;
+-import com.google.common.base.Preconditions;
++import java.util.Arrays;
++import java.util.Map;
++import java.util.Map.Entry;
++import java.util.concurrent.ConcurrentHashMap;
+ 
+ public class ContainersMonitorImpl extends AbstractService implements
+     ContainersMonitor {
+@@ -447,6 +447,17 @@ public void run() {
+                       containerMetricsUnregisterDelayMs);
+                   usageMetrics.recordProcessId(pId);
+                 }
++                Container container = context.getContainers().get(containerId);
++                String[] ipAndHost = containerExecutor.getIpAndHost(container);
++                if (ipAndHost != null && ipAndHost[0] != null
++                    && ipAndHost[1] != null) {
++                  container.setIpAndHost(ipAndHost);
++                  LOG.info(containerId + "'s ip = " + ipAndHost[0]
++                      + ", and hostname = " + ipAndHost[1]);
++                } else {
++                  LOG.info("Can not get both ip and hostname: " + Arrays
++                      .toString(ipAndHost));
++                }
+               }
+             }
+             // End of initializing any uninitialized processTrees
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/runtime/ContainerRuntime.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/runtime/ContainerRuntime.java
+index e05f3fc..b8aca4b 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/runtime/ContainerRuntime.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/runtime/ContainerRuntime.java
+@@ -22,6 +22,7 @@
+ 
+ import org.apache.hadoop.classification.InterfaceAudience;
+ import org.apache.hadoop.classification.InterfaceStability;
++import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
+ 
+ /** An abstraction for various container runtime implementations. Examples
+  * include Process Tree, Docker, Appc runtimes etc., These implementations
+@@ -47,4 +48,7 @@ void signalContainer(ContainerRuntimeContext ctx)
+   /** Any container cleanup that may be required. */
+   void reapContainer(ContainerRuntimeContext ctx)
+       throws ContainerExecutionException;
++
++  // Return the host and ip of the container
++  String[] getIpAndHost(Container container);
+ }
+\ No newline at end of file
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/native/container-executor/impl/container-executor.c b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/native/container-executor/impl/container-executor.c
+index 40b8edc0..f8c7f6e 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/native/container-executor/impl/container-executor.c
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/main/native/container-executor/impl/container-executor.c
+@@ -419,6 +419,13 @@ int change_user(uid_t user, gid_t group) {
+   return 0;
+ }
+ 
++char* check_docker_binary(char *docker_binary) {
++  if (docker_binary == NULL) {
++    return "docker";
++  }
++  return docker_binary;
++}
++
+ /**
+  * Utility function to concatenate argB to argA using the concat_pattern.
+  */
+@@ -1123,6 +1130,8 @@ char* parse_docker_command_file(const char* command_file) {
+ int run_docker(const char *command_file) {
+   char* docker_command = parse_docker_command_file(command_file);
+   char* docker_binary = get_value(DOCKER_BINARY_KEY, &executor_cfg);
++  docker_binary = check_docker_binary(docker_binary);
++
+   char* docker_command_with_binary = calloc(sizeof(char), EXECUTOR_PATH_MAX);
+   snprintf(docker_command_with_binary, EXECUTOR_PATH_MAX, "%s %s", docker_binary, docker_command);
+   char **args = extract_values_delim(docker_command_with_binary, " ");
+@@ -1288,9 +1297,7 @@ int launch_docker_container_as_user(const char * user, const char *app_id,
+ 
+   char *docker_command = parse_docker_command_file(command_file);
+   char *docker_binary = get_value(DOCKER_BINARY_KEY, &executor_cfg);
+-  if (docker_binary == NULL) {
+-    docker_binary = "docker";
+-  }
++  docker_binary = check_docker_binary(docker_binary);
+ 
+   fprintf(LOGFILE, "Creating script paths...\n");
+   exit_code = create_script_paths(
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/test/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/linux/runtime/docker/TestDockerInspectCommand.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/test/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/linux/runtime/docker/TestDockerInspectCommand.java
+index 3321364..c6ebd89 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/test/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/linux/runtime/docker/TestDockerInspectCommand.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/test/java/org/apache/hadoop/yarn/server/nodemanager/containermanager/linux/runtime/docker/TestDockerInspectCommand.java
+@@ -47,4 +47,13 @@ public void testGetContainerStatus() throws Exception {
+     assertEquals("inspect --format='{{.State.Status}}' foo",
+         dockerInspectCommand.getCommandWithArguments());
+   }
++
++  @Test
++  public void testGetIpAndHost() throws Exception {
++    dockerInspectCommand.getIpAndHost();
++    assertEquals(
++        "inspect --format='{{range.NetworkSettings.Networks}}{{.IPAddress}}"
++            + "{{end}},{{.Config.Hostname}}' foo",
++        dockerInspectCommand.getCommandWithArguments());
++  }
+ }
+\ No newline at end of file
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/test/java/org/apache/hadoop/yarn/server/nodemanager/webapp/MockContainer.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/test/java/org/apache/hadoop/yarn/server/nodemanager/webapp/MockContainer.java
+index b21ba4b..c16a206 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/test/java/org/apache/hadoop/yarn/server/nodemanager/webapp/MockContainer.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server/hadoop-yarn-server-nodemanager/src/test/java/org/apache/hadoop/yarn/server/nodemanager/webapp/MockContainer.java
+@@ -174,7 +174,13 @@ public String getLogDir() {
+   public void setLogDir(String logDir) {
+   }
+ 
++  @Override
+   public Priority getPriority() {
+     return Priority.UNDEFINED;
+   }
++  
++  @Override
++  public void setIpAndHost(String[] ipAndHost) {
++
++  }
+ }

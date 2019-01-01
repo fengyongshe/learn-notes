@@ -1,0 +1,1396 @@
+diff --git a/slider-agent/src/main/python/agent/ActionQueue.py b/slider-agent/src/main/python/agent/ActionQueue.py
+index e5e2d1a..ca68d5d 100644
+--- a/slider-agent/src/main/python/agent/ActionQueue.py
++++ b/slider-agent/src/main/python/agent/ActionQueue.py
+@@ -30,6 +30,7 @@ from AgentConfig import AgentConfig
+ from AgentToggleLogger import AgentToggleLogger
+ from CommandStatusDict import CommandStatusDict
+ from CustomServiceOrchestrator import CustomServiceOrchestrator
++from DockerManager import DockerManager
+ import Constants
+ 
+ 
+@@ -51,6 +52,8 @@ class ActionQueue(threading.Thread):
+ 
+   STORE_APPLIED_CONFIG = 'record_config'
+   AUTO_RESTART = 'auto_restart'
++  
++  docker_mode = False
+ 
+   def __init__(self, config, controller, agentToggleLogger):
+     super(ActionQueue, self).__init__()
+@@ -67,7 +70,8 @@ class ActionQueue(threading.Thread):
+     self.customServiceOrchestrator = CustomServiceOrchestrator(config,
+                                                                controller,
+                                                                self.queueOutAgentToggleLogger)
+-
++    self.dockerManager = DockerManager(self.tmpdir, config.getWorkRootPath(), self.customServiceOrchestrator)
++    
+ 
+   def stop(self):
+     self._stop.set()
+@@ -123,9 +127,9 @@ class ActionQueue(threading.Thread):
+     clusterName = command['clusterName']
+     commandId = command['commandId']
+     if 'package' in command:
+-        self.componentPackage = command['package']
++      self.componentPackage = command['package']
+     else:
+-        self.componentPackage = ''
++      self.componentPackage = ''
+     
+     logger.info("Package received: " + self.componentPackage)
+ 
+@@ -165,8 +169,12 @@ class ActionQueue(threading.Thread):
+     
+     logger.info("Running command: " + str(command))
+     
+-    # running command
+-    commandresult = self.customServiceOrchestrator.runCommand(command,
++    if 'configurations' in command and 'docker' in command['configurations']:
++      self.docker_mode = True
++      commandresult = self.dockerManager.execute_command(command, store_config or store_command)
++    else:
++      # running command
++      commandresult = self.customServiceOrchestrator.runCommand(command,
+                                                               in_progress_status[
+                                                                 'tmpout'],
+                                                               in_progress_status[
+@@ -223,7 +231,11 @@ class ActionQueue(threading.Thread):
+       service = command['serviceName']
+       component = command['componentName']
+       reportResult = CommandStatusDict.shouldReportResult(command)
+-      component_status = self.customServiceOrchestrator.requestComponentStatus(command)
++      component_status = None
++      if self.docker_mode:
++        component_status = self.dockerManager.query_status(command)
++      else:
++        component_status = self.customServiceOrchestrator.requestComponentStatus(command)
+ 
+       result = {"componentName": component,
+                 "msg": "",
+diff --git a/slider-agent/src/main/python/agent/DockerManager.py b/slider-agent/src/main/python/agent/DockerManager.py
+new file mode 100644
+index 0000000..7cab24c
+--- /dev/null
++++ b/slider-agent/src/main/python/agent/DockerManager.py
+@@ -0,0 +1,190 @@
++import logging
++import os
++import subprocess
++from AgentConfig import AgentConfig
++import Constants
++
++logger = logging.getLogger()
++
++class DockerManager():
++  stored_status_command = ''
++  stored_command = ''
++
++  def __init__(self, tmpdir, workroot, customServiceOrchestrator):
++    self.tmpdir = tmpdir
++    self.workroot = workroot
++    self.customServiceOrchestrator = customServiceOrchestrator
++
++  def execute_command(self, command, store_command=False):
++    returncode = ''
++    out = ''
++    err = ''
++    
++    if store_command:
++      logger.info("Storing applied config: " + str(command['configurations']))
++      self.stored_command = command
++    status_command_str = self.extract_config_from_command(command, 'docker.status_command')
++    if status_command_str:
++      self.stored_status_command = status_command_str.split(" ")
++    logger.info("status command" + str(self.stored_status_command))
++        
++    if command['roleCommand'] == 'INSTALL':
++      returncode, out, err = self.pull_image(command)
++      logger.info("docker pull result: " + str(returncode) + ";")
++    if command['roleCommand'] == 'START':
++      returncode, out, err = self.start_container(command)    
++    # need check
++    return {Constants.EXIT_CODE:returncode, 'stdout':out, 'stderr':err}
++        
++  def pull_image(self, command):
++    logger.info(str( command['configurations']))
++    command_path = self.extract_config_from_command(command, 'docker.command_path')
++    imageName = self.extract_config_from_command(command, 'docker.image_name')
++    
++    docker_command = [command_path, 'pull', imageName]
++    logger.info("docker pull command: " + str(docker_command))
++    return self.execute_command_on_linux(docker_command)
++    
++
++  def extract_config_from_command(self, command, field):
++    value = ''
++    if 'configurations' in command:
++      if 'docker' in command['configurations']:
++        if field in command['configurations']['docker']:
++          logger.info(field + ': ' + str( command['configurations']['docker'][field]))
++          value = command['configurations']['docker'][field]
++    return value
++
++
++  # will evolve into a class hierarch, linux and windows
++  def execute_command_on_linux(self, docker_command):
++    proc = subprocess.Popen(docker_command, stdout = subprocess.PIPE)
++    out, err = proc.communicate()
++    logger.info("docker command output: " + str(out) + " err: " + str(err))
++    return proc.returncode, out, err
++
++
++  def start_container(self, command):
++    #extracting param needed by docker run from the command passed from AM
++    command_path = self.extract_config_from_command(command, 'docker.command_path')
++    imageName = self.extract_config_from_command(command, 'docker.image_name')
++    options = self.extract_config_from_command(command, 'docker.options')
++    containerPort = self.extract_config_from_command(command, 'docker.containerPort')
++    mounting_directory = self.extract_config_from_command(command, 'docker.mounting_directory')
++    memory_usage = self.extract_config_from_command(command, "docker.memory_usage")
++    additional_param = self.extract_config_from_command(command, 'docker.additional_param')
++    input_file_local_path = self.extract_config_from_command(command, 'docker.input_file.local_path')
++    input_file_mount_path = self.extract_config_from_command(command, 'docker.input_file.mount_path')
++    
++    docker_command = [command_path, "run"]
++    
++    #docker_command.append("--net=host")
++    
++    if options:
++      docker_command = self.add_docker_run_options_to_command(docker_command, options)
++    if containerPort:
++      logger.info("container port is not null")
++      self.add_port_binding_to_command(docker_command, command, containerPort)
++    if mounting_directory:
++      self.add_mnted_dir_to_command(docker_command, "/docker_use", mounting_directory)
++    if input_file_local_path:
++      self.add_mnted_dir_to_command(docker_command, "/inputDir", input_file_mount_path)
++    if memory_usage:
++      self.add_resource_restriction(docker_command, memory_usage)
++    self.add_container_name_to_command(docker_command, command)
++    docker_command.append(imageName)
++    if additional_param:
++      docker_command = self.add_additional_param_to_command(docker_command, additional_param)
++    logger.info("docker run command: " + str(docker_command))
++    return self.execute_command_on_linux(docker_command)
++
++  def add_docker_run_options_to_command(self, docker_command, options):
++    return docker_command + options.split(" ")
++
++  def add_port_binding_to_command(self, docker_command, command, containerPort):
++    docker_command.append("-p")
++    hostPort = self.extract_config_from_command(command, 'docker.hostPort')
++    
++    if not hostPort:
++      #this is the list of allowed port range specified in appConfig
++      allowedPorts = self.customServiceOrchestrator.get_allowed_ports(command)
++      #if the user specify hostPort in appConfig, then we use it, otherwise allocate it
++      allocated_for_this_component_format = "${{{0}.ALLOCATED_PORT}}"
++      component = command['componentName']
++      port_allocation_req = allocated_for_this_component_format.format(component)
++      hostPort = self.customServiceOrchestrator.allocate_ports(port_allocation_req, port_allocation_req, allowedPorts)
++    docker_command.append(hostPort+":"+containerPort)
++    
++  def add_mnted_dir_to_command(self, docker_command, host_dir, container_dir):
++    docker_command.append("-v")
++    tmp_mount_dir = self.workroot + host_dir
++    docker_command.append(tmp_mount_dir+":"+container_dir)
++
++  def add_container_name_to_command(self, docker_command, command):
++    docker_command.append("--name")
++    docker_command.append(self.get_container_id(command))
++    
++  def add_additional_param_to_command(self, docker_command, additional_param):
++    return docker_command + additional_param.split(" ")
++
++  def get_container_id(self, command):
++    # will make this more resilient to changes
++    return self.tmpdir[-30:-2]
++
++  def add_resource_restriction(self, docker_command, memory_usage):
++    docker_command.append("-m")
++    docker_command.append(memory_usage)
++
++  def query_status(self, command):
++    if command['roleCommand'] == "GET_CONFIG":
++      return self.getConfig(command)
++    else:
++      returncode = ''
++      out = ''
++      err = ''
++      status_command_str = self.extract_config_from_command(command, 'docker.status_command')
++      if status_command_str:
++        self.stored_status_command = status_command_str.split(" ")
++        logger.info("in query_status, got stored status command" + str(self.stored_status_command))
++      if self.stored_status_command:
++        logger.info("stored status command to run: " + str(self.stored_status_command))
++        returncode, out, err = self.execute_command_on_linux(self.stored_status_command)
++      logger.info("status of the app in docker container: " + str(returncode) + ";" + str(out) + ";" + str(err))
++      return {Constants.EXIT_CODE:returncode, 'stdout':out, 'stderr':err}
++
++  def getConfig(self, command):
++    logger.info("get config command: " + str(command))
++    if 'configurations' in self.stored_command:
++      if 'commandParams' in command and 'config_type' in command['commandParams']:
++        config_type = command['commandParams']['config_type']
++        logger.info("Requesting applied config for type {0}".format(config_type))
++        if config_type in self.stored_command['configurations']:
++          logger.info("get config result: " + self.stored_command['configurations'][config_type])
++          return {
++            'configurations': {config_type: self.stored_command['configurations'][config_type]}
++          }
++        else:
++          return {
++            'configurations': {}
++          }
++        pass
++      else:
++        logger.info("Requesting all applied config." + str(self.stored_command['configurations']))
++        return {
++          'configurations': self.stored_command['configurations']
++        }
++      pass
++    else:
++      return {
++        'configurations': {}
++      }
++    pass
++
++  def stop_container(self):
++    docker_command = ["/usr/bin/docker", "stop"]
++    docker_command.append(self.get_container_id(docker_command))
++    logger.info("docker stop: " + str(docker_command))
++    code, out, err = self.execute_command_on_linux(docker_command)
++    logger.info("output: " + str(out))
++    
++        
+\ No newline at end of file
+diff --git a/slider-agent/src/main/python/agent/main.py b/slider-agent/src/main/python/agent/main.py
+index f592d08..e6a4790 100644
+--- a/slider-agent/src/main/python/agent/main.py
++++ b/slider-agent/src/main/python/agent/main.py
+@@ -41,7 +41,7 @@ logger = logging.getLogger()
+ IS_WINDOWS = platform.system() == "Windows"
+ formatstr = "%(levelname)s %(asctime)s %(filename)s:%(lineno)d - %(message)s"
+ agentPid = os.getpid()
+-
++controller = None
+ configFileRelPath = "infra/conf/agent.ini"
+ logFileName = "slider-agent.log"
+ 
+@@ -54,6 +54,9 @@ def signal_handler(signum, frame):
+   if os.getpid() != agentPid:
+     os._exit(0)
+   logger.info('signal received, exiting.')
++  global controller
++  if controller is not None:
++    tmpdir = controller.actionQueue.dockerManager.stop_container()
+   ProcessHelper.stopAgent()
+ 
+ 
+@@ -285,8 +288,10 @@ def main():
+   pass
+ 
+   # Launch Controller communication
++  global controller
+   controller = Controller(agentConfig)
+   controller.start()
++  
+   try:
+     while controller.is_alive():
+       controller.join(timeout=1.0)
+diff --git a/slider-core/src/main/java/org/apache/slider/common/tools/SliderUtils.java b/slider-core/src/main/java/org/apache/slider/common/tools/SliderUtils.java
+index 4fcfed1..c06aa4a 100644
+--- a/slider-core/src/main/java/org/apache/slider/common/tools/SliderUtils.java
++++ b/slider-core/src/main/java/org/apache/slider/common/tools/SliderUtils.java
+@@ -145,6 +145,11 @@ public final class SliderUtils {
+    */
+   public static final String PYTHON = "python";
+ 
++  /**
++   * name of docker program
++   */
++  public static final String DOCKER = "docker";
++
+   private SliderUtils() {
+   }
+ 
+diff --git a/slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java b/slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java
+index f806157..b3c513a 100644
+--- a/slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java
++++ b/slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java
+@@ -20,6 +20,7 @@ package org.apache.slider.providers.agent;
+ 
+ import com.google.common.annotations.VisibleForTesting;
+ import com.google.common.base.Preconditions;
++
+ import org.apache.commons.io.FileUtils;
+ import org.apache.hadoop.conf.Configuration;
+ import org.apache.hadoop.fs.FSDataOutputStream;
+@@ -64,6 +65,7 @@ import org.apache.slider.providers.AbstractProviderService;
+ import org.apache.slider.providers.ProviderCore;
+ import org.apache.slider.providers.ProviderRole;
+ import org.apache.slider.providers.ProviderUtils;
++import org.apache.slider.providers.agent.application.metadata.AbstractComponent;
+ import org.apache.slider.providers.agent.application.metadata.Application;
+ import org.apache.slider.providers.agent.application.metadata.CommandScript;
+ import org.apache.slider.providers.agent.application.metadata.Component;
+@@ -72,6 +74,7 @@ import org.apache.slider.providers.agent.application.metadata.ComponentExport;
+ import org.apache.slider.providers.agent.application.metadata.ComponentsInAddonPackage;
+ import org.apache.slider.providers.agent.application.metadata.ConfigFile;
+ import org.apache.slider.providers.agent.application.metadata.DefaultConfig;
++import org.apache.slider.providers.agent.application.metadata.DockerContainer;
+ import org.apache.slider.providers.agent.application.metadata.Export;
+ import org.apache.slider.providers.agent.application.metadata.ExportGroup;
+ import org.apache.slider.providers.agent.application.metadata.Metainfo;
+@@ -117,6 +120,7 @@ import java.util.LinkedHashMap;
+ import java.util.List;
+ import java.util.Locale;
+ import java.util.Map;
++import java.util.Map.Entry;
+ import java.util.Scanner;
+ import java.util.Set;
+ import java.util.TreeMap;
+@@ -124,6 +128,7 @@ import java.util.concurrent.ConcurrentHashMap;
+ import java.util.concurrent.CopyOnWriteArrayList;
+ import java.util.concurrent.TimeUnit;
+ import java.util.concurrent.atomic.AtomicInteger;
++import java.util.regex.Pattern;
+ 
+ import static org.apache.slider.server.appmaster.web.rest.RestPaths.SLIDER_PATH_AGENTS;
+ 
+@@ -476,7 +481,8 @@ public class AgentProviderService extends AbstractProviderService implements
+       operation.add(debugCmd);
+     }
+ 
+-    operation.add("> " + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/" + AgentKeys.AGENT_OUT_FILE + " 2>&1");
++    operation.add("> " + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/"
++        + AgentKeys.AGENT_OUT_FILE + " 2>&1");
+ 
+     launcher.addCommand(operation.build());
+ 
+@@ -823,15 +829,18 @@ public class AgentProviderService extends AbstractProviderService implements
+     CommandScript cmdScript = getScriptPathForMasterPackage(roleName);
+     List<ComponentCommand> commands = getMetaInfo().getApplicationComponent(roleName).getCommands();
+ 
+-    if ((cmdScript == null || cmdScript.getScript() == null) && commands.size() == 0) {
+-      log.error("role.script is unavailable for {}. Commands will not be sent.",
++    if (!isDockerContainer(roleName)
++        && (cmdScript == null || cmdScript.getScript() == null)
++        && commands.size() == 0) {
++      log.error(
++          "role.script is unavailable for {}. Commands will not be sent.",
+           roleName);
+       return response;
+     }
+ 
+     String scriptPath = null;
+     long timeout = 600L;
+-    if(cmdScript != null) {
++    if (cmdScript != null) {
+       scriptPath = cmdScript.getScript();
+       timeout = cmdScript.getTimeout();
+     }
+@@ -907,7 +916,9 @@ public class AgentProviderService extends AbstractProviderService implements
+             componentStatus.getNextPkgToInstall(), command.toString());
+         if (command == Command.INSTALL) {
+           log.info("Installing {} on {}.", roleName, containerId);
+-          if (scriptPath != null) {
++          if (isDockerContainer(roleName)){
++            addInstallDockerCommand(roleName, containerId, response, null, timeout);
++          } else if (scriptPath != null) {
+             addInstallCommand(roleName, containerId, response, scriptPath,
+                 null, timeout, null);
+           } else {
+@@ -955,7 +966,9 @@ public class AgentProviderService extends AbstractProviderService implements
+           boolean canExecute = commandOrder.canExecute(roleName, command, getComponentStatuses().values());
+           if (canExecute) {
+             log.info("Starting {} on {}.", roleName, containerId);
+-            if (scriptPath != null) {
++            if (isDockerContainer(roleName)){
++              addStartDockerCommand(roleName, containerId, response, null, timeout, false);
++            } else if (scriptPath != null) {
+               addStartCommand(roleName,
+                               containerId,
+                               response,
+@@ -1004,10 +1017,14 @@ public class AgentProviderService extends AbstractProviderService implements
+           && command == Command.NOP) {
+         if (!componentStatus.getConfigReported()) {
+           log.info("Requesting applied config for {} on {}.", roleName, containerId);
+-          addGetConfigCommand(roleName, containerId, response);
++          if (isDockerContainer(roleName)){
++            addGetConfigDockerCommand(roleName, containerId, response);
++          } else {
++            addGetConfigCommand(roleName, containerId, response);
++          }
+         }
+       }
+-
++      
+       // if restart is required then signal
+       response.setRestartEnabled(false);
+       if (componentStatus.getState() == State.STARTED
+@@ -1016,7 +1033,7 @@ public class AgentProviderService extends AbstractProviderService implements
+       }
+ 
+       //If INSTALL_FAILED and no INSTALL is scheduled let the agent fail
+-      if(componentStatus.getState() == State.INSTALL_FAILED
++      if (componentStatus.getState() == State.INSTALL_FAILED
+          && command == Command.NOP) {
+         log.warn("Sending terminate signal to container that failed installation: {}", label);
+         response.setTerminateAgent(true);
+@@ -1031,6 +1048,14 @@ public class AgentProviderService extends AbstractProviderService implements
+     return response;
+   }
+ 
++  private boolean isDockerContainer(String roleName) {
++    String type = getMetaInfo().getApplicationComponent(roleName).getType();
++    if (SliderUtils.isSet(type)) {
++      return type.toLowerCase().equals(SliderUtils.DOCKER);
++    }
++    return false;
++  }
++
+   protected void processAllocatedPorts(String fqdn,
+                                        String roleName,
+                                        String containerId,
+@@ -1422,7 +1447,7 @@ public class AgentProviderService extends AbstractProviderService implements
+     for(Map.Entry<String, ExportEntry> logEntry : folderExports.entrySet())
+     {
+       String componentName = logEntry.getValue().getTag();
+-      if(!perComponentList.containsKey(componentName)) {
++      if (!perComponentList.containsKey(componentName)) {
+         perComponentList.put(componentName, new ArrayList<ExportEntry>());
+       }
+       perComponentList.get(componentName).add(logEntry.getValue());
+@@ -1567,7 +1592,7 @@ public class AgentProviderService extends AbstractProviderService implements
+       Map<String, String> simpleEntries = new HashMap<String, String>();
+       for (Map.Entry<String, List<ExportEntry>> entry : entries.entrySet()) {
+         List<ExportEntry> exports = entry.getValue();
+-        if(SliderUtils.isNotEmpty(exports)) {
++        if (SliderUtils.isNotEmpty(exports)) {
+           // there is no support for multiple exports per name - so extract only the first one
+           simpleEntries.put(entry.getKey(), entry.getValue().get(0).getValue());
+         }
+@@ -1884,12 +1909,12 @@ public class AgentProviderService extends AbstractProviderService implements
+     Map<String, Map<String, String>> configurations = buildCommandConfigurations(appConf, containerId, componentName);
+     cmd.setConfigurations(configurations);
+ 
+-    if(SliderUtils.isSet(scriptPath)) {
++    if (SliderUtils.isSet(scriptPath)) {
+       cmd.setCommandParams(commandParametersSet(scriptPath, timeout, false));
+     } else {
+       // assume it to be default shell command
+       ComponentCommand effectiveCommand = compCmd;
+-      if(effectiveCommand == null) {
++      if (effectiveCommand == null) {
+         effectiveCommand = ComponentCommand.getDefaultComponentCommand("INSTALL");
+       }
+       cmd.setCommandParams(commandParametersSet(effectiveCommand, timeout, false));
+@@ -1903,6 +1928,85 @@ public class AgentProviderService extends AbstractProviderService implements
+     log.debug("command looks like: {} ",  cmd);
+   }
+ 
++  @VisibleForTesting
++  protected void addInstallDockerCommand(String componentName,
++                                   String containerId,
++                                   HeartBeatResponse response,
++                                   ComponentCommand compCmd,
++                                   long timeout)
++      throws SliderException {
++    assert getAmState().isApplicationLive();
++    ConfTreeOperations appConf = getAmState().getAppConfSnapshot();
++
++    ExecutionCommand cmd = new ExecutionCommand(AgentCommandType.EXECUTION_COMMAND);
++    prepareExecutionCommand(cmd);
++    String clusterName = getClusterName();
++    cmd.setClusterName(clusterName);
++    cmd.setRoleCommand(Command.INSTALL.toString());
++    cmd.setServiceName(clusterName);
++    cmd.setComponentName(componentName);
++    cmd.setRole(componentName);
++    Map<String, String> hostLevelParams = new TreeMap<String, String>();
++    hostLevelParams.put(PACKAGE_LIST, getPackageList());
++    hostLevelParams.put(CONTAINER_ID, containerId);
++    cmd.setHostLevelParams(hostLevelParams);
++
++    Map<String, Map<String, String>> configurations = buildCommandConfigurations(
++        appConf, containerId, componentName);
++    cmd.setConfigurations(configurations);
++
++    ComponentCommand effectiveCommand = compCmd;
++    if (compCmd == null) {
++      effectiveCommand = new ComponentCommand();
++      effectiveCommand.setName("INSTALL");
++      effectiveCommand.setExec("DEFAULT");
++    }
++    cmd.setCommandParams(setCommandParameters(effectiveCommand, timeout, false));
++    configurations.get("global").put("exec_cmd", effectiveCommand.getExec());
++
++    cmd.setHostname(getClusterInfoPropertyValue(StatusKeys.INFO_AM_HOSTNAME));
++    cmd.addContainerDetails(componentName, getMetaInfo());
++
++    Map<String, String> dockerConfig = new HashMap<String, String>();
++    dockerConfig.put(
++        "docker.command_path",
++        getConfigFromMetaInfoWithAppConfigOverriding(componentName,
++            "commandPath"));
++    dockerConfig.put("docker.image_name",
++        getConfigFromMetaInfo(componentName, "image"));
++    configurations.put("docker", dockerConfig);
++
++    log.debug("Docker- command: {}", cmd.toString());
++
++    response.addExecutionCommand(cmd);
++  }
++
++  private Map<String, String> setCommandParameters(String scriptPath,
++      long timeout, boolean recordConfig) {
++    Map<String, String> cmdParams = new TreeMap<String, String>();
++    cmdParams.put("service_package_folder",
++        "${AGENT_WORK_ROOT}/work/app/definition/package");
++    cmdParams.put("script", scriptPath);
++    cmdParams.put("schema_version", "2.0");
++    cmdParams.put("command_timeout", Long.toString(timeout));
++    cmdParams.put("script_type", AbstractComponent.TYPE_PYTHON);
++    cmdParams.put("record_config", Boolean.toString(recordConfig));
++    return cmdParams;
++  }
++
++  private Map<String, String> setCommandParameters(ComponentCommand compCmd,
++      long timeout, boolean recordConfig) {
++    Map<String, String> cmdParams = new TreeMap<String, String>();
++    cmdParams.put("service_package_folder",
++        "${AGENT_WORK_ROOT}/work/app/definition/package");
++    cmdParams.put("command", compCmd.getExec());
++    cmdParams.put("schema_version", "2.0");
++    cmdParams.put("command_timeout", Long.toString(timeout));
++    cmdParams.put("script_type", compCmd.getType());
++    cmdParams.put("record_config", Boolean.toString(recordConfig));
++    return cmdParams;
++  }
++
+   private Map<String, Map<String, String>> buildComponentConfigurations(
+       ConfTreeOperations appConf) {
+     return appConf.getComponents();
+@@ -1981,6 +2085,11 @@ public class AgentProviderService extends AbstractProviderService implements
+       throws SliderException {
+     assert getAmState().isApplicationLive();
+     ConfTreeOperations appConf = getAmState().getAppConfSnapshot();
++    if (isDockerContainer(componentName)) {
++      addStatusDockerCommand(componentName, containerId, response, scriptPath,
++          timeout);
++      return;
++    }
+ 
+     StatusCommand cmd = new StatusCommand();
+     String clusterName = getClusterName();
+@@ -2006,6 +2115,307 @@ public class AgentProviderService extends AbstractProviderService implements
+   }
+ 
+   @VisibleForTesting
++  protected void addStatusDockerCommand(String componentName,
++                                  String containerId,
++                                  HeartBeatResponse response,
++                                  String scriptPath,
++                                  long timeout)
++      throws SliderException {
++    assert getAmState().isApplicationLive();
++    ConfTreeOperations appConf = getAmState().getAppConfSnapshot();
++
++    StatusCommand cmd = new StatusCommand();
++    String clusterName = getClusterName();
++
++    cmd.setCommandType(AgentCommandType.STATUS_COMMAND);
++    cmd.setComponentName(componentName);
++    cmd.setServiceName(clusterName);
++    cmd.setClusterName(clusterName);
++    cmd.setRoleCommand(StatusCommand.STATUS_COMMAND);
++
++    Map<String, String> hostLevelParams = new TreeMap<String, String>();
++    hostLevelParams.put(JAVA_HOME, appConf.getGlobalOptions().getMandatoryOption(JAVA_HOME));
++    hostLevelParams.put(CONTAINER_ID, containerId);
++    cmd.setHostLevelParams(hostLevelParams);
++
++    cmd.setCommandParams(setCommandParameters(scriptPath, timeout, false));
++
++    Map<String, Map<String, String>> configurations = buildCommandConfigurations(
++        appConf, containerId, componentName);
++    Map<String, String> dockerConfig = new HashMap<String, String>();
++    String statusCommand = getConfigFromMetaInfoWithAppConfigOverriding(componentName, "statusCommand");
++    if (statusCommand == null) {
++      statusCommand = "docker top "
++            + containerId.substring(containerId.indexOf("_") + 1)
++            + " | grep \"\"";// default value
++    }
++    dockerConfig.put("docker.status_command",statusCommand);
++    configurations.put("docker", dockerConfig);
++    cmd.setConfigurations(configurations);
++    log.debug("Docker- status {}", cmd);
++    response.addStatusCommand(cmd);
++  }
++
++  @VisibleForTesting
++  protected void addGetConfigDockerCommand(String componentName,
++      String containerId, HeartBeatResponse response) throws SliderException {
++    assert getAmState().isApplicationLive();
++
++    StatusCommand cmd = new StatusCommand();
++    String clusterName = getClusterName();
++
++    cmd.setCommandType(AgentCommandType.STATUS_COMMAND);
++    cmd.setComponentName(componentName);
++    cmd.setServiceName(clusterName);
++    cmd.setClusterName(clusterName);
++    cmd.setRoleCommand(StatusCommand.GET_CONFIG_COMMAND);
++    Map<String, String> hostLevelParams = new TreeMap<String, String>();
++    hostLevelParams.put(CONTAINER_ID, containerId);
++    cmd.setHostLevelParams(hostLevelParams);
++
++    hostLevelParams.put(CONTAINER_ID, containerId);
++
++    ConfTreeOperations appConf = getAmState().getAppConfSnapshot();
++    Map<String, Map<String, String>> configurations = buildCommandConfigurations(
++        appConf, containerId, componentName);
++    Map<String, String> dockerConfig = new HashMap<String, String>();
++    String statusCommand = getConfigFromMetaInfoWithAppConfigOverriding(componentName, "statusCommand");
++    if (statusCommand == null) {
++      statusCommand = "docker top "
++            + containerId.substring(containerId.indexOf("_") + 1)
++            + " | grep \"\"";// default value
++    }
++    dockerConfig.put("docker.status_command",statusCommand);
++    configurations.put("docker", dockerConfig);
++
++    cmd.setConfigurations(configurations);
++    log.debug("Docker- getconfig command {}", cmd);
++
++    response.addStatusCommand(cmd);
++  }
++  
++  private String getConfigFromMetaInfoWithAppConfigOverriding(String componentName, String configName){
++    ConfTreeOperations appConf = getAmState().getAppConfSnapshot();
++    String containerName = getMetaInfo().getApplicationComponent(componentName)
++        .getDockerContainers().get(0).getName();
++    String composedConfigName = null;
++    String appConfigValue = null;
++    //if the configName is about port , mount, inputfile, then check differently
++    if (configName.equals("containerPort") || configName.equals("hostPort")){
++      composedConfigName = containerName + ".ports." + configName;
++    } else 
++    if (configName.equals("containerMount")
++        || configName.equals("hostMount")){
++      composedConfigName = containerName + ".mounts." + configName;
++    } else
++    if (configName.equals("containerPath")
++        || configName.equals("fileLocalPath")) {
++      composedConfigName = containerName + ".inputFiles." + configName;
++    } else {
++      composedConfigName = containerName + "." + configName;
++    }
++    appConfigValue = appConf.getComponentOpt(componentName, composedConfigName,
++        null);
++    log.debug(
++        "Docker- value from appconfig component: {} configName: {} value: {}",
++        componentName, composedConfigName, appConfigValue);
++    if (appConfigValue == null) {
++      appConfigValue = getConfigFromMetaInfo(componentName, configName);
++      log.debug(
++          "Docker- value from metainfo component: {} configName: {} value: {}",
++          componentName, configName, appConfigValue);
++
++    }
++    return appConfigValue;
++  }
++
++  @VisibleForTesting
++  protected void addStartDockerCommand(String componentName,
++      String containerId, HeartBeatResponse response,
++      ComponentCommand startCommand, long timeout, boolean isMarkedAutoRestart)
++      throws
++      SliderException {
++    assert getAmState().isApplicationLive();
++    ConfTreeOperations appConf = getAmState().getAppConfSnapshot();
++    ConfTreeOperations internalsConf = getAmState().getInternalsSnapshot();
++
++    ExecutionCommand cmd = new ExecutionCommand(AgentCommandType.EXECUTION_COMMAND);
++    prepareExecutionCommand(cmd);
++    String clusterName = internalsConf.get(OptionKeys.APPLICATION_NAME);
++    String hostName = getClusterInfoPropertyValue(StatusKeys.INFO_AM_HOSTNAME);
++    cmd.setHostname(hostName);
++    cmd.setClusterName(clusterName);
++    cmd.setRoleCommand(Command.START.toString());
++    cmd.setServiceName(clusterName);
++    cmd.setComponentName(componentName);
++    cmd.setRole(componentName);
++    Map<String, String> hostLevelParams = new TreeMap<>();
++    hostLevelParams.put(CONTAINER_ID, containerId);
++    cmd.setHostLevelParams(hostLevelParams);
++
++    Map<String, String> roleParams = new TreeMap<>();
++    cmd.setRoleParams(roleParams);
++    cmd.getRoleParams().put("auto_restart", Boolean.toString(isMarkedAutoRestart));
++    startCommand = new ComponentCommand();
++    startCommand.setName("START");
++    startCommand.setType("docker");
++    startCommand.setExec("exec");
++    cmd.setCommandParams(setCommandParameters(startCommand, timeout, true));
++    
++    Map<String, Map<String, String>> configurations = buildCommandConfigurations(
++        appConf, containerId, componentName);
++
++    log.info("before resolution: " + appConf.toString());
++    resolveVariablesForComponentAppConfigs(appConf, componentName, containerId);
++    log.info("after resolution: " + appConf.toString());
++
++    Map<String, String> dockerConfig = new HashMap<String, String>();
++    dockerConfig.put(
++        "docker.command_path",
++        getConfigFromMetaInfoWithAppConfigOverriding(componentName,
++            "commandPath"));
++    dockerConfig.put("docker.image_name",
++        getConfigFromMetaInfo(componentName, "image"));
++    // options should always have -d
++    String options = getConfigFromMetaInfoWithAppConfigOverriding(
++        componentName, "options");
++    options = options + " -d";
++    dockerConfig.put("docker.options", options);
++    // options should always have -d
++    dockerConfig.put(
++        "docker.containerPort",
++        getConfigFromMetaInfoWithAppConfigOverriding(componentName,
++            "containerPort"));
++    dockerConfig
++        .put(
++            "docker.hostPort",
++            getConfigFromMetaInfoWithAppConfigOverriding(componentName,
++                "hostPort"));
++
++    dockerConfig.put(
++        "docker.mounting_directory",
++        getConfigFromMetaInfoWithAppConfigOverriding(componentName,
++            "containerMount"));
++    dockerConfig
++        .put(
++            "docker.host_mounting_directory",
++            getConfigFromMetaInfoWithAppConfigOverriding(componentName,
++                "hostMount"));
++
++    dockerConfig.put("docker.additional_param",
++        getConfigFromMetaInfoWithAppConfigOverriding(componentName, "additionalParam"));
++
++    dockerConfig.put("docker.input_file.mount_path", getConfigFromMetaInfo(
++        componentName, "containerPath"));
++    configurations.put("docker", dockerConfig);
++    String statusCommand = getConfigFromMetaInfoWithAppConfigOverriding(
++        componentName, "statusCommand");
++    if (statusCommand == null) {
++      statusCommand = "docker top "
++            + containerId.substring(containerId.indexOf("_") + 1)
++            + " | grep \"\"";// default value
++    }
++    dockerConfig.put("docker.status_command",statusCommand);
++    
++    cmd.setConfigurations(configurations);
++   // configurations.get("global").put("exec_cmd", startCommand.getExec());
++    cmd.addContainerDetails(componentName, getMetaInfo());
++
++    log.debug("Docker- command: {}", cmd.toString());
++
++    response.addExecutionCommand(cmd);
++  }
++
++  private void resolveVariablesForComponentAppConfigs(
++      ConfTreeOperations appConf, String componentName, String containerId)
++      throws SliderException {
++    Map<String, String> tokens = getStandardTokenMap(appConf, componentName);
++    addRoleRelatedTokens(tokens);
++    log.debug("docker- tokens: {}", tokens);
++    
++    MapOperations compConf = appConf.getComponent(componentName);
++    for(Entry<String, String> element: compConf.entrySet()){
++      
++      log.debug("docker- key: {} value: {}", element.getKey(), element.getValue());
++      
++      Object value = element.getValue();
++      if (value instanceof String){
++        String valueStr = (String)value;
++        
++        //resolving host names
++        for (Map.Entry<String,String> token : tokens.entrySet()) {
++          valueStr = valueStr.replaceAll(Pattern.quote(token.getKey()),
++                                   token.getValue());
++          compConf.put(element.getKey(), valueStr);
++        }
++
++        // resolving container ids
++        if (valueStr.contains("${CONTAINER_ID}")) {
++          valueStr = valueStr.replace("${CONTAINER_ID}",
++              containerId.substring(containerId.indexOf("_") + 1));
++          compConf.put(element.getKey(), valueStr);
++        }
++      }
++    }
++  }
++
++  private String getConfigFromMetaInfo(String componentName, String configName) {
++    String result = null;
++
++    List<DockerContainer> containers = getMetaInfo().getApplicationComponent(
++        componentName).getDockerContainers();// to support multi container per
++                                             // component later
++    log.debug("Docker- containers metainfo: {}", containers.toString());
++    if (containers.size() > 0) {
++      DockerContainer container = containers.get(0);
++      
++      switch (configName) {
++      case "image":
++        result = container.getImage();
++        break;
++      case "statusCommand":
++        result = container.getStatusCommand();
++        break;
++      case "commandPath":
++        result = container.getCommandPath();
++        break;
++      case "options":
++        result = container.getOptions();
++        break;
++      case "containerPort":
++        result = container.getPorts().size() > 0 ? container.getPorts().get(0)
++            .getContainerPort() : null;// to support
++        // multi port
++        // later
++        break;
++      case "hostPort":
++        result = container.getPorts().size() > 0 ? container.getPorts().get(0)
++            .getHostPort() : null;// to support multi
++        // port later
++        break;
++      case "containerMount":
++        result = container.getMounts().size() > 0 ? container.getMounts()
++            .get(0).getContainerMount() : null;// to support
++        // multi port
++        // later
++        break;
++      case "hostMount":
++        result = container.getMounts().size() > 0 ? container.getMounts()
++            .get(0).getHostMount() : null;// to support multi
++        // port later
++        break;
++      case "additionalParam":
++        result = container.getAdditionalParam();// to support multi port later
++        break;
++      default:
++        break;
++      }
++    }
++    log.debug("Docker- component: {} configName: {} value: {}", componentName, configName, result);
++    return result;
++  }
++
++  @VisibleForTesting
+   protected void addGetConfigCommand(String componentName, String containerId, HeartBeatResponse response)
+       throws SliderException {
+     assert getAmState().isApplicationLive();
+@@ -2060,10 +2470,10 @@ public class AgentProviderService extends AbstractProviderService implements
+     Map<String, Map<String, String>> configurations = buildCommandConfigurations(appConf, containerId, componentName);
+     cmd.setConfigurations(configurations);
+ 
+-    if(SliderUtils.isSet(scriptPath)) {
++    if (SliderUtils.isSet(scriptPath)) {
+       cmd.setCommandParams(commandParametersSet(scriptPath, timeout, true));
+     } else {
+-      if(startCommand == null) {
++      if (startCommand == null) {
+         throw new SliderException("Expected START command not found for component " + componentName);
+       }
+       cmd.setCommandParams(commandParametersSet(startCommand, timeout, true));
+@@ -2097,10 +2507,10 @@ public class AgentProviderService extends AbstractProviderService implements
+     cmdStop.getRoleParams().put("auto_restart",
+                                 Boolean.toString(isMarkedAutoRestart));
+ 
+-    if(SliderUtils.isSet(scriptPath)) {
++    if (SliderUtils.isSet(scriptPath)) {
+       cmdStop.setCommandParams(commandParametersSet(scriptPath, timeout, true));
+     } else {
+-      if(stopCommand == null) {
++      if (stopCommand == null) {
+         stopCommand = ComponentCommand.getDefaultComponentCommand("STOP");
+       }
+       cmd.setCommandParams(commandParametersSet(stopCommand, timeout, true));
+@@ -2384,10 +2794,10 @@ public class AgentProviderService extends AbstractProviderService implements
+     config.put("app_container_tag", tags.getTag(roleName, containerId));
+ 
+     // add optional parameters only if they are not already provided
+-    if(!config.containsKey("pid_file")) {
++    if (!config.containsKey("pid_file")) {
+       config.put("pid_file", "${AGENT_WORK_ROOT}/app/run/component.pid");
+     }
+-    if(!config.containsKey("app_root")) {
++    if (!config.containsKey("app_root")) {
+       config.put("app_root", "${AGENT_WORK_ROOT}/app/install");
+     }
+   }
+diff --git a/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/AbstractComponent.java b/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/AbstractComponent.java
+index be3a26c..1b63b58 100644
+--- a/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/AbstractComponent.java
++++ b/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/AbstractComponent.java
+@@ -27,6 +27,7 @@ import org.codehaus.jackson.annotate.JsonProperty;
+ public abstract class AbstractComponent implements Validate {
+   public static final String TYPE_STANDARD = "STANDARD";
+   public static final String TYPE_DOCKER = "DOCKER";
++  public static final String TYPE_PYTHON = "PYTHON";
+   public static final String CATEGORY_MASTER = "MASTER";
+   public static final String CATEGORY_SLAVE = "SLAVE";
+   public static final String CATEGORY_CLIENT = "CLIENT";
+diff --git a/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/Component.java b/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/Component.java
+index 609ffa1..7099448 100644
+--- a/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/Component.java
++++ b/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/Component.java
+@@ -19,7 +19,7 @@ package org.apache.slider.providers.agent.application.metadata;
+ import org.apache.slider.common.tools.SliderUtils;
+ import org.apache.slider.core.exceptions.BadConfigException;
+ import org.apache.slider.core.exceptions.SliderException;
+-
++import org.codehaus.jackson.annotate.JsonProperty;
+ import java.util.ArrayList;
+ import java.util.List;
+ 
+@@ -37,7 +37,8 @@ public class Component extends AbstractComponent {
+   String compExports;
+   String type = TYPE_STANDARD;
+   List<ComponentExport> componentExports = new ArrayList<>();
+-
++  List<DockerContainer> dockerContainers = new ArrayList<>();
++  
+   public Component() {
+   }
+ 
+@@ -92,7 +93,12 @@ public class Component extends AbstractComponent {
+   public String getMinInstanceCount() {
+     return minInstanceCount;
+   }
+-
++  
++  @JsonProperty("dockerContainers")
++  public List<DockerContainer> getDockerContainers() {
++     return this.dockerContainers;
++  }
++  
+   public Boolean getAutoStartOnFailureBoolean() {
+     if (SliderUtils.isUnset(getAutoStartOnFailure())) {
+       return Boolean.FALSE;
+diff --git a/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/DockerContainer.java b/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/DockerContainer.java
+new file mode 100644
+index 0000000..ecd0166
+--- /dev/null
++++ b/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/DockerContainer.java
+@@ -0,0 +1,132 @@
++/*
++ * Licensed to the Apache Software Foundation (ASF) under one
++ *  or more contributor license agreements.  See the NOTICE file
++ *  distributed with this work for additional information
++ *  regarding copyright ownership.  The ASF licenses this file
++ *  to you under the Apache License, Version 2.0 (the
++ *  "License"); you may not use this file except in compliance
++ *  with the License.  You may obtain a copy of the License at
++ *
++ *       http://www.apache.org/licenses/LICENSE-2.0
++ *
++ *  Unless required by applicable law or agreed to in writing, software
++ *  distributed under the License is distributed on an "AS IS" BASIS,
++ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ *  See the License for the specific language governing permissions and
++ *  limitations under the License.
++ */
++
++package org.apache.slider.providers.agent.application.metadata;
++
++import org.apache.slider.core.exceptions.SliderException;
++import org.codehaus.jackson.annotate.JsonProperty;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++
++import java.util.ArrayList;
++import java.util.List;
++
++/**
++ * Represents a docker container
++ */
++public class DockerContainer implements Validate {
++  protected static final Logger
++      log = LoggerFactory.getLogger(DockerContainer.class);
++
++  private String name;
++  private String image;
++  private String options;
++  private List<DockerContainerMount> mounts = new ArrayList<>();
++  private List<DockerContainerPort> ports = new ArrayList<>();
++  private String statusCommand;
++  private String commandPath;
++  private String additionalParam;
++  private List<DockerContainerInputFile> inputFiles = new ArrayList<>();
++
++  public DockerContainer() {
++  }
++
++  @JsonProperty("mounts")
++  public List<DockerContainerMount> getMounts() { return this.mounts; }
++
++  @JsonProperty("ports")
++  public List<DockerContainerPort> getPorts() {
++    return this.ports;
++  }
++
++  @JsonProperty("inputFiles")
++  public List<DockerContainerInputFile> getInputFiles() {
++    return this.inputFiles;
++  }
++
++  public String getName() {
++    return name;
++  }
++
++  public void setName(String name) {
++    this.name = name;
++  }
++
++  public String getImage() {
++    return image;
++  }
++
++  public void setImage(String image) {
++    this.image = image;
++  }
++
++  public String getOptions() {
++    return options;
++  }
++
++  public void setOptions(String options) {
++    this.options = options;
++  }
++
++  @Override
++  public void validate(String version) throws SliderException {
++    Metainfo.checkNonNull(getName(), "name", "dockerContainer");
++    Metainfo.checkNonNull(getImage(), "image", "dockerContainer");
++    for (DockerContainerMount dcm : getMounts()) {
++      dcm.validate(version);
++    }
++    for (DockerContainerPort dcp : getPorts()) {
++      dcp.validate(version);
++    }
++  }
++
++  public String getStatusCommand() {
++    return statusCommand;
++  }
++
++  public void setStatusCommand(String statusCommand) {
++    this.statusCommand = statusCommand;
++  }
++
++  public String getCommandPath() {
++    return commandPath;
++  }
++
++  public void setCommandPath(String commandPath) {
++    this.commandPath = commandPath;
++  }
++
++  public String getAdditionalParam() {
++    return additionalParam;
++  }
++
++  public void setAdditionalParam(String additionalParam) {
++    this.additionalParam = additionalParam;
++  }
++
++  @Override
++  public String toString() {
++    StringBuilder result = new StringBuilder("DockerContainer [name=")
++              .append(name).append(", image=").append(image).append(", options=")
++              .append(options).append(", mounts=").append(mounts).append(", ports=")
++              .append(ports).append(", statusCommand=").append(statusCommand)
++              .append(", commandPath=").append(commandPath).append(", additionalParam=")
++              .append(additionalParam).append(", inputFiles=").append(inputFiles).append("]");
++    return result.toString();
++  }
++}
+\ No newline at end of file
+diff --git a/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/DockerContainerInputFile.java b/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/DockerContainerInputFile.java
+new file mode 100644
+index 0000000..fa6eacb
+--- /dev/null
++++ b/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/DockerContainerInputFile.java
+@@ -0,0 +1,32 @@
++package org.apache.slider.providers.agent.application.metadata;
++
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++
++public class DockerContainerInputFile {
++  protected static final Logger log = LoggerFactory
++      .getLogger(DockerContainerInputFile.class);
++
++  private String containerPath;
++  private String fileLocalPath;
++
++  public DockerContainerInputFile() {
++  }
++
++  public String getContainerMount() {
++    return containerPath;
++  }
++
++  public void setContainerMount(String containerMount) {
++    this.containerPath = containerMount;
++  }
++
++  public String getFileLocalPath() {
++    return fileLocalPath;
++  }
++
++  public void setFileLocalPath(String fileLocalPath) {
++    this.fileLocalPath = fileLocalPath;
++  }
++
++}
+\ No newline at end of file
+diff --git a/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/DockerContainerMount.java b/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/DockerContainerMount.java
+new file mode 100644
+index 0000000..61f07f4
+--- /dev/null
++++ b/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/DockerContainerMount.java
+@@ -0,0 +1,60 @@
++/*
++ * Licensed to the Apache Software Foundation (ASF) under one
++ *  or more contributor license agreements.  See the NOTICE file
++ *  distributed with this work for additional information
++ *  regarding copyright ownership.  The ASF licenses this file
++ *  to you under the Apache License, Version 2.0 (the
++ *  "License"); you may not use this file except in compliance
++ *  with the License.  You may obtain a copy of the License at
++ *
++ *       http://www.apache.org/licenses/LICENSE-2.0
++ *
++ *  Unless required by applicable law or agreed to in writing, software
++ *  distributed under the License is distributed on an "AS IS" BASIS,
++ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ *  See the License for the specific language governing permissions and
++ *  limitations under the License.
++ */
++
++package org.apache.slider.providers.agent.application.metadata;
++
++import org.apache.slider.core.exceptions.SliderException;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++
++/**
++ * Represents a docker container mount
++ */
++public class DockerContainerMount implements Validate {
++  protected static final Logger
++      log = LoggerFactory.getLogger(DockerContainerMount.class);
++
++
++  private String containerMount;
++  private String hostMount;
++
++  public DockerContainerMount() {
++  }
++
++  public String getContainerMount() {
++    return containerMount;
++  }
++
++  public void setContainerMount(String containerMount) {
++    this.containerMount = containerMount;
++  }
++
++  public String getHostMount() {
++    return hostMount;
++  }
++
++  public void setHostMount(String hostMount) {
++    this.hostMount = hostMount;
++  }
++
++  @Override
++  public void validate(String version) throws SliderException {
++    Metainfo.checkNonNull(getContainerMount(), "containerMount", "dockerContainerMount");
++    Metainfo.checkNonNull(getHostMount(), "hostMount", "dockerContainerMount");
++  }
++}
+\ No newline at end of file
+diff --git a/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/DockerContainerPort.java b/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/DockerContainerPort.java
+new file mode 100644
+index 0000000..0629d9d
+--- /dev/null
++++ b/slider-core/src/main/java/org/apache/slider/providers/agent/application/metadata/DockerContainerPort.java
+@@ -0,0 +1,66 @@
++/*
++ * Licensed to the Apache Software Foundation (ASF) under one
++ *  or more contributor license agreements.  See the NOTICE file
++ *  distributed with this work for additional information
++ *  regarding copyright ownership.  The ASF licenses this file
++ *  to you under the Apache License, Version 2.0 (the
++ *  "License"); you may not use this file except in compliance
++ *  with the License.  You may obtain a copy of the License at
++ *
++ *       http://www.apache.org/licenses/LICENSE-2.0
++ *
++ *  Unless required by applicable law or agreed to in writing, software
++ *  distributed under the License is distributed on an "AS IS" BASIS,
++ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ *  See the License for the specific language governing permissions and
++ *  limitations under the License.
++ */
++
++package org.apache.slider.providers.agent.application.metadata;
++
++import org.apache.slider.core.exceptions.SliderException;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++
++/**
++ * Represents a docker container port
++ */
++public class DockerContainerPort implements Validate {
++  protected static final Logger
++      log = LoggerFactory.getLogger(DockerContainerPort.class);
++
++
++  private String containerPort;
++  private String hostPort;
++
++  public DockerContainerPort() {
++  }
++
++  public String getContainerPort() {
++    return containerPort;
++  }
++
++  public void setContainerPort(String containerPort) {
++    this.containerPort = containerPort;
++  }
++
++  public String getHostPort() {
++    return hostPort;
++  }
++
++  public void setHostPort(String hostPort) {
++    this.hostPort = hostPort;
++  }
++
++  @Override
++  public void validate(String version) throws SliderException {
++    Metainfo.checkNonNull(getContainerPort(), "containerPort", "dockerContainerPort");
++    Metainfo.checkNonNull(getHostPort(), "hostPort", "dockerContainerPort");
++  }
++
++  @Override
++  public String toString() {
++    return "DockerContainerPort [containerPort=" + containerPort
++         + ", hostPort=" + hostPort + "]";
++  }
++}
+\ No newline at end of file
+diff --git a/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/ExecutionCommand.java b/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/ExecutionCommand.java
+index d8a4dbc..e852902 100644
+--- a/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/ExecutionCommand.java
++++ b/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/ExecutionCommand.java
+@@ -16,13 +16,21 @@
+  */
+ package org.apache.slider.server.appmaster.web.rest.agent;
+ 
++import org.apache.slider.providers.agent.application.metadata.Component;
++import org.apache.slider.providers.agent.application.metadata.DockerContainer;
++import org.apache.slider.providers.agent.application.metadata.DockerContainerInputFile;
++import org.apache.slider.providers.agent.application.metadata.DockerContainerMount;
++import org.apache.slider.providers.agent.application.metadata.DockerContainerPort;
++import org.apache.slider.providers.agent.application.metadata.Metainfo;
+ import org.codehaus.jackson.annotate.JsonIgnoreProperties;
+ import org.codehaus.jackson.annotate.JsonProperty;
+ import org.codehaus.jackson.map.annotate.JsonSerialize;
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
+ 
++import java.util.ArrayList;
+ import java.util.HashMap;
++import java.util.List;
+ import java.util.Map;
+ 
+ /**
+@@ -49,6 +57,7 @@ public class ExecutionCommand {
+   private String serviceName;
+   private String componentName;
+   private String componentType;
++  private List<DockerContainer> containers = new ArrayList<>();
+   private String pkg;
+ 
+   public ExecutionCommand(AgentCommandType commandType) {
+@@ -214,6 +223,11 @@ public class ExecutionCommand {
+     this.componentConfigurations = componentConfigurations;
+   }
+ 
++  @JsonProperty("containers")
++  public List<DockerContainer> getContainers() {
++    return containers;
++  }
++  
+   @Override
+   public String toString() {
+     StringBuilder builder = new StringBuilder();
+@@ -231,4 +245,47 @@ public class ExecutionCommand {
+         .append(pkg).append("]");
+     return builder.toString();
+   }
++  
++  public void addContainerDetails(String componentName, Metainfo metaInfo) {
++    Component component = metaInfo.getApplicationComponent(componentName);
++    this.setComponentType(component.getType());
++    log.info("Adding container details for {}", componentName, " from ",
++        metaInfo.toString());
++    for (DockerContainer metaContainer : component.getDockerContainers()) {
++      DockerContainer container = new DockerContainer();
++      container.setImage(metaContainer.getImage());
++      container.setName(metaContainer.getName());
++      container.setOptions(metaContainer.getOptions());
++      container.setAdditionalParam(metaContainer.getAdditionalParam());
++      container.setCommandPath(metaContainer.getAdditionalParam());
++      container.setStatusCommand(metaContainer.getStatusCommand());
++      if (metaContainer.getMounts().size() > 0) {
++        for (DockerContainerMount metaContMount : metaContainer.getMounts()) {
++          DockerContainerMount contMnt = new DockerContainerMount();
++          contMnt.setContainerMount(metaContMount.getContainerMount());
++          contMnt.setHostMount(metaContMount.getHostMount());
++          container.getMounts().add(contMnt);
++        }
++      }
++      if (metaContainer.getPorts().size() > 0) {
++        for (DockerContainerPort metaCntPort : metaContainer.getPorts()) {
++          DockerContainerPort cntPort = new DockerContainerPort();
++          cntPort.setContainerPort(metaCntPort.getContainerPort());
++          cntPort.setHostPort(metaCntPort.getHostPort());
++          container.getPorts().add(cntPort);
++        }
++      }
++      if (metaContainer.getInputFiles().size() > 0) {
++        for (DockerContainerInputFile metaInpFile : metaContainer
++            .getInputFiles()) {
++          DockerContainerInputFile inpFile = new DockerContainerInputFile();
++          inpFile.setContainerMount(metaInpFile.getContainerMount());
++          inpFile.setFileLocalPath(metaInpFile.getFileLocalPath());
++          container.getInputFiles().add(inpFile);
++        }
++      }
++      log.info("Docker container meta info ready: " + container.toString());
++      this.getContainers().add(container);
++    }
++  }
+ }

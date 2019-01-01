@@ -1,0 +1,174 @@
+diff --git a/slider-agent/src/main/python/agent/DockerManager.py b/slider-agent/src/main/python/agent/DockerManager.py
+index 645622c..696301e 100644
+--- a/slider-agent/src/main/python/agent/DockerManager.py
++++ b/slider-agent/src/main/python/agent/DockerManager.py
+@@ -29,6 +29,7 @@ logger = logging.getLogger()
+ class DockerManager():
+   stored_status_command = ''
+   stored_command = ''
++  container_id = ''
+ 
+   def __init__(self, tmpdir, workroot, customServiceOrchestrator):
+     self.tmpdir = tmpdir
+@@ -47,6 +48,9 @@ class DockerManager():
+     if status_command_str:
+       self.stored_status_command = status_command_str.split(" ")
+     logger.info("status command" + str(self.stored_status_command))
++    if command['hostLevelParams']:
++        if command['hostLevelParams']['container_id']:
++            self.container_id = command['hostLevelParams']['container_id']
+         
+     if command['roleCommand'] == 'INSTALL':
+       returncode, out, err = self.pull_image(command)
+@@ -78,7 +82,13 @@ class DockerManager():
+ 
+   # will evolve into a class hierarch, linux and windows
+   def execute_command_on_linux(self, docker_command):
+-    proc = subprocess.Popen(docker_command, stdout = subprocess.PIPE)
++    #proc = subprocess.Popen(docker_command, stdout = subprocess.PIPE)
++    command_str = ''
++    for itr in docker_command:
++        command_str = command_str + ' ' + itr
++
++    logger.info("command str: " + command_str)
++    proc = subprocess.Popen(command_str, stdout = subprocess.PIPE, shell=True)
+     out, err = proc.communicate()
+     logger.info("docker command output: " + str(out) + " err: " + str(err))
+     return proc.returncode, out, err
+@@ -149,7 +159,8 @@ class DockerManager():
+ 
+   def get_container_id(self, command):
+     # will make this more resilient to changes
+-    return self.tmpdir[-30:-2]
++    logger.info("container id is: " + self.container_id)
++    return self.container_id
+ 
+   def add_resource_restriction(self, docker_command, memory_usage):
+     docker_command.append("-m")
+diff --git a/slider-agent/src/main/python/agent/main.py b/slider-agent/src/main/python/agent/main.py
+index 127ba9d..e6a4790 100644
+--- a/slider-agent/src/main/python/agent/main.py
++++ b/slider-agent/src/main/python/agent/main.py
+@@ -54,6 +54,7 @@ def signal_handler(signum, frame):
+   if os.getpid() != agentPid:
+     os._exit(0)
+   logger.info('signal received, exiting.')
++  global controller
+   if controller is not None:
+     tmpdir = controller.actionQueue.dockerManager.stop_container()
+   ProcessHelper.stopAgent()
+@@ -287,6 +288,7 @@ def main():
+   pass
+ 
+   # Launch Controller communication
++  global controller
+   controller = Controller(agentConfig)
+   controller.start()
+   
+diff --git a/slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java b/slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java
+index 9875861..74917d6 100644
+--- a/slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java
++++ b/slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java
+@@ -977,7 +977,6 @@ public class AgentProviderService extends AbstractProviderService implements
+                               null,
+                               timeout,
+                               isMarkedAutoRestart(roleName));
+-              componentStatus.commandIssued(command);
+             } else {
+               ComponentCommand startCmd = null;
+               for (ComponentCommand compCmd : commands) {
+@@ -992,8 +991,8 @@ public class AgentProviderService extends AbstractProviderService implements
+                 }
+               }
+               addStartCommand(roleName, containerId, response, null, startCmd, stopCmd, timeout, false);
+-              componentStatus.commandIssued(command);
+             }
++            componentStatus.commandIssued(command);
+           } else {
+             log.info("Start of {} on {} delayed as dependencies have not started.", roleName, containerId);
+           }
+@@ -2150,7 +2149,7 @@ public class AgentProviderService extends AbstractProviderService implements
+     String statusCommand = getConfigFromMetaInfoWithAppConfigOverriding(componentName, "statusCommand");
+     if (statusCommand == null) {
+       statusCommand = "docker top "
+-            + containerId.substring(containerId.indexOf("_") + 1)
++            + containerId
+             + " | grep \"\"";// default value
+     }
+     dockerConfig.put("docker.status_command",statusCommand);
+@@ -2186,7 +2185,7 @@ public class AgentProviderService extends AbstractProviderService implements
+     String statusCommand = getConfigFromMetaInfoWithAppConfigOverriding(componentName, "statusCommand");
+     if (statusCommand == null) {
+       statusCommand = "docker top "
+-            + containerId.substring(containerId.indexOf("_") + 1)
++            + containerId
+             + " | grep \"\"";// default value
+     }
+     dockerConfig.put("docker.status_command",statusCommand);
+@@ -2271,9 +2270,9 @@ public class AgentProviderService extends AbstractProviderService implements
+     Map<String, Map<String, String>> componentConfigurations = buildComponentConfigurations(appConf);
+     cmd.setComponentConfigurations(componentConfigurations);
+     
+-    log.info("before resolution: " + appConf.toString());
++    log.debug("before resolution: " + appConf.toString());
+     resolveVariablesForComponentAppConfigs(appConf, componentName, containerId);
+-    log.info("after resolution: " + appConf.toString());
++    log.debug("after resolution: " + appConf.toString());
+ 
+     Map<String, String> dockerConfig = new HashMap<String, String>();
+     dockerConfig.put(
+@@ -2285,7 +2284,11 @@ public class AgentProviderService extends AbstractProviderService implements
+     // options should always have -d
+     String options = getConfigFromMetaInfoWithAppConfigOverriding(
+         componentName, "options");
+-    options = options + " -d";
++    if(options != null && !options.isEmpty()){
++      options = options + " -d";
++    } else {
++      options = "-d";
++    }
+     dockerConfig.put("docker.options", options);
+     // options should always have -d
+     dockerConfig.put(
+@@ -2317,9 +2320,13 @@ public class AgentProviderService extends AbstractProviderService implements
+     String statusCommand = getConfigFromMetaInfoWithAppConfigOverriding(
+         componentName, "statusCommand");
+     if (statusCommand == null) {
++      /*
+       statusCommand = "docker top "
+             + containerId.substring(containerId.indexOf("_") + 1)
+             + " | grep \"\"";// default value
++            */
++      statusCommand = "docker top "
++          + containerId + " | grep \"\"";
+     }
+     dockerConfig.put("docker.status_command",statusCommand);
+     
+@@ -2327,7 +2334,7 @@ public class AgentProviderService extends AbstractProviderService implements
+    // configurations.get("global").put("exec_cmd", startCommand.getExec());
+     cmd.addContainerDetails(componentName, getMetaInfo());
+ 
+-    log.debug("Docker- command: {}", cmd.toString());
++    log.info("Docker- command: {}", cmd.toString());
+ 
+     response.addExecutionCommand(cmd);
+   }
+@@ -2340,6 +2347,9 @@ public class AgentProviderService extends AbstractProviderService implements
+     log.debug("docker- tokens: {}", tokens);
+     
+     MapOperations compConf = appConf.getComponent(componentName);
++    if (compConf == null){
++      return;
++    }
+     for(Entry<String, String> element: compConf.entrySet()){
+       
+       log.debug("docker- key: {} value: {}", element.getKey(), element.getValue());
+@@ -2358,7 +2368,7 @@ public class AgentProviderService extends AbstractProviderService implements
+         // resolving container ids
+         if (valueStr.contains("${CONTAINER_ID}")) {
+           valueStr = valueStr.replace("${CONTAINER_ID}",
+-              containerId.substring(containerId.indexOf("_") + 1));
++              containerId);
+           compConf.put(element.getKey(), valueStr);
+         }
+       }

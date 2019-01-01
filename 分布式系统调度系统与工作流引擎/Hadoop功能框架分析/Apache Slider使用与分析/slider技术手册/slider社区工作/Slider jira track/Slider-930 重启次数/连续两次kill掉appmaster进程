@@ -1,0 +1,37 @@
+连续两次kill掉appmaster进程
+[root@bdi32 tomcat]# slider list
+demo-tomcat                         FAILED  application_1449127000251_0041
+
+
+
+启动后
+13405 SliderAppMaster
+ 
+kill掉进程13405
+[root@bdi32 tomcat]# slider list
+demo-tomcat  
+                     ACCEPTED  application_1449127000251_0042
+自动重启
+14116 SliderAppMaster
+
+间隔2分钟
+kill 掉14116
+15853 SliderAppMaster
+
+间隔5分钟，kill掉15853
+17429 SliderAppMaster
+
+重复数次，SliderAppMaster均正常启动
+
+mvn test -Dtest=TestAppMasterLauncherWithAmReset.java
+
+Results :
+Tests run: 2, Failures: 0, Errors: 0, Skipped: 0
+
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time: 02:38 min
+[INFO] Finished at: 2015-12-12T12:13:49+08:00
+[INFO] Final Memory: 37M/209M
+[INFO] ------------------------------------------------------------------------

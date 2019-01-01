@@ -1,0 +1,723 @@
+
+== Examples
+
+=== Create a simple single-artifact application with most attribute values as defaults
+POST URL - http://host.mycompany.com:8088/services/v1/applications/
+
+==== POST Request JSON
+[source,json]
+----
+{
+  "name": "hello-world",
+  "number_of_containers": 1,
+  "artifact": {
+    "id": "nginx:latest"
+  },
+  "resource": {
+    "cpus": 1,
+    "memory": "2048"
+  },
+  "launch_command": "/start_nginx.sh"
+}
+----
+
+==== GET Response JSON
+GET URL - http://host.mycompany.com:8088/services/v1/applications/hello-world
+
+Note, lifetime value of -1 means unlimited lifetime.
+
+[source,json]
+----
+{
+  "uri": "/services/v1/applications/hello-world",
+  "name": "hello-world",
+  "id": "application_1458061340047_0008",
+  "lifetime": -1,
+  "state": "READY",
+  "number_of_containers": 1,
+  "number_of_running_containers": 1,
+  "launch_time": 1481218155100,
+  "containers": [
+    {
+      "uri": "/services/v1/applications/hello-world/containers/container_e3751_1458061340047_0008_01_000002",
+      "id": "container_e3751_1458061340047_0008_01_000002",
+      "ip": "172.31.42.141",
+      "hostname": "ctr-e3751-1458061340047-0008-01-000002.examplestg.site",
+      "state": "READY",
+      "component_name": "DEFAULT",
+      "bare_host": "cn007.example.com",
+      "launch_time": 1481218156918,
+      "resource": {
+        "cpus": 1,
+        "memory": "2048"
+      }
+    }
+  ]
+}
+----
+
+=== Create a simple single-artifact application
+POST URL - http://host.mycompany.com:8088/services/v1/applications/
+
+Showing overrides of default attribute values. Note, lifetime is in seconds.
+
+==== POST Request JSON
+[source,json]
+----
+{
+  "name": "hello-world",
+  "lifetime": 3600,
+  "number_of_containers": 3,
+  "artifact": {
+    "id": "nginx:latest",
+    "type": "DOCKER"
+  },
+  "launch_command": "/start_nginx.sh",
+  "readiness_check": {
+    "uri": "${APP_NAME}-${APP_COMPONENT_NAME}-${COMPONENT_ID}.examplestg.site",
+    "artifact": {
+      "id": "readiness-check/nginx:latest",
+      "type": "DOCKER"
+    }
+  },
+  "resource": {
+    "cpus": 2,
+    "memory": "16384"
+  }
+}
+----
+
+==== GET Response JSON
+GET URL - http://host.mycompany.com:8088/services/v1/applications/hello-world-2
+
+[source,json]
+----
+{
+  "uri": "/services/v1/applications/hello-world-2",
+  "name": "hello-world-2",
+  "id": "application_1458061340047_0009",
+  "lifetime": 3600,
+  "state": "READY",
+  "number_of_containers": 3,
+  "number_of_running_containers": 3,
+  "launch_time": 1481218155100,
+  "containers": [
+    {
+      "uri": "/services/v1/applications/hello-world-2/containers/container_e3751_1458061340047_0009_01_000002",
+      "id": "container_e3751_1458061340047_0009_01_000002",
+      "ip": "172.31.42.142",
+      "hostname": "ctr-e3751-1458061340047-0009-01-000002.examplestg.site",
+      "state": "READY",
+      "component_name": "DEFAULT",
+      "bare_host": "cn007.example.com",
+      "launch_time": 1481218156918,
+      "resource": {
+        "cpus": 2,
+        "memory": "16384"
+      }
+    },
+    {
+      "uri": "/services/v1/applications/hello-world-2/containers/container_e3751_1458061340047_0009_01_000003",
+      "id": "container_e3751_1458061340047_0009_01_000003",
+      "ip": "172.31.42.143",
+      "hostname": "ctr-e3751-1458061340047-0009-01-000003.examplestg.site",
+      "state": "READY",
+      "component_name": "DEFAULT",
+      "bare_host": "cn008.example.com",
+      "launch_time": 1481218156918,
+      "resource": {
+        "cpus": 2,
+        "memory": "16384"
+      }
+    },
+    {
+      "uri": "/services/v1/applications/hello-world-2/containers/container_e3751_1458061340047_0009_01_000004",
+      "id": "container_e3751_1458061340047_0009_01_000004",
+      "ip": "172.31.42.144",
+      "hostname": "ctr-e3751-1458061340047-0009-01-000004.examplestg.site",
+      "state": "READY",
+      "component_name": "DEFAULT",
+      "bare_host": "cn009.example.com",
+      "launch_time": 1481218156918,
+      "resource": {
+        "cpus": 2,
+        "memory": "16384"
+      }
+    }
+  ]
+}
+----
+
+=== Create HBase
+POST URL - http://host.mycompany.com:8088/services/v1/applications/
+
+==== POST Request JSON
+
+[source,json]
+----
+{
+  "name": "hbase-dept1",
+  "lifetime": 86400,
+  "configurations": {
+    "properties": {
+      "app_version": "${hbase.version}",
+      "app_root": "${AGENT_WORK_ROOT}/app/install/hbase-${hbase.version}",
+      "metric_collector_host": "${NN_HOST}",
+      "metric_collector_port": "6188",
+      "metric_collector_lib": "",
+      "hbase_instance_name": "instancename",
+      "hbase_root_password": "secret",
+      "user_group": "hadoop",
+      "monitor_protocol": "http",
+      "hbase_thrift_port": "${HBASE_THRIFT.ALLOCATED_PORT}",
+      "hbase_thrift2_port": "${HBASE_THRIFT2.ALLOCATED_PORT}",
+      "hbase_rest_port": "${HBASE_REST.ALLOCATED_PORT}"          
+    },
+    "env": {
+      "hbase_master_heapsize": "1024m",
+      "hbase_regionserver_heapsize": "1024m"
+    },
+    "files": [
+      {
+        "type": "HADOOP_XML",
+        "dest_file": "/etc/hadoop/conf/hbase-site.xml",
+        "props": {
+          "hbase.rootdir": "${DEFAULT_DATA_DIR}/data",
+          "hbase.superuser": "${USER_NAME}",
+          "hbase.tmp.dir": "${AGENT_WORK_ROOT}/work/app/tmp",
+          "hbase.local.dir": "${hbase.tmp.dir}/local",
+          "hbase.zookeeper.quorum": "${ZK_HOST}",
+          "zookeeper.znode.parent": "${DEFAULT_ZK_PATH}",
+          "hbase.regionserver.info.port": "0",
+          "hbase.bulkload.staging.dir": "/user/${USER_NAME}/hbase-staging",
+          "hbase.coprocessor.region.classes": "org.apache.hadoop.hbase.security.access.SecureBulkLoadEndpoint",
+          "hbase.master.info.port": "${HBASE_MASTER.ALLOCATED_PORT}",
+          "hbase.regionserver.port": "0",
+          "hbase.master.port": "0"
+        }
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "HBASE_MASTER",
+      "dependencies": [  ],
+      "readiness_check": {
+        "type": "HTTP",
+        "uri": "hmaster.${APP_NAME}-${APP_COMPONENT_NAME}.root.examplestg.site",
+        "artifact": {
+          "id": "readiness-check/hbase-master:latest",
+          "type": "DOCKER"
+        }
+      },
+      "number_of_containers": 1,
+      "artifact": {
+        "id": "hbase:latest",
+        "type": "DOCKER"
+      },
+      "launch_command": "/hbase_master.py",
+      "resource": {
+        "profile": "xlarge"
+      }
+    },
+    {
+      "name": "HBASE_REGIONSERVER",
+      "dependencies": [ "hbase_master" ],
+      "readiness_check": {
+        "type": "HTTP",
+        "uri": "hregion${COMPONENT_ID}.${APP_NAME}-${APP_COMPONENT_NAME}.root.examplestg.site",
+        "artifact": {
+          "id": "readiness-check/hbase-region:latest",
+          "type": "DOCKER"
+        }
+      },
+      "number_of_containers": 2,
+      "artifact": {
+        "id": "hbase:latest",
+        "type": "DOCKER"
+      },
+      "launch_command": "/hbase_region.py",
+      "resource": {
+        "profile": "medium"
+      },
+      "placement_policy": { 
+        "label": "anti_affinity"
+      }
+    },
+    {
+      "name": "HBASE_DATA_MONITOR",
+      "dependencies": [  ],
+      "readiness_check": {
+        "type": "HTTP",
+        "uri": "hbase_mon.${APP_NAME}-${APP_COMPONENT_NAME}.root.examplestg.site",
+        "artifact": {
+          "id": "readiness-check/hbase-mon:latest",
+          "type": "DOCKER"
+        }
+      },
+      "number_of_containers": 1,
+      "artifact": {
+        "id": "hbase-data-monitor:latest",
+        "type": "DOCKER"
+      },
+      "launch_command": "/hbase_data_monitor_start.sh > /tmp/hbase_data_monitor.log 2>&1",
+      "configurations": {
+        "env": {
+          "DATA_DIR": "${DEFAULT_DATA_DIR}"
+        }
+      },
+      "resource": {
+        "cpus": 1,
+        "memory": "4096"
+      }
+    }
+  ]
+}
+----
+
+==== GET Response JSON
+GET URL - http://host.mycompany.com:8088/services/v1/applications/hbase-dept1
+
+[source,json]
+----
+{
+  "uri": "/services/v1/applications/hbase-dept1",
+  "name": "hbase-dept1",
+  "id": "application_1458061340047_0010",
+  "lifetime": 86400,
+  "state": "READY",
+  "number_of_containers": 4,
+  "number_of_running_containers": 4,
+  "launch_time": 1481218155100,
+  "containers": [
+    {
+      "uri": "/services/v1/applications/hbase-dept1/containers/container_e3751_1458061340047_0010_01_000002",
+      "id": "container_e3751_1458061340047_0010_01_000002",
+      "launch_time": 1481218156918,
+      "ip": "172.31.42.145",
+      "hostname": "ctr-e3751-1458061340047-0010-01-000002.examplestg.site",
+      "state": "READY",
+      "component_name": "HBASE_MASTER",
+      "bare_host": "cn007.example.com",
+      "resource": {
+        "cpus": 4,
+        "memory": "16384"
+      }
+    },
+    {
+      "uri": "/services/v1/applications/hbase-dept1/containers/container_e3751_1458061340047_0010_01_000003",
+      "id": "container_e3751_1458061340047_0010_01_000003",
+      "launch_time": 1481218156918,
+      "ip": "172.31.42.146",
+      "hostname": "ctr-e3751-1458061340047-0010-01-000003.examplestg.site",
+      "state": "READY",
+      "component_name": "HBASE_REGIONSERVER",
+      "bare_host": "cn008.example.com",
+      "resource": {
+        "cpus": 2,
+        "memory": "8192"
+      }
+    },
+    {
+      "uri": "/services/v1/applications/hbase-dept1/containers/container_e3751_1458061340047_0010_01_000004",
+      "id": "container_e3751_1458061340047_0010_01_000004",
+      "launch_time": 1481218156918,
+      "ip": "172.31.42.147",
+      "hostname": "ctr-e3751-1458061340047-0010-01-000004.examplestg.site",
+      "state": "READY",
+      "component_name": "HBASE_REGIONSERVER",
+      "bare_host": "cn009.example.com",
+      "resource": {
+        "cpus": 2,
+        "memory": "8192"
+      }
+    },
+    {
+      "uri": "/services/v1/applications/hbase-dept1/containers/container_e3751_1458061340047_0010_01_000005",
+      "id": "container_e3751_1458061340047_0010_01_000005",
+      "launch_time": 1481218156918,
+      "ip": "172.31.42.148",
+      "hostname": "ctr-e3751-1458061340047-0010-01-000005.examplestg.site",
+      "state": "READY",
+      "component_name": "HBASE_DATA_MONITOR",
+      "bare_host": "cn005.example.com",
+      "resource": {
+        "cpus": 1,
+        "memory": "4096"
+      }
+    }
+  ]
+}
+----
+
+=== Create a complex business application with multiple components
+POST URL - http://host.mycompany.com:8088/services/v1/applications/
+
+Showing override of attribute values at the global level by values at the component level. Not specifying a lifetime value means unlimited lifetime.
+
+==== POST Request JSON
+[source,json]
+----
+{
+  "name": "logsearch4",
+  "resource": {
+    "cpus": 2,
+    "memory": "8192"
+  },
+  "components": [
+    {
+      "name": "ZK",
+      "dependencies": [  ],
+      "readiness_check": {
+        "type": "HTTP",
+        "uri": "zk${COMPONENT_ID}.${APP_NAME}-${APP_COMPONENT_NAME}.root.examplestg.site",
+        "artifact": {
+          "id": "readiness-check/zookeeper:latest",
+          "type": "DOCKER"
+        }
+      },
+      "number_of_containers": 3,
+      "artifact": {
+        "id": "zookeeper:latest"
+      },
+      "launch_command": "/wait_for_hosts.sh zk1.${APP_NAME}-${APP_COMPONENT_NAME}.root.examplestg.site zk2.${APP_NAME}-${APP_COMPONENT_NAME}.root.examplestg.site zk3.${APP_NAME}-${APP_COMPONENT_NAME}.root.examplestg.site; JVMFLAGS=-Djava.net.preferIPv4Stack=true /opt/zookeeper/bin/zkServer.sh start-foreground > /tmp/zoo.log 2>/tmp/zoo.err",
+      "configurations": {
+        "properties": {
+          "dataDir": "/grid/0/hadoop/yarn/local/usercache/${USER}/${CLUSTER_NAME}/${COMPONENT_NAME}",
+          "component.unique.names": "true"
+        },
+        "files": [
+          {
+            "type": "PROPERTIES",
+            "dest_file": "${dataDir}/myid",
+            "props": {
+              "content": "${COMPONENT_ID}"
+            }
+          },
+          {
+            "type": "PROPERTIES",
+            "dest_file": "/opt/zookeeper/conf/zoo.cfg",
+            "props": {
+              "tickTime": "2000",
+              "initLimit": "10",
+              "syncLimit": "5",
+              "dataDir": "${dataDir}",
+              "clientPort": "2181",
+              "maxClientCnxns": "100",
+              "server.1": "zk1.${CLUSTER_NAME}.${USER}.examplestg.site:2888:3888",
+              "server.2": "zk2.${CLUSTER_NAME}.${USER}.examplestg.site:2888:3888",
+              "server.3": "zk3.${CLUSTER_NAME}.${USER}.examplestg.site:2888:3888"
+            }
+          }
+        ]
+      },
+      "resource": {
+        "cpus": 2,
+        "memory": "8096"
+      },
+      "placement_policy": { 
+        "label": "anti_affinity"
+      }
+    },
+    {
+      "name": "SOLR",
+      "dependencies": [ "ZK" ],
+      "readiness_check": {
+        "type": "HTTP",
+        "uri": "solr${COMPONENT_ID}.${APP_NAME}-${APP_COMPONENT_NAME}.root.examplestg.site",
+        "artifact": {
+          "id": "readiness-check/solr:latest",
+          "type": "DOCKER"
+        }
+      },
+      "number_of_containers": 2,
+      "artifact": {
+        "id": "solr:latest",
+        "type": "DOCKER"
+      },
+      "launch_command": "/solr_start_hdfs.sh -cloud -f -p $SOLR_PORT -m $SOLR_MEMORY -z ${ZK_HOST}$ZK_PATH -Dsolr.directoryFactory=HdfsDirectoryFactory -Dsolr.lock.type=none -Dsolr.hdfs.confdir=/etc/hadoop/conf -Dsolr.hdfs.home=$DATA_DIR -Djava.net.preferIPv4Stack=true > /tmp/solr.log 2>&1",
+      "configurations": {
+        "properties": {
+          "create.default.zookeeper.node": "true",
+          "component.unique.names": "true"
+        },
+        "env": {
+          "SOLR_PORT": "8983",
+          "SOLR_MEMORY": "8192m",
+          "ZK_HOST": "zk1.${APP_NAME}-zk.root.examplestg.site,zk2.${APP_NAME}-zk.root.examplestg.site,zk3.${APP_NAME}-zk.root.examplestg.site",
+          "ZK_PATH": "/solr-hdfs",
+          "DATA_DIR": "${DEFAULT_DATA_DIR}"
+        }
+      },
+      "resource": {
+        "cpus": 2,
+        "memory": "8192"
+      },
+      "placement_policy": {
+        "label": "strict"
+      }
+    },
+    {
+      "name": "UI",
+      "dependencies": [ "SOLR" ],
+      "readiness_check": {
+        "type": "HTTP",
+        "uri": "ui.${APP_NAME}-${APP_COMPONENT_NAME}.root.examplestg.site",
+        "artifact": {
+          "id": "readiness-check/ui:latest",
+          "type": "DOCKER"
+        }
+      },
+      "number_of_containers": 1,
+      "artifact": {
+        "id": "logsearch-portal:latest"
+      },
+      "launch_command": "/init_and_run_hdfs.sh",
+      "configurations": {
+        "properties": {
+          "logsearch-portal-site.destDir": "/logsearch-portal/classes"
+        },
+        "env": {
+          "NUM_SHARDS": "2",
+          "ZK_HOST": "zk1.${APP_NAME}-zk.root.examplestg.site,zk2.${APP_NAME}-zk.root.examplestg.site,zk3.${APP_NAME}-zk.root.examplestg.site",
+          "ZK_PATH": "/solr-hdfs",
+          "SOLR_SERVER": "solr1.${APP_NAME}-solr.root.examplestg.site",
+          "SOLR_PORT": "8983",
+          "PID_FILE": "/logsearch-portal/logsearch-portal.pid",
+          "LOGFILE": "/logsearch-portal/logsearch-portal.log",
+          "LOGSEARCH_JAVA_MEM": "-Xmx512M",
+          "LOGSEARCH_JAVA_OPTS": "-Djava.net.preferIPv4Stack=true"
+        },
+        "files": [
+          {
+            "type": "PROPERTIES",
+            "dest_file": "/etc/system.properties",
+            "props": {
+              "solr.zkhosts": "{ZK_HOST}{ZK_PATH}",
+              "auditlog.solr.zkhosts": "{ZK_HOST}{ZK_PATH}"
+            }
+          }
+        ]
+      },
+      "resource": {
+        "profile": "small"
+      }
+    },
+    {
+      "name": "SOLR_DATA_MONITOR",
+      "dependencies": [ "SOLR" ],
+      "readiness_check": {
+        "type": "HTTP",
+        "uri": "solr_mon.${APP_NAME}-${APP_COMPONENT_NAME}.root.examplestg.site",
+        "artifact": {
+          "id": "readiness-check/data-mon:latest",
+          "type": "DOCKER"
+        }
+      },
+      "number_of_containers": 1,
+      "artifact": {
+        "id": "solr-data-monitor:latest"
+      },
+      "launch_command": "/solr_data_monitor_start.sh > /tmp/solr_data_monitor.log 2>&1",
+      "configurations": {
+        "env": {
+          "DATA_DIR": "${DEFAULT_DATA_DIR}"
+        }
+      },
+      "resource": {
+        "cpus": 2,
+        "memory": "4096"
+      }
+    }
+  ]
+}
+----
+
+==== GET Response JSON
+GET URL - http://host.mycompany.com:8088/services/v1/applications/logsearch4
+
+[source,json]
+----
+{
+  "uri": "/services/v1/applications/logsearch4",
+  "name": "logsearch4",
+  "id": "application_1458061340047_0011",
+  "lifetime": -1,
+  "state": "READY",
+  "number_of_containers": 7,
+  "number_of_running_containers": 7,
+  "launch_time": 1481218155100,
+  "containers": [
+    {
+      "uri": "/services/v1/applications/logsearch4/containers/container_e3751_1458061340047_0011_01_000002",
+      "id": "container_e3751_1458061340047_0011_01_000002",
+      "launch_time": 1481218156918,
+      "ip": "172.31.42.149",
+      "hostname": "ctr-e3751-1458061340047-0011-01-000002.examplestg.site",
+      "state": "READY",
+      "component_name": "ZK",
+      "bare_host": "cn008.example.com",
+      "resource": {
+        "cpus": 2,
+        "memory": "8192"
+      }
+    },
+    {
+      "uri": "/services/v1/applications/logsearch4/containers/container_e3751_1458061340047_0011_01_000003",
+      "id": "container_e3751_1458061340047_0011_01_000003",
+      "launch_time": 1481218156918,
+      "ip": "172.31.42.150",
+      "hostname": "ctr-e3751-1458061340047-0011-01-000003.examplestg.site",
+      "state": "READY",
+      "component_name": "ZK",
+      "bare_host": "cn005.example.com",
+      "resource": {
+        "cpus": 2,
+        "memory": "8192"
+      }
+    },
+    {
+      "uri": "/services/v1/applications/logsearch4/containers/container_e3751_1458061340047_0011_01_000004",
+      "id": "container_e3751_1458061340047_0011_01_000004",
+      "launch_time": 1481218156918,
+      "ip": "172.31.42.151",
+      "hostname": "ctr-e3751-1458061340047-0011-01-000004.examplestg.site",
+      "state": "READY",
+      "component_name": "ZK",
+      "bare_host": "cn007.example.com",
+      "resource": {
+        "cpus": 2,
+        "memory": "8192"
+      }
+    },
+    {
+      "uri": "/services/v1/applications/logsearch4/containers/container_e3751_1458061340047_0011_01_000005",
+      "id": "container_e3751_1458061340047_0011_01_000005",
+      "launch_time": 1481218156918,
+      "ip": "172.31.42.152",
+      "hostname": "ctr-e3751-1458061340047-0011-01-000005.examplestg.site",
+      "state": "READY",
+      "component_name": "SOLR",
+      "bare_host": "cn008.example.com",
+      "resource": {
+        "cpus": 2,
+        "memory": "8192"
+      }
+    },
+    {
+      "uri": "/services/v1/applications/logsearch4/containers/container_e3751_1458061340047_0011_01_000006",
+      "id": "container_e3751_1458061340047_0011_01_000006",
+      "launch_time": 1481218156918,
+      "ip": "172.31.42.153",
+      "hostname": "ctr-e3751-1458061340047-0011-01-000006.examplestg.site",
+      "state": "READY",
+      "component_name": "SOLR",
+      "bare_host": "cn005.example.com",
+      "resource": {
+        "cpus": 2,
+        "memory": "8192"
+      }
+    },
+    {
+      "uri": "/services/v1/applications/logsearch4/containers/container_e3751_1458061340047_0011_01_000007",
+      "id": "container_e3751_1458061340047_0011_01_000007",
+      "launch_time": 1481218156918,
+      "ip": "172.31.42.154",
+      "hostname": "ctr-e3751-1458061340047-0011-01-000007.examplestg.site",
+      "state": "READY",
+      "component_name": "UI",
+      "bare_host": "cn007.example.com",
+      "resource": {
+        "cpus": 1,
+        "memory": "4096"
+      }
+    },
+    {
+      "uri": "/services/v1/applications/logsearch4/containers/container_e3751_1458061340047_0011_01_000008",
+      "id": "container_e3751_1458061340047_0011_01_000008",
+      "launch_time": 1481218156918,
+      "ip": "172.31.42.155",
+      "hostname": "ctr-e3751-1458061340047-0011-01-000008.examplestg.site",
+      "state": "READY",
+      "component_name": "SOLR_DATA_MONITOR",
+      "bare_host": "cn009.example.com",
+      "resource": {
+        "cpus": 2,
+        "memory": "4096"
+      }
+    }
+  ]
+}
+----
+
+=== Update to modify the lifetime of an application
+PUT URL - http://host.mycompany.com:8088/services/v1/applications/hbase-dept1
+
+==== PUT Request JSON
+
+Note, irrespective of what the current lifetime value is, this update request will set the lifetime of the application to be 3600 seconds (1 hour) from the time the request is submitted. Hence, if an application has remaining lifetime of 5 mins (say) and would like to extend it to an hour OR if an application has remaining lifetime of 5 hours (say) and would like to reduce it down to an hour, then for both scenarios you need to submit the same request below.
+
+[source,json]
+----
+{
+  "lifetime": 3600
+}
+----
+
+=== Update to flex up/down the no of containers (instances) of components of an application
+PUT URL - http://host.mycompany.com:8088/services/v1/applications/hbase-dept1
+
+==== PUT Request JSON
+[source,json]
+----
+{
+  "components": [
+    {
+      "name": "HBASE_REGIONSERVER",
+      "number_of_containers": "+5"
+    },
+    {
+      "name": "HBASE_REST",
+      "number_of_containers": "-2"
+    }
+  ]
+}
+----
+
+=== Upgrade a specific container of a component of an application to a newer version of an artifact
+PUT URL - http://host.mycompany.com:8088/services/v1/applications/hbase-dept1
+
+Orchestrate a rolling upgrade of an application. One or more currently running containers of a specific component of the application can be upgraded to a newer version. This can be done at once or with sufficient delays between each container upgrade. The API service does not provide any orchestration. It is the responsibility of the application owner to run a series of such PUT requests orchestrating the expected order of the upgrade and to ensure that the application as a whole is up and available to end users during the entire process. The id attribute needs to be provided for each container in the PUT request. TODO: Can a different size of the running container be requested during upgrade? Yes, if YARN-1197 is implemented.
+
+==== PUT Request JSON
+[source,json]
+----
+{
+  "components": [
+    {
+      "id": "container_e3751_1458061340047_0010_01_000003",
+      "name": "HBASE_REGIONSERVER",
+      "readiness_check": {
+        "type": "HTTP",
+        "uri": "hregion${COMPONENT_ID}.${APP_NAME}-${APP_COMPONENT_NAME}.root.examplestg.site",
+        "artifact": {
+          "id": "readiness-check/hbase-region:latest",
+          "type": "DOCKER"
+        }
+      },
+      "artifact": {
+        "id": "hbase:version20160601",
+        "type": "DOCKER"
+      },
+      "launch_command": "/hbase_region_new.py",
+      "resource": {
+        "cpus": 4,
+        "memory": "4096"
+      }
+    }
+  ]
+}
+----
+
+=== Destroy an application
+DELETE URL - http://host.mycompany.com:8088/services/v1/applications/hbase-dept1

@@ -1,0 +1,70 @@
+Index: slider-core/src/main/java/org/apache/slider/server/appmaster/actions/ActionOperateContainers.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/server/appmaster/actions/ActionOperateContainers.java	(revision 0)
++++ slider-core/src/main/java/org/apache/slider/server/appmaster/actions/ActionOperateContainers.java	(revision 0)
+@@ -0,0 +1,65 @@
++package org.apache.slider.server.appmaster.actions;
++
++import org.apache.commons.collections.CollectionUtils;
++import org.apache.slider.server.appmaster.SliderAppMaster;
++import org.apache.slider.server.appmaster.state.AppState;
++
++import java.util.HashSet;
++import java.util.List;
++import java.util.Set;
++
++/**
++ * Created by fys on 8/4/15.
++ */
++public class ActionOperateContainers extends AsyncAction {
++
++  private String message;
++  private String cmdName;
++  private Set<String> containers = new HashSet<>();
++  private Set<String> components = new HashSet<>();
++  private Set<String> parameters = new HashSet<>();
++
++  public ActionOperateContainers(String name,
++                                 String cmdName,
++                                 List<String> containers,
++                                 List<String> components,
++                                 List<String> parameters,
++                                 String message){
++    super(name);
++    this.cmdName = cmdName;
++    this.containers.addAll(containers);
++    this.components.addAll(components);
++    this.parameters.addAll(parameters);
++    this.message = message;
++  }
++
++  @Override
++  public void execute(SliderAppMaster appMaster, QueueAccess queueService,
++                      AppState appState) throws Exception {
++    if(CollectionUtils.isNotEmpty(this.containers)||
++        CollectionUtils.isNotEmpty(this.components)){
++      SliderAppMaster.getLog().info("SliderAppMaster.operateContainers:{}",message);
++      appMaster.onOperateContainers(this);
++    }
++  }
++
++  public String getMessage(){return message;}
++
++  public void setMessage(String message){ this.message = message;}
++
++  public String getCmdName(){ return cmdName;}
++
++  public void setCmdName(String cmdName) { this.cmdName = cmdName;}
++
++  public Set<String> getContainers() { return containers;}
++
++  public void setContainers(Set<String> containers){ this.containers = containers;}
++
++  public Set<String> getComponents(){ return components;}
++
++  public void setComponents(Set<String> components){ this.components = components;}
++
++  public Set<String> getParameters(){ return parameters;}
++
++  public void setParameters(Set<String> parameters){ this.parameters = parameters;}
++}

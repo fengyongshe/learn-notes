@@ -1,0 +1,80 @@
+diff --git a/slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java b/slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java
+index 74eda97..a1e05fb 100644
+--- a/slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java
++++ b/slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java
+@@ -20,6 +20,7 @@ package org.apache.slider.providers.agent;
+ 
+ import com.google.common.annotations.VisibleForTesting;
+ import com.google.common.base.Preconditions;
++
+ import org.apache.commons.io.FileUtils;
+ import org.apache.hadoop.conf.Configuration;
+ import org.apache.hadoop.fs.FSDataOutputStream;
+@@ -1656,11 +1657,21 @@ public class AgentProviderService extends AbstractProviderService implements
+ 
+     Map<String, Map<String, String>> configurations = buildCommandConfigurations(appConf, containerId, componentName);
+     cmd.setConfigurations(configurations);
+-
++    
++    Map<String, Map<String, String>> component_configurations = buildComponentConfigurations(appConf);
++    cmd.setComponentConfigurations(component_configurations);
++    
+     cmd.setCommandParams(setCommandParameters(scriptPath, timeout, false));
+ 
+     cmd.setHostname(getClusterInfoPropertyValue(StatusKeys.INFO_AM_HOSTNAME));
+     response.addExecutionCommand(cmd);
++    
++    log.debug("command looks like: " + cmd.toString());
++  }
++
++  private Map<String, Map<String, String>> buildComponentConfigurations(
++      ConfTreeOperations appConf) {
++    return appConf.getComponents();
+   }
+ 
+   protected static String getPackageListFromApplication(Application application) {
+@@ -1793,11 +1804,15 @@ public class AgentProviderService extends AbstractProviderService implements
+ 
+     cmd.setCommandParams(setCommandParameters(scriptPath, timeout, true));
+ 
++    Map<String, Map<String, String>> component_configurations = buildComponentConfigurations(appConf);
++    cmd.setComponentConfigurations(component_configurations);
++    
+     Map<String, Map<String, String>> configurations = buildCommandConfigurations(appConf, containerId, componentName);
+ 
+     cmd.setConfigurations(configurations);
+     response.addExecutionCommand(cmd);
+-    
++
++    log.debug("command looks like: " + cmd.toString());
+     // With start command, the corresponding command for graceful stop needs to
+     // be sent. This will be used when a particular container is lost as per RM,
+     // but then the agent is still running and heart-beating to the Slider AM.
+diff --git a/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/ExecutionCommand.java b/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/ExecutionCommand.java
+index 5fb3b5e..bfe0eb7 100644
+--- a/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/ExecutionCommand.java
++++ b/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/ExecutionCommand.java
+@@ -43,6 +43,7 @@ public class ExecutionCommand {
+   private Map<String, String> roleParams = null;
+   private String roleCommand;
+   private Map<String, Map<String, String>> configurations;
++  private Map<String, Map<String, String>> componentConfigurations;
+   private Map<String, String> commandParams;
+   private String serviceName;
+   private String componentName;
+@@ -181,6 +182,15 @@ public class ExecutionCommand {
+     this.componentName = componentName;
+   }
+ 
++  public Map<String, Map<String, String>> getComponentConfigurations() {
++    return componentConfigurations;
++  }
++
++  public void setComponentConfigurations(
++      Map<String, Map<String, String>> component_configurations) {
++    this.componentConfigurations = component_configurations;
++  }
++  
+   @Override
+   public String toString() {
+     StringBuilder builder = new StringBuilder();

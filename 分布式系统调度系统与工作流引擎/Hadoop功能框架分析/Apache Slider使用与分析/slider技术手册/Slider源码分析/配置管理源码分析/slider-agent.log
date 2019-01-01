@@ -1,0 +1,180 @@
+INFO 2016-05-03 18:18:49,489 main.py:87 - loglevel=logging.INFO
+INFO 2016-05-03 18:18:49,489 main.py:234 - Security/Keys directory: /data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/infra/run/security
+INFO 2016-05-03 18:18:49,491 main.py:244 - Using AGENT_WORK_ROOT = /data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002
+INFO 2016-05-03 18:18:49,491 main.py:245 - Using AGENT_LOG_ROOT = /data11/hadoop/yarn/log/application_1461811649094_0010/container_1461811649094_0010_01_000002
+INFO 2016-05-03 18:18:49,492 connection.py:573 - Connecting to bditest3.cmss.com:2181
+INFO 2016-05-03 18:18:49,495 client.py:439 - Zookeeper connection established, state: CONNECTED
+INFO 2016-05-03 18:18:49,500 connection.py:540 - Closing connection to bditest3.cmss.com:2181
+INFO 2016-05-03 18:18:49,501 client.py:443 - Zookeeper session lost, state: CLOSED
+INFO 2016-05-03 18:18:49,503 Registry.py:69 - AM Host = bditest1.cmss.com, AM Secured Port = 50155, ping port = 36617
+INFO 2016-05-03 18:18:49,503 main.py:277 - Connecting to the server at: https://bditest1.cmss.com:36617/ws/v1/slider/agents/
+INFO 2016-05-03 18:18:49,503 NetUtil.py:67 - DEBUG: Trying to connect to the server at https://bditest1.cmss.com:36617/ws/v1/slider/agents/
+INFO 2016-05-03 18:18:49,503 NetUtil.py:38 - Connecting to the following url https://bditest1.cmss.com:36617/ws/v1/slider/agents/
+INFO 2016-05-03 18:18:49,987 NetUtil.py:45 - Calling url received 200
+INFO 2016-05-03 18:18:49,990 Controller.py:140 - Registering with the server at https://bditest1.cmss.com:50155/ws/v1/slider/agents/container_1461811649094_0010_01_000002___KAFKA_BROKER/register with data '{"tags": "", "timestamp": 1462270729990, "expectedState": 0, "responseId": -1, "actualState": 0, "logFolders": {}, "agentVersion": "1", "allocatedPorts": {}, "appVersion": null, "publicHostname": "bditest3.cmss.com", "label": "container_1461811649094_0010_01_000002___KAFKA_BROKER"}'
+INFO 2016-05-03 18:18:49,990 security.py:89 - SSL Connect being called.. connecting to the server
+INFO 2016-05-03 18:18:50,158 security.py:51 - SSL connection established. Two-way SSL authentication is turned off on the server.
+INFO 2016-05-03 18:18:50,355 Controller.py:164 - Registered with the server with {u'exitstatus': 0,
+ u'response': u'OK',
+ u'responseId': 0,
+ u'responseStatus': u'OK',
+ u'tags': u'1'}
+INFO 2016-05-03 18:18:50,356 Controller.py:602 - Response from server = OK
+INFO 2016-05-03 18:19:00,366 AgentToggleLogger.py:40 - Queue result: {'componentStatus': [], 'reports': []}
+INFO 2016-05-03 18:19:00,367 AgentToggleLogger.py:40 - Sending heartbeat with response id: 0 and timestamp: 1462270740366. Command(s) in progress: False. Components mapped: False
+INFO 2016-05-03 18:19:00,551 Controller.py:483 - Stored appRoot = ${AGENT_WORK_ROOT}/app/install/kafka_2.10-0.8.2.1
+INFO 2016-05-03 18:19:00,552 Controller.py:484 - Stored appVersion = None
+INFO 2016-05-03 18:19:00,552 AgentToggleLogger.py:40 - Adding EXECUTION_COMMAND for service kafka210 of cluster kafka210 to the queue.
+INFO 2016-05-03 18:19:00,564 ActionQueue.py:134 - Package received: 
+INFO 2016-05-03 18:19:00,564 ActionQueue.py:140 - Executing command with id = 2-1 for role = KAFKA_BROKER of cluster kafka210
+INFO 2016-05-03 18:19:00,568 ActionQueue.py:170 - Running command: {u'componentConfigurations': {u'slider-appmaster': {u'site.global.kafka_version': u'kafka_2.10-0.8.2.1', u'zookeeper.hosts': u'bditest3.cmss.com,bditest2.cmss.com,bditest1.cmss.com', u'site.broker.instance.name': u'kafka210', u'site.global.app_user': u'fys', u'site.fs.defaultFS': u'hdfs://testhbase', u'java_home': u'/usr/jdk64/jdk1.7.0_67', u'site.global.pid_file': u'${AGENT_WORK_ROOT}/app/run/koya.pid', u'env.MALLOC_ARENA_MAX': u'4', u'jvm.heapsize': u'256M', u'site.global.app_install_dir': u'${AGENT_WORK_ROOT}/app/install', u'site.broker.xms_val': u'1024m', u'site.broker.zookeeper': u'bditest1.cmss.com,bditest2.cmss.com,bditest3.cmss.com', u'site.global.hdfs_app_dir': u'/slider/.slider/cluster/kafka210/localstore', u'zookeeper.quorum': u'bditest3.cmss.com:2181,bditest2.cmss.com:2181,bditest1.cmss.com:2181', u'site.broker.xmx_val': u'1024m', u'zookeeper.path': u'/services/slider/users/fys/kafka210', u'system_configs': u'broker', u'site.fs.default.name': u'hdfs://testhbase', u'application.def': u'/slider/.slider/package/KOYA2/slider-kafka-app-package-0.80.0-bc1.3.0.zip', u'site.server.port': u'${KAFKA_BROKER.ALLOCATED_PORT}{PER_CONTAINER}', u'site.global.app_root': u'${AGENT_WORK_ROOT}/app/install/kafka_2.10-0.8.2.1', u'site.global.security_enabled': u'false'}, u'broker': {u'site.global.kafka_version': u'kafka_2.10-0.8.2.1', u'site.broker.xmx_val': u'1024m', u'env.MALLOC_ARENA_MAX': u'4', u'java_home': u'/usr/jdk64/jdk1.7.0_67', u'zookeeper.hosts': u'bditest3.cmss.com,bditest2.cmss.com,bditest1.cmss.com', u'site.global.app_install_dir': u'${AGENT_WORK_ROOT}/app/install', u'system_configs': u'broker', u'site.global.hdfs_app_dir': u'/slider/.slider/cluster/kafka210/localstore', u'site.fs.default.name': u'hdfs://testhbase', u'zookeeper.path': u'/services/slider/users/fys/kafka210', u'site.global.security_enabled': u'false', u'site.global.app_user': u'fys', u'application.def': u'/slider/.slider/package/KOYA2/slider-kafka-app-package-0.80.0-bc1.3.0.zip', u'site.broker.zookeeper': u'bditest1.cmss.com,bditest2.cmss.com,bditest3.cmss.com', u'site.server.port': u'${KAFKA_BROKER.ALLOCATED_PORT}{PER_CONTAINER}', u'zookeeper.quorum': u'bditest3.cmss.com:2181,bditest2.cmss.com:2181,bditest1.cmss.com:2181', u'site.broker.instance.name': u'kafka210', u'site.fs.defaultFS': u'hdfs://testhbase', u'site.global.app_root': u'${AGENT_WORK_ROOT}/app/install/kafka_2.10-0.8.2.1', u'site.broker.xms_val': u'1024m', u'site.global.pid_file': u'${AGENT_WORK_ROOT}/app/run/koya.pid'}}, u'clusterName': u'kafka210', u'componentName': u'KAFKA_BROKER', u'hostname': u'bditest1.cmss.com', u'hostLevelParams': {u'java_home': u'/usr/jdk64/jdk1.7.0_67', u'container_id': u'container_1461811649094_0010_01_000002', u'package_list': u'[{"type":"tarball","name":"files/kafka_2.10-0.8.2.1.tgz"}]'}, u'commandType': u'EXECUTION_COMMAND', u'roleCommand': u'INSTALL', u'serviceName': u'kafka210', u'role': u'KAFKA_BROKER', u'commandParams': {u'record_config': u'false', u'foreground_start': u'false', u'script': u'scripts/kafka.py', u'schema_version': u'2.0', u'service_package_folder': u'${AGENT_WORK_ROOT}/work/app/definition/package', u'command_timeout': u'600', u'script_type': u'PYTHON'}, u'taskId': 2, u'commandId': u'2-1', u'containers': [], u'configurations': {u'global': {u'security_enabled': u'false', u'app_container_id': u'container_1461811649094_0010_01_000002', u'app_root': u'${AGENT_WORK_ROOT}/app/install/kafka_2.10-0.8.2.1', u'app_log_dir': u'${AGENT_LOG_ROOT}', u'app_user': u'fys', u'app_pid_dir': u'${AGENT_WORK_ROOT}/app/run', u'kafka_version': u'kafka_2.10-0.8.2.1', u'app_container_tag': u'1', u'pid_file': u'${AGENT_WORK_ROOT}/app/run/koya.pid', u'app_install_dir': u'${AGENT_WORK_ROOT}/app/install', u'hdfs_app_dir': u'/slider/.slider/cluster/kafka210/localstore', u'app_input_conf_dir': u'${AGENT_WORK_ROOT}/propagatedconf'}, u'broker': {u'xmx_val': u'1024m', u'instance.name': u'kafka210', u'zookeeper': u'bditest1.cmss.com,bditest2.cmss.com,bditest3.cmss.com', u'xms_val': u'1024m'}, u'server': {u'log.dirs': u'${AGENT_WORK_ROOT}/app/run', u'broker.id': u'1', u'zookeeper.connect': u'bditest1.cmss.com,bditest2.cmss.com,bditest3.cmss.com/kafka/kafka210', u'port': u'${KAFKA_BROKER.ALLOCATED_PORT}{PER_CONTAINER}'}}}
+INFO 2016-05-03 18:19:00,570 CustomServiceOrchestrator.py:446 - Allocated dynamic port: 40045
+INFO 2016-05-03 18:19:00,570 CustomServiceOrchestrator.py:416 - Allocated port 40045 for ${KAFKA_BROKER.ALLOCATED_PORT}{PER_CONTAINER}
+INFO 2016-05-03 18:19:00,572 AgentToggleLogger.py:40 - Running command ['/usr/bin/python',
+ '-S',
+ u'/data15/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/filecache/11/slider-kafka-app-package-0.80.0-bc1.3.0.zip/package/scripts/kafka.py',
+ u'INSTALL',
+ '/data11/hadoop/yarn/log/application_1461811649094_0010/container_1461811649094_0010_01_000002/command-2.json',
+ '/data15/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/filecache/11/slider-kafka-app-package-0.80.0-bc1.3.0.zip/package',
+ '/data11/hadoop/yarn/log/application_1461811649094_0010/container_1461811649094_0010_01_000002/structured-out-2.json',
+ 'INFO',
+ '/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002']
+INFO 2016-05-03 18:19:00,572 AgentToggleLogger.py:40 - Setting env: PYTHONPATH to /data14/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/filecache/10/slider-agent.tar.gz/slider-agent/jinja2:/data14/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/filecache/10/slider-agent.tar.gz/slider-agent
+INFO 2016-05-03 18:19:00,670 AgentToggleLogger.py:40 - Queue result: {'componentStatus': [],
+ 'reports': [{'actionId': u'2-1',
+              'clusterName': u'kafka210',
+              'exitcode': 777,
+              'reportResult': True,
+              'role': u'KAFKA_BROKER',
+              'roleCommand': u'INSTALL',
+              'serviceName': u'kafka210',
+              'status': 'IN_PROGRESS',
+              'stderr': '',
+              'stdout': '',
+              'structuredOut': '{}',
+              'taskId': 2}]}
+INFO 2016-05-03 18:19:00,670 AgentToggleLogger.py:40 - Sending heartbeat with response id: 1 and timestamp: 1462270740669. Command(s) in progress: True. Components mapped: False
+INFO 2016-05-03 18:19:00,999 AgentToggleLogger.py:40 - Result: {'structuredOut': {}, 'stdout': "2016-05-03 18:19:00,750 - Directory['/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install'] {'action': ['delete']}\n2016-05-03 18:19:00,753 - Removing directory Directory['/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install'] and all its content\n2016-05-03 18:19:00,753 - Directory['/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install'] {}\n2016-05-03 18:19:00,754 - Creating directory Directory['/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install']\n2016-05-03 18:19:00,754 - Tarball['/data15/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/filecache/11/slider-kafka-app-package-0.80.0-bc1.3.0.zip/package/files/kafka_2.10-0.8.2.1.tgz'] {'location': '/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install'}\n2016-05-03 18:19:00,755 - Installing tarball /data15/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/filecache/11/slider-kafka-app-package-0.80.0-bc1.3.0.zip/package/files/kafka_2.10-0.8.2.1.tgz at /data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install (tar -xvf /data15/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/filecache/11/slider-kafka-app-package-0.80.0-bc1.3.0.zip/package/files/kafka_2.10-0.8.2.1.tgz -C /data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install)", 'stderr': '', 'exitcode': 0}
+INFO 2016-05-03 18:19:01,148 AgentToggleLogger.py:40 - Queue result: {'componentStatus': [],
+ 'reports': [{'actionId': u'2-1',
+              'allocatedPorts': {u'server.port': u'40045'},
+              'clusterName': u'kafka210',
+              'exitcode': 0,
+              'folders': {'AGENT_LOG_ROOT': '/data11/hadoop/yarn/log/application_1461811649094_0010/container_1461811649094_0010_01_000002',
+                          'AGENT_WORK_ROOT': '/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002'},
+              'reportResult': True,
+              'role': u'KAFKA_BROKER',
+              'roleCommand': u'INSTALL',
+              'serviceName': u'kafka210',
+              'status': 'COMPLETED',
+              'stderr': 'None',
+              'stdout': "2016-05-03 18:19:00,750 - Directory['/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install'] {'action': ['delete']}\n2016-05-03 18:19:00,753 - Removing directory Directory['/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install'] and all its content\n2016-05-03 18:19:00,753 - Directory['/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install'] {}\n2016-05-03 18:19:00,754 - Creating directory Directory['/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install']\n2016-05-03 18:19:00,754 - Tarball['/data15/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/filecache/11/slider-kafka-app-package-0.80.0-bc1.3.0.zip/package/files/kafka_2.10-0.8.2.1.tgz'] {'location': '/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install'}\n2016-05-03 18:19:00,755 - Installing tarball /data15/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/filecache/11/slider-kafka-app-package-0.80.0-bc1.3.0.zip/package/files/kafka_2.10-0.8.2.1.tgz at /data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install (tar -xvf /data15/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/filecache/11/slider-kafka-app-package-0.80.0-bc1.3.0.zip/package/files/kafka_2.10-0.8.2.1.tgz -C /data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install)",
+              'structuredOut': '{}',
+              'taskId': 2}]}
+INFO 2016-05-03 18:19:01,149 AgentToggleLogger.py:40 - Sending heartbeat with response id: 2 and timestamp: 1462270741141. Command(s) in progress: True. Components mapped: False
+INFO 2016-05-03 18:19:01,154 Controller.py:560 - Component states (result): Expected: 2 and Actual: 2
+INFO 2016-05-03 18:19:01,200 Controller.py:576 - Status command: {'auto_generated': True,
+ 'clusterName': u'kafka210',
+ 'commandParams': {u'command_timeout': u'600',
+                   u'foreground_start': u'false',
+                   u'record_config': u'true',
+                   u'schema_version': u'2.0',
+                   u'script': u'scripts/kafka.py',
+                   u'script_type': u'PYTHON',
+                   u'service_package_folder': u'${AGENT_WORK_ROOT}/work/app/definition/package'},
+ 'commandType': 'STATUS_COMMAND',
+ 'componentName': u'KAFKA_BROKER',
+ 'configurations': {'global': {u'app_container_id': u'container_1461811649094_0010_01_000002',
+                               u'app_container_tag': u'1',
+                               u'app_input_conf_dir': u'${AGENT_WORK_ROOT}/propagatedconf',
+                               u'app_install_dir': u'${AGENT_WORK_ROOT}/app/install',
+                               u'app_log_dir': u'${AGENT_LOG_ROOT}',
+                               u'app_pid_dir': u'${AGENT_WORK_ROOT}/app/run',
+                               u'app_root': u'${AGENT_WORK_ROOT}/app/install/kafka_2.10-0.8.2.1',
+                               u'app_user': u'fys',
+                               u'hdfs_app_dir': u'/slider/.slider/cluster/kafka210/localstore',
+                               u'kafka_version': u'kafka_2.10-0.8.2.1',
+                               u'pid_file': u'${AGENT_WORK_ROOT}/app/run/koya.pid',
+                               u'security_enabled': u'false'}},
+ 'hostLevelParams': {u'container_id': u'container_1461811649094_0010_01_000002',
+                     u'java_home': u'/usr/jdk64/jdk1.7.0_67'},
+ 'roleCommand': 'STATUS',
+ 'serviceName': u'kafka210',
+ 'taskId': 'status'}
+INFO 2016-05-03 18:19:01,200 AgentToggleLogger.py:40 - Adding EXECUTION_COMMAND for service kafka210 of cluster kafka210 to the queue.
+INFO 2016-05-03 18:19:03,003 ActionQueue.py:134 - Package received: 
+INFO 2016-05-03 18:19:03,003 ActionQueue.py:140 - Executing command with id = 4-1 for role = KAFKA_BROKER of cluster kafka210
+INFO 2016-05-03 18:19:03,007 ActionQueue.py:170 - Running command: {u'componentConfigurations': {u'slider-appmaster': {u'site.global.kafka_version': u'kafka_2.10-0.8.2.1', u'zookeeper.hosts': u'bditest3.cmss.com,bditest2.cmss.com,bditest1.cmss.com', u'site.broker.instance.name': u'kafka210', u'site.global.app_user': u'fys', u'site.fs.defaultFS': u'hdfs://testhbase', u'java_home': u'/usr/jdk64/jdk1.7.0_67', u'site.global.pid_file': u'${AGENT_WORK_ROOT}/app/run/koya.pid', u'env.MALLOC_ARENA_MAX': u'4', u'jvm.heapsize': u'256M', u'site.global.app_install_dir': u'${AGENT_WORK_ROOT}/app/install', u'site.broker.xms_val': u'1024m', u'site.broker.zookeeper': u'bditest1.cmss.com,bditest2.cmss.com,bditest3.cmss.com', u'site.global.hdfs_app_dir': u'/slider/.slider/cluster/kafka210/localstore', u'zookeeper.quorum': u'bditest3.cmss.com:2181,bditest2.cmss.com:2181,bditest1.cmss.com:2181', u'site.broker.xmx_val': u'1024m', u'zookeeper.path': u'/services/slider/users/fys/kafka210', u'system_configs': u'broker', u'site.fs.default.name': u'hdfs://testhbase', u'application.def': u'/slider/.slider/package/KOYA2/slider-kafka-app-package-0.80.0-bc1.3.0.zip', u'site.server.port': u'${KAFKA_BROKER.ALLOCATED_PORT}{PER_CONTAINER}', u'site.global.app_root': u'${AGENT_WORK_ROOT}/app/install/kafka_2.10-0.8.2.1', u'site.global.security_enabled': u'false'}, u'broker': {u'site.global.kafka_version': u'kafka_2.10-0.8.2.1', u'site.broker.xmx_val': u'1024m', u'env.MALLOC_ARENA_MAX': u'4', u'java_home': u'/usr/jdk64/jdk1.7.0_67', u'zookeeper.hosts': u'bditest3.cmss.com,bditest2.cmss.com,bditest1.cmss.com', u'site.global.app_install_dir': u'${AGENT_WORK_ROOT}/app/install', u'system_configs': u'broker', u'site.global.hdfs_app_dir': u'/slider/.slider/cluster/kafka210/localstore', u'site.fs.default.name': u'hdfs://testhbase', u'zookeeper.path': u'/services/slider/users/fys/kafka210', u'site.global.security_enabled': u'false', u'site.global.app_user': u'fys', u'application.def': u'/slider/.slider/package/KOYA2/slider-kafka-app-package-0.80.0-bc1.3.0.zip', u'site.broker.zookeeper': u'bditest1.cmss.com,bditest2.cmss.com,bditest3.cmss.com', u'site.server.port': u'${KAFKA_BROKER.ALLOCATED_PORT}{PER_CONTAINER}', u'zookeeper.quorum': u'bditest3.cmss.com:2181,bditest2.cmss.com:2181,bditest1.cmss.com:2181', u'site.broker.instance.name': u'kafka210', u'site.fs.defaultFS': u'hdfs://testhbase', u'site.global.app_root': u'${AGENT_WORK_ROOT}/app/install/kafka_2.10-0.8.2.1', u'site.broker.xms_val': u'1024m', u'site.global.pid_file': u'${AGENT_WORK_ROOT}/app/run/koya.pid'}}, u'roleCommand': u'START', u'clusterName': u'kafka210', u'componentName': u'KAFKA_BROKER', u'hostname': u'bditest1.cmss.com', u'hostLevelParams': {u'java_home': u'/usr/jdk64/jdk1.7.0_67', u'container_id': u'container_1461811649094_0010_01_000002'}, u'commandType': u'EXECUTION_COMMAND', u'roleParams': {u'auto_restart': u'false'}, u'serviceName': u'kafka210', u'role': u'KAFKA_BROKER', u'commandParams': {u'record_config': u'true', u'foreground_start': u'false', u'script': u'scripts/kafka.py', u'schema_version': u'2.0', u'service_package_folder': u'${AGENT_WORK_ROOT}/work/app/definition/package', u'command_timeout': u'600', u'script_type': u'PYTHON'}, u'taskId': 4, u'commandId': u'4-1', u'containers': [], u'configurations': {u'global': {u'security_enabled': u'false', u'app_container_id': u'container_1461811649094_0010_01_000002', u'app_root': u'${AGENT_WORK_ROOT}/app/install/kafka_2.10-0.8.2.1', u'app_log_dir': u'${AGENT_LOG_ROOT}', u'app_user': u'fys', u'app_pid_dir': u'${AGENT_WORK_ROOT}/app/run', u'kafka_version': u'kafka_2.10-0.8.2.1', u'app_container_tag': u'1', u'pid_file': u'${AGENT_WORK_ROOT}/app/run/koya.pid', u'app_install_dir': u'${AGENT_WORK_ROOT}/app/install', u'hdfs_app_dir': u'/slider/.slider/cluster/kafka210/localstore', u'app_input_conf_dir': u'${AGENT_WORK_ROOT}/propagatedconf'}, u'broker': {u'xmx_val': u'1024m', u'instance.name': u'kafka210', u'zookeeper': u'bditest1.cmss.com,bditest2.cmss.com,bditest3.cmss.com', u'xms_val': u'1024m'}, u'server': {u'log.dirs': u'${AGENT_WORK_ROOT}/app/run', u'broker.id': u'1', u'zookeeper.connect': u'bditest1.cmss.com,bditest2.cmss.com,bditest3.cmss.com/kafka/kafka210', u'port': u'40045'}}}
+INFO 2016-05-03 18:19:03,009 CustomServiceOrchestrator.py:330 - Storing applied config: {u'broker': {u'instance.name': u'kafka210',
+             u'xms_val': u'1024m',
+             u'xmx_val': u'1024m',
+             u'zookeeper': u'bditest1.cmss.com,bditest2.cmss.com,bditest3.cmss.com'},
+ u'global': {u'app_container_id': u'container_1461811649094_0010_01_000002',
+             u'app_container_tag': u'1',
+             u'app_input_conf_dir': u'/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/propagatedconf',
+             u'app_install_dir': u'/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install',
+             u'app_log_dir': u'/data11/hadoop/yarn/log/application_1461811649094_0010/container_1461811649094_0010_01_000002',
+             u'app_pid_dir': u'/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/run',
+             u'app_root': u'/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install/kafka_2.10-0.8.2.1',
+             u'app_user': u'fys',
+             u'hdfs_app_dir': u'/slider/.slider/cluster/kafka210/localstore',
+             u'kafka_version': u'kafka_2.10-0.8.2.1',
+             u'pid_file': u'/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/run/koya.pid',
+             u'security_enabled': u'false'},
+ u'server': {u'broker.id': u'1',
+             u'log.dirs': u'/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/run',
+             u'port': u'40045',
+             u'zookeeper.connect': u'bditest1.cmss.com,bditest2.cmss.com,bditest3.cmss.com/kafka/kafka210'}}
+INFO 2016-05-03 18:19:03,011 AgentToggleLogger.py:40 - Running command ['/usr/bin/python',
+ '-S',
+ u'/data15/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/filecache/11/slider-kafka-app-package-0.80.0-bc1.3.0.zip/package/scripts/kafka.py',
+ u'START',
+ '/data11/hadoop/yarn/log/application_1461811649094_0010/container_1461811649094_0010_01_000002/command-4.json',
+ '/data15/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/filecache/11/slider-kafka-app-package-0.80.0-bc1.3.0.zip/package',
+ '/data11/hadoop/yarn/log/application_1461811649094_0010/container_1461811649094_0010_01_000002/structured-out-4.json',
+ 'INFO',
+ '/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002']
+INFO 2016-05-03 18:19:03,012 AgentToggleLogger.py:40 - Setting env: PYTHONPATH to /data14/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/filecache/10/slider-agent.tar.gz/slider-agent/jinja2:/data14/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/filecache/10/slider-agent.tar.gz/slider-agent
+INFO 2016-05-03 18:19:03,121 AgentToggleLogger.py:40 - Queue result: {'componentStatus': [],
+ 'reports': [{'actionId': u'4-1',
+              'clusterName': u'kafka210',
+              'exitcode': 777,
+              'reportResult': True,
+              'role': u'KAFKA_BROKER',
+              'roleCommand': u'START',
+              'serviceName': u'kafka210',
+              'status': 'IN_PROGRESS',
+              'stderr': '',
+              'stdout': '',
+              'structuredOut': '{}',
+              'taskId': 4}]}
+INFO 2016-05-03 18:19:03,121 AgentToggleLogger.py:40 - Sending heartbeat with response id: 3 and timestamp: 1462270743120. Command(s) in progress: True. Components mapped: False
+INFO 2016-05-03 18:19:03,193 AgentToggleLogger.py:40 - Result: {'structuredOut': {}, 'stdout': "2016-05-03 18:19:03,125 - PropertiesFile['/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install/kafka_2.10-0.8.2.1/config/server.slider.properties'] {'owner': 'fys', 'properties': ...}\n2016-05-03 18:19:03,132 - Generating properties file: /data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install/kafka_2.10-0.8.2.1/config/server.slider.properties\n2016-05-03 18:19:03,132 - File['/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install/kafka_2.10-0.8.2.1/config/server.slider.properties'] {'owner': 'fys', 'content': InlineTemplate(...), 'group': None, 'mode': None}\n2016-05-03 18:19:03,133 - Writing File['/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install/kafka_2.10-0.8.2.1/config/server.slider.properties'] because it doesn't exist\n2016-05-03 18:19:03,133 - Execute['/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install/kafka_2.10-0.8.2.1/bin/kafka-server-start.sh /data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install/kafka_2.10-0.8.2.1/config/server.slider.properties'] {'pid_file': '/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/run/koya.pid', 'wait_for_finish': False, 'logoutput': True, 'user': 'fys'}", 'stderr': '', 'exitcode': 0}
+INFO 2016-05-03 18:19:03,306 AgentToggleLogger.py:40 - Queue result: {'componentStatus': [],
+ 'reports': [{'actionId': u'4-1',
+              'allocatedPorts': {},
+              'clusterName': u'kafka210',
+              'exitcode': 0,
+              'reportResult': True,
+              'role': u'KAFKA_BROKER',
+              'roleCommand': u'START',
+              'serviceName': u'kafka210',
+              'status': 'COMPLETED',
+              'stderr': 'None',
+              'stdout': "2016-05-03 18:19:03,125 - PropertiesFile['/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install/kafka_2.10-0.8.2.1/config/server.slider.properties'] {'owner': 'fys', 'properties': ...}\n2016-05-03 18:19:03,132 - Generating properties file: /data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install/kafka_2.10-0.8.2.1/config/server.slider.properties\n2016-05-03 18:19:03,132 - File['/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install/kafka_2.10-0.8.2.1/config/server.slider.properties'] {'owner': 'fys', 'content': InlineTemplate(...), 'group': None, 'mode': None}\n2016-05-03 18:19:03,133 - Writing File['/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install/kafka_2.10-0.8.2.1/config/server.slider.properties'] because it doesn't exist\n2016-05-03 18:19:03,133 - Execute['/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install/kafka_2.10-0.8.2.1/bin/kafka-server-start.sh /data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/install/kafka_2.10-0.8.2.1/config/server.slider.properties'] {'pid_file': '/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002/app/run/koya.pid', 'wait_for_finish': False, 'logoutput': True, 'user': 'fys'}",
+              'structuredOut': '{}',
+              'taskId': 4}]}
+INFO 2016-05-03 18:19:03,306 AgentToggleLogger.py:40 - Sending heartbeat with response id: 4 and timestamp: 1462270743299. Command(s) in progress: True. Components mapped: False
+INFO 2016-05-03 18:19:03,310 Controller.py:560 - Component states (result): Expected: 4 and Actual: 4
+INFO 2016-05-03 18:19:03,318 AgentToggleLogger.py:40 - Adding STATUS_COMMAND for service kafka210 of cluster kafka210 to the queue.
+INFO 2016-05-03 18:19:05,200 AgentToggleLogger.py:40 - Running command ['/usr/bin/python',
+ '-S',
+ u'/data15/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/filecache/11/slider-kafka-app-package-0.80.0-bc1.3.0.zip/package/scripts/kafka.py',
+ 'STATUS',
+ '/data11/hadoop/yarn/log/application_1461811649094_0010/container_1461811649094_0010_01_000002/status_command.json',
+ '/data15/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/filecache/11/slider-kafka-app-package-0.80.0-bc1.3.0.zip/package',
+ '/data11/hadoop/yarn/log/application_1461811649094_0010/container_1461811649094_0010_01_000002/structured-out-status.json',
+ 'INFO',
+ '/data10/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/container_1461811649094_0010_01_000002']
+INFO 2016-05-03 18:19:05,200 AgentToggleLogger.py:40 - Setting env: PYTHONPATH to /data14/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/filecache/10/slider-agent.tar.gz/slider-agent/jinja2:/data14/hadoop/yarn/local/usercache/fys/appcache/application_1461811649094_0010/filecache/10/slider-agent.tar.gz/slider-agent
+INFO 2016-05-03 18:19:05,328 AgentToggleLogger.py:40 - Result: {'structuredOut': {}, 'stdout': '', 'stderr': '', 'exitcode': 0}

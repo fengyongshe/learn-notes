@@ -1,0 +1,11 @@
+K 25
+svn:wc:ra_dav:version-url
+V 65
+/svn/omae/!svn/ver/5803/runtime/trunk/dev/approuter_nginx/src/log
+END
+redis.log
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/svn/omae/!svn/ver/5803/runtime/trunk/dev/approuter_nginx/src/log/redis.log
+END

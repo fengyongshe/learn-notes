@@ -1,0 +1,1522 @@
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/api/RoleKeys.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/api/RoleKeys.java
+index 812a6b3..ce413ff 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/api/RoleKeys.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/api/RoleKeys.java
+@@ -35,6 +35,11 @@
+   String ROLE_GROUP = "role.group";
+ 
+   /**
++   * The prefix of a role: {@value}
++   */
++  String ROLE_PREFIX = "role.prefix";
++
++  /**
+    * Status report: number actually granted : {@value} 
+    */
+   String ROLE_ACTUAL_INSTANCES = "role.actual.instances";
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/client/SliderClient.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/client/SliderClient.java
+index d464ce0..3129f6f 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/client/SliderClient.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/client/SliderClient.java
+@@ -151,6 +151,7 @@
+ import org.apache.slider.core.registry.docstore.ConfigFormat;
+ import org.apache.slider.core.registry.docstore.PublishedConfigSet;
+ import org.apache.slider.core.registry.docstore.PublishedConfiguration;
++import org.apache.slider.core.registry.docstore.PublishedConfigurationOutputter;
+ import org.apache.slider.core.registry.docstore.PublishedExports;
+ import org.apache.slider.core.registry.docstore.PublishedExportsOutputter;
+ import org.apache.slider.core.registry.docstore.PublishedExportsSet;
+@@ -724,7 +725,8 @@ public int actionCreate(String clustername, ActionCreateArgs createArgs) throws
+     AggregateConf instanceDefinition = loadInstanceDefinitionUnresolved(
+         clustername, clusterDirectory);
+     try {
+-      checkForCredentials(getConfig(), instanceDefinition.getAppConf());
++      checkForCredentials(getConfig(), instanceDefinition.getAppConf(),
++          clustername);
+     } catch (IOException e) {
+       sliderFileSystem.getFileSystem().delete(clusterDirectory, true);
+       throw e;
+@@ -906,7 +908,7 @@ private boolean isAppInRunningState(String clustername) throws YarnException,
+   }
+ 
+   protected static void checkForCredentials(Configuration conf,
+-      ConfTree tree) throws IOException {
++      ConfTree tree, String clusterName) throws IOException {
+     if (tree.credentials == null || tree.credentials.isEmpty()) {
+       log.info("No credentials requested");
+       return;
+@@ -915,7 +917,9 @@ protected static void checkForCredentials(Configuration conf,
+     BufferedReader br = null;
+     try {
+       for (Entry<String, List<String>> cred : tree.credentials.entrySet()) {
+-        String provider = cred.getKey();
++        String provider = cred.getKey()
++            .replaceAll(Pattern.quote("${CLUSTER_NAME}"), clusterName)
++            .replaceAll(Pattern.quote("${CLUSTER}"), clusterName);
+         List<String> aliases = cred.getValue();
+         if (aliases == null || aliases.isEmpty()) {
+           continue;
+@@ -1727,6 +1731,7 @@ public void buildInstanceDefinition(String clustername,
+     resources.mergeComponents(buildInfo.getResourceCompOptionMap());
+ 
+     builder.init(providerName, instanceDefinition);
++    builder.resolve();
+     builder.propagateFilename();
+     builder.propagatePrincipals();
+     builder.setImageDetailsIfAvailable(buildInfo.getImage(),
+@@ -1917,8 +1922,7 @@ public static void replaceTokens(ConfTree conf,
+   private static String replaceTokens(String s, String userName,
+       String clusterName) throws IOException {
+     return s.replaceAll(Pattern.quote("${USER}"), userName)
+-        .replaceAll(Pattern.quote("${USER_NAME}"), userName)
+-        .replaceAll(Pattern.quote("${CLUSTER_NAME}"), clusterName);
++        .replaceAll(Pattern.quote("${USER_NAME}"), userName);
+   }
+ 
+   public FsPermission getClusterDirectoryPermissions(Configuration conf) {
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/common/SliderKeys.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/common/SliderKeys.java
+index ba3effc..120b1fc 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/common/SliderKeys.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/common/SliderKeys.java
+@@ -70,6 +70,19 @@
+   String APP_TYPE = "org-apache-slider";
+ 
+   /**
++   * Key for component type. This MUST NOT be set in app_config/global {@value}
++   */
++  String COMPONENT_TYPE_KEY = "site.global.component_type";
++  /**
++   * A component type for an external app that has been predefined using the
++   * slider build command
++   */
++  String COMPONENT_TYPE_EXTERNAL_APP = "external_app";
++  String COMPONENT_SEPARATOR = "-";
++  String[] COMPONENT_KEYS_TO_SKIP = {"zookeeper.", "env.MALLOC_ARENA_MAX",
++      "site.fs.", "site.dfs."};
++
++  /**
+    * Key for application version. This must be set in app_config/global {@value}
+    */
+   String APP_VERSION = "site.global.app_version";
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/common/tools/SliderUtils.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/common/tools/SliderUtils.java
+index 73e0879..e9f65ba 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/common/tools/SliderUtils.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/common/tools/SliderUtils.java
+@@ -69,6 +69,7 @@
+ import org.apache.slider.core.launch.ClasspathConstructor;
+ import org.apache.slider.core.main.LauncherExitCodes;
+ import org.apache.slider.providers.agent.AgentKeys;
++import org.apache.slider.providers.agent.application.metadata.Component;
+ import org.apache.slider.server.services.utility.PatternValidator;
+ import org.apache.slider.server.services.workflow.ForkedProcessService;
+ import org.apache.zookeeper.server.util.KerberosUtil;
+@@ -122,6 +123,8 @@
+ import java.util.zip.ZipEntry;
+ import java.util.zip.ZipOutputStream;
+ 
++import static org.apache.slider.common.SliderKeys.COMPONENT_SEPARATOR;
++
+ /**
+  * These are slider-specific Util methods
+  */
+@@ -475,6 +478,32 @@ public static int copyDirectory(Configuration conf,
+     return srcFileCount;
+   }
+ 
++  /**
++   * Copy a file to a new FS -both paths must be qualified.
++   * @param conf conf file
++   * @param srcFile src file
++   * @param destFile dest file
++   */
++  public static void copy(Configuration conf,
++      Path srcFile,
++      Path destFile) throws
++      IOException,
++      BadClusterStateException {
++    FileSystem srcFS = FileSystem.get(srcFile.toUri(), conf);
++    //list all paths in the src.
++    if (!srcFS.exists(srcFile)) {
++      throw new FileNotFoundException("Source file not found " + srcFile);
++    }
++    if (!srcFS.isFile(srcFile)) {
++      throw new FileNotFoundException(
++          "Source file not a file " + srcFile);
++    }
++    FileSystem destFS = FileSystem.get(destFile.toUri(), conf);
++    if (destFS.exists(destFile)) {
++      throw new IOException("Dest file already exists " + destFile);
++    }
++    FileUtil.copy(srcFS, srcFile, destFS, destFile, false, true, conf);
++  }
+ 
+   public static String stringify(Throwable t) {
+     StringWriter sw = new StringWriter();
+@@ -927,6 +956,38 @@ public static void sortApplicationReport(List<ApplicationReport> instances) {
+   }
+ 
+   /**
++   * Merge string maps excluding prefixes
++   * @param first first map
++   * @param second second map
++   * @param  prefixes prefixes to ignore
++   * @return 'first' merged with the second
++   */
++  public static Map<String, String> mergeMapsIgnoreDuplicateKeysAndPrefixes(
++      Map<String, String> first, Map<String, String> second,
++      String... prefixes) {
++    Preconditions.checkArgument(first != null, "Null 'first' value");
++    Preconditions.checkArgument(second != null, "Null 'second' value");
++    Preconditions.checkArgument(prefixes != null, "Null 'prefixes' value");
++    for (Map.Entry<String, String> entry : second.entrySet()) {
++      String key = entry.getKey();
++      boolean hasPrefix = false;
++      for (String prefix : prefixes) {
++        if (key.startsWith(prefix)) {
++          hasPrefix = true;
++          break;
++        }
++      }
++      if (hasPrefix) {
++        continue;
++      }
++      if (!first.containsKey(key)) {
++        first.put(key, entry.getValue());
++      }
++    }
++    return first;
++  }
++
++  /**
+    * Convert a map to a multi-line string for printing
+    * @param map map to stringify
+    * @return a string representation of the map
+@@ -2352,8 +2413,28 @@ public static String getCurrentCommandPath() {
+    */
+   public static String getApplicationDefinitionPath(ConfTreeOperations conf)
+       throws BadConfigException {
++    return getApplicationDefinitionPath(conf, null);
++  }
++
++  /**
++   * return the HDFS path where the application package has been uploaded
++   * manually or by using slider client (install package command)
++   *
++   * @param conf configuration
++   * @param roleGroup name of component
++   * @return
++   */
++  public static String getApplicationDefinitionPath(ConfTreeOperations conf,
++      String roleGroup)
++      throws BadConfigException {
+     String appDefPath = conf.getGlobalOptions().getMandatoryOption(
+         AgentKeys.APP_DEF);
++    if (roleGroup != null) {
++      MapOperations component = conf.getComponent(roleGroup);
++      if (component != null) {
++        appDefPath = component.getOption(AgentKeys.APP_DEF, appDefPath);
++      }
++    }
+     return appDefPath;
+   }
+ 
+@@ -2545,4 +2626,11 @@ public static String requestToString(AMRMClient.ContainerRequest request) {
+     }
+     return buffer.toString();
+   }
++
++  public static String trimPrefix(String prefix) {
++    if (prefix != null && prefix.endsWith(COMPONENT_SEPARATOR)) {
++      return prefix.substring(0, prefix.length()-1);
++    }
++    return prefix;
++  }
+ }
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/core/buildutils/InstanceBuilder.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/core/buildutils/InstanceBuilder.java
+index 4250d79..25c65fc 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/core/buildutils/InstanceBuilder.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/core/buildutils/InstanceBuilder.java
+@@ -25,7 +25,9 @@
+ import org.apache.hadoop.fs.permission.FsPermission;
+ import org.apache.slider.api.InternalKeys;
+ import org.apache.slider.api.OptionKeys;
++import org.apache.slider.api.ResourceKeys;
+ import org.apache.slider.api.StatusKeys;
++import org.apache.slider.common.SliderKeys;
+ import org.apache.slider.common.SliderXmlConfKeys;
+ import org.apache.slider.common.tools.CoreFileSystem;
+ import org.apache.slider.common.tools.SliderUtils;
+@@ -42,11 +44,17 @@
+ import org.apache.slider.core.persist.LockHeldAction;
+ import org.apache.slider.core.zk.ZKPathBuilder;
+ import org.apache.slider.core.zk.ZookeeperUtils;
++import org.apache.slider.providers.agent.AgentKeys;
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
+ 
+ import java.io.IOException;
++import java.util.HashMap;
++import java.util.HashSet;
+ import java.util.Map;
++import java.util.Map.Entry;
++import java.util.Set;
++import java.util.TreeSet;
+ 
+ import static org.apache.slider.api.InternalKeys.INTERNAL_ADDONS_DIR_PATH;
+ import static org.apache.slider.api.InternalKeys.INTERNAL_APPDEF_DIR_PATH;
+@@ -61,6 +69,12 @@
+ import static org.apache.slider.api.OptionKeys.ZOOKEEPER_HOSTS;
+ import static org.apache.slider.api.OptionKeys.ZOOKEEPER_PATH;
+ import static org.apache.slider.api.OptionKeys.ZOOKEEPER_QUORUM;
++import static org.apache.slider.api.RoleKeys.ROLE_PREFIX;
++import static org.apache.slider.common.SliderKeys.COMPONENT_AM;
++import static org.apache.slider.common.SliderKeys.COMPONENT_SEPARATOR;
++import static org.apache.slider.common.SliderKeys.COMPONENT_TYPE_EXTERNAL_APP;
++import static org.apache.slider.common.SliderKeys.COMPONENT_TYPE_KEY;
++import static org.apache.slider.common.tools.SliderUtils.isClusternameValid;
+ 
+ /**
+  * Build up the instance of a cluster.
+@@ -72,6 +86,8 @@
+   private final CoreFileSystem coreFS;
+   private final InstancePaths instancePaths;
+   private AggregateConf instanceDescription;
++  private Map<String, Path> externalAppDefs = new HashMap<>();
++  private TreeSet<Integer> priorities = new TreeSet<>();
+ 
+   private static final Logger log =
+     LoggerFactory.getLogger(InstanceBuilder.class);
+@@ -244,6 +260,192 @@ public void takeSnapshotOfConfDir(Path appconfdir) throws
+   }
+ 
+ 
++  private Set<String> getExternalComponents(ConfTreeOperations ops)
++      throws BadConfigException {
++    Set<String> externalComponents = new HashSet<>();
++    if (ops.getGlobalOptions().containsKey(COMPONENT_TYPE_KEY)) {
++      throw new BadConfigException(COMPONENT_TYPE_KEY + " must be " +
++          "specified per-component, not in global");
++    }
++
++    for (Entry<String, Map<String, String>> entry : ops.getComponents()
++        .entrySet()) {
++      if (COMPONENT_AM.equals(entry.getKey())) {
++        continue;
++      }
++      Map<String, String> options = entry.getValue();
++      if (COMPONENT_TYPE_EXTERNAL_APP.equals(options.get(COMPONENT_TYPE_KEY))) {
++        externalComponents.add(entry.getKey());
++      }
++    }
++    return externalComponents;
++  }
++
++  private void mergeExternalComponent(ConfTreeOperations ops,
++      ConfTreeOperations externalOps, String externalComponent,
++      Integer priority) throws BadConfigException {
++    for (String subComponent : externalOps.getComponentNames()) {
++      if (COMPONENT_AM.equals(subComponent)) {
++        continue;
++      }
++      String prefix = externalComponent + COMPONENT_SEPARATOR;
++      log.debug("Merging options for {} into {}", subComponent,
++          prefix + subComponent);
++      MapOperations subComponentOps = ops.getOrAddComponent(
++          prefix + subComponent);
++      if (priority == null) {
++        SliderUtils.mergeMaps(subComponentOps,
++            ops.getComponent(externalComponent).options);
++        subComponentOps.remove(COMPONENT_TYPE_KEY);
++      }
++
++      SliderUtils.mergeMapsIgnoreDuplicateKeysAndPrefixes(subComponentOps,
++          externalOps.getComponent(subComponent),
++          SliderKeys.COMPONENT_KEYS_TO_SKIP);
++
++      // add prefix to existing prefix
++      String existingPrefix = subComponentOps.get(ROLE_PREFIX);
++      if (existingPrefix != null) {
++        if (!subComponent.startsWith(existingPrefix)) {
++          throw new BadConfigException("Bad prefix " + existingPrefix +
++              " for subcomponent " + subComponent + " of " + externalComponent);
++        }
++        prefix = prefix + existingPrefix;
++      }
++      subComponentOps.set(ROLE_PREFIX, prefix);
++
++      // adjust priority
++      if (priority != null) {
++        subComponentOps.put(ResourceKeys.COMPONENT_PRIORITY,
++            Integer.toString(priority));
++        priorities.add(priority);
++        priority++;
++      }
++    }
++  }
++
++  private int getNextPriority() {
++    if (priorities.isEmpty()) {
++      return 1;
++    } else {
++      return priorities.last() + 1;
++    }
++  }
++
++  public void resolve()
++      throws BadConfigException, IOException, BadClusterStateException {
++    ConfTreeOperations appConf = instanceDescription.getAppConfOperations();
++    ConfTreeOperations resources = instanceDescription.getResourceOperations();
++
++    for (Entry<String, Map<String, String>> entry : resources.getComponents()
++        .entrySet()) {
++      if (COMPONENT_AM.equals(entry.getKey())) {
++        continue;
++      }
++      if (entry.getValue().containsKey(ResourceKeys.COMPONENT_PRIORITY)) {
++        priorities.add(Integer.parseInt(entry.getValue().get(
++            ResourceKeys.COMPONENT_PRIORITY)));
++      }
++    }
++
++    Set<String> externalComponents = getExternalComponents(appConf);
++    if (!externalComponents.isEmpty()) {
++      log.info("Found external components {}", externalComponents);
++    }
++
++    for (String component : externalComponents) {
++      if (!isClusternameValid(component)) {
++        throw new BadConfigException(component + " is not a valid external " +
++            "component");
++      }
++      Path componentClusterDir = coreFS.buildClusterDirPath(component);
++      try {
++        coreFS.verifyPathExists(componentClusterDir);
++      } catch (IOException e) {
++        throw new BadConfigException("external component " + component +
++            " doesn't exist");
++      }
++      AggregateConf componentConf = new AggregateConf();
++      ConfPersister persister = new ConfPersister(coreFS, componentClusterDir);
++      try {
++        persister.load(componentConf);
++      } catch (Exception e) {
++        throw new BadConfigException("Couldn't read configuration for " +
++            "external component " + component);
++      }
++
++      ConfTreeOperations componentAppConf = componentConf.getAppConfOperations();
++      String externalAppDef = componentAppConf.get(AgentKeys.APP_DEF);
++      if (SliderUtils.isSet(externalAppDef)) {
++        Path newAppDef = new Path(coreFS.buildAppDefDirPath(clustername),
++            component + "_" + SliderKeys.DEFAULT_APP_PKG);
++        componentAppConf.set(AgentKeys.APP_DEF, newAppDef);
++        componentAppConf.append(AgentKeys.APP_DEF_ORIGINAL, externalAppDef);
++        log.info("Copying external appdef {} to {} for {}", externalAppDef,
++            newAppDef, component);
++        externalAppDefs.put(externalAppDef, newAppDef);
++        externalAppDef = newAppDef.toString();
++      }
++
++      for (String rcomp : componentConf.getResourceOperations()
++          .getComponentNames()) {
++        if (COMPONENT_AM.equals(rcomp)) {
++          continue;
++        }
++        log.debug("Adding component {} to appConf for {}", rcomp, component);
++        componentAppConf.getOrAddComponent(rcomp);
++      }
++      componentConf.resolve();
++
++      for (String rcomp : componentConf.getResourceOperations()
++          .getComponentNames()) {
++        if (COMPONENT_AM.equals(rcomp)) {
++          continue;
++        }
++        String componentAppDef = componentAppConf.getComponentOpt(
++            rcomp, AgentKeys.APP_DEF, null);
++        if (SliderUtils.isUnset(componentAppDef) ||
++            componentAppDef.equals(externalAppDef)) {
++          continue;
++        }
++        if (externalAppDefs.containsKey(componentAppDef)) {
++          log.info("Using external appdef {} for {}",
++              externalAppDefs.get(componentAppDef), rcomp);
++        } else {
++          String existingPrefix = componentAppConf.getComponentOpt(rcomp,
++              ROLE_PREFIX, null);
++          if (SliderUtils.isUnset(existingPrefix)) {
++            existingPrefix = "";
++          } else {
++            existingPrefix = COMPONENT_SEPARATOR + SliderUtils.trimPrefix(
++                existingPrefix);
++          }
++          Path newAppDef = new Path(coreFS.buildAppDefDirPath(clustername),
++              component + existingPrefix + "_" + SliderKeys.DEFAULT_APP_PKG);
++          externalAppDefs.put(componentAppDef, newAppDef);
++          log.info("Copying external appdef {} to {} for {}", componentAppDef,
++              newAppDef, component + COMPONENT_SEPARATOR + rcomp);
++        }
++        componentAppConf.setComponentOpt(rcomp, AgentKeys.APP_DEF,
++            externalAppDefs.get(componentAppDef).toString());
++        componentAppConf.appendComponentOpt(rcomp,
++            AgentKeys.APP_DEF_ORIGINAL, componentAppDef);
++      }
++      Set<Path> newAppDefs = new HashSet<>();
++      newAppDefs.addAll(externalAppDefs.values());
++      if (newAppDefs.size() != externalAppDefs.size()) {
++        throw new IllegalStateException("Values repeat in external appdefs "
++            + externalAppDefs);
++      }
++      log.info("External appdefs after {}: {}", component, externalAppDefs);
++
++      mergeExternalComponent(appConf, componentAppConf, component, null);
++      mergeExternalComponent(resources, componentConf.getResourceOperations(),
++          component, getNextPriority());
++    }
++  }
++
++
+   /**
+    * Persist this
+    * @param appconfdir conf dir
+@@ -266,6 +468,9 @@ public void persist(Path appconfdir, boolean overwrite) throws
+       action = new ConfDirSnapshotAction(appconfdir);
+     }
+     persister.save(instanceDescription, action);
++    for (Entry<String, Path> appDef : externalAppDefs.entrySet()) {
++      SliderUtils.copy(conf, new Path(appDef.getKey()), appDef.getValue());
++    }
+   }
+ 
+   /**
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/core/conf/ConfTreeOperations.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/core/conf/ConfTreeOperations.java
+index d24a158..526e17d 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/core/conf/ConfTreeOperations.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/core/conf/ConfTreeOperations.java
+@@ -214,6 +214,23 @@ public void set(String key, Object value) {
+   public String get(String key) {
+     return globalOptions.get(key);
+   }
++  /**
++   * append to a global option
++   * @param key key
++   * @return value
++   *
++   */
++  public String append(String key, String value) {
++    if (SliderUtils.isUnset(value)) {
++      return null;
++    }
++    if (globalOptions.containsKey(key)) {
++      globalOptions.put(key, globalOptions.get(key) + "," + value);
++    } else {
++      globalOptions.put(key, value);
++    }
++    return globalOptions.get(key);
++  }
+ 
+   /**
+    * Propagate all global keys matching a prefix
+@@ -257,6 +274,17 @@ public void mergeSingleComponentMapPrefix(String component,
+                                             Map<String, String> map,
+                                             String prefix,
+                                             boolean overwrite) {
++    boolean needsMerge = false;
++    for (Map.Entry<String, String> entry : map.entrySet()) {
++      String key = entry.getKey();
++      if (key.startsWith(prefix)) {
++        needsMerge = true;
++        break;
++      }
++    }
++    if (!needsMerge) {
++      return;
++    }
+     MapOperations comp = getOrAddComponent(component);
+     comp.mergeMapPrefixedKeys(map,prefix, overwrite);
+   }
+@@ -474,4 +502,26 @@ public void setComponentOpt(String role, String option, long val) {
+     setComponentOpt(role, option, Long.toString(val));
+   }
+ 
++  /**
++   * append to a component option
++   * @param key key
++   * @return value
++   *
++   */
++  public String appendComponentOpt(String role, String key, String value) {
++    if (SliderUtils.isUnset(value)) {
++      return null;
++    }
++    MapOperations roleopts = getComponent(role);
++    if (roleopts == null) {
++      return null;
++    }
++
++    if (roleopts.containsKey(key)) {
++      roleopts.put(key, roleopts.get(key) + "," + value);
++    } else {
++      roleopts.put(key, value);
++    }
++    return roleopts.get(key);
++  }
+ }
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/providers/AbstractProviderService.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/providers/AbstractProviderService.java
+index 61b2655..92766f5 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/providers/AbstractProviderService.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/providers/AbstractProviderService.java
+@@ -169,7 +169,8 @@ protected Configuration loadProviderConfigurationInformation(File confDir,
+    */
+   @Override
+   public void initializeApplicationConfiguration(
+-      AggregateConf instanceDefinition, SliderFileSystem fileSystem)
++      AggregateConf instanceDefinition, SliderFileSystem fileSystem,
++      String roleGroup)
+       throws IOException, SliderException {
+   }
+ 
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/providers/ProviderService.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/providers/ProviderService.java
+index f754eee..3f24665 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/providers/ProviderService.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/providers/ProviderService.java
+@@ -118,11 +118,13 @@ Configuration loadProviderConfigurationInformation(File confDir)
+    * 
+    * @param instanceDefinition
+    * @param fileSystem
++   * @param roleGroup
+    * @throws IOException
+    * @throws SliderException
+    */
+   void initializeApplicationConfiguration(AggregateConf instanceDefinition,
+-      SliderFileSystem fileSystem) throws IOException, SliderException;
++      SliderFileSystem fileSystem, String roleGroup) throws IOException,
++      SliderException;
+ 
+   /**
+    * This is a validation of the application configuration on the AM.
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/providers/agent/AgentClientProvider.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/providers/agent/AgentClientProvider.java
+index 4c6a50b..8203cf0 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/providers/agent/AgentClientProvider.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/providers/agent/AgentClientProvider.java
+@@ -176,13 +176,22 @@ public void validateInstanceDefinition(AggregateConf instanceDefinition, SliderF
+     names.remove(SliderKeys.COMPONENT_AM);
+     Map<Integer, String> priorityMap = new HashMap<Integer, String>();
+ 
+-    Metainfo metaInfo = getMetainfo(fs, appDef);
+-
+     for (String name : names) {
++      try {
++        // Validate the app definition
++        appDef = SliderUtils.getApplicationDefinitionPath(instanceDefinition
++            .getAppConfOperations(), name);
++      } catch (BadConfigException bce) {
++        throw new BadConfigException("Application definition must be provided. " + bce.getMessage());
++      }
++      Metainfo metaInfo = getMetainfo(fs, appDef);
++
+       MapOperations component = resources.getMandatoryComponent(name);
+ 
+       if (metaInfo != null) {
+-        Component componentDef = metaInfo.getApplicationComponent(name);
++        Component componentDef = metaInfo.getApplicationComponent(
++            AgentUtils.getMetainfoComponentName(name,
++                instanceDefinition.getAppConfOperations()));
+         if (componentDef == null) {
+           throw new BadConfigException(
+               "Component %s is not a member of application.", name);
+@@ -208,16 +217,12 @@ public void validateInstanceDefinition(AggregateConf instanceDefinition, SliderF
+             existing);
+       }
+       priorityMap.put(priority, name);
+-    }
+ 
+-    // fileSystem may be null for tests
+-    if (metaInfo != null) {
+-      for (String name : names) {
+-        Component componentDef = metaInfo.getApplicationComponent(name);
+-        if (componentDef == null) {
+-          throw new BadConfigException(
+-              "Component %s is not a member of application.", name);
+-        }
++      // fileSystem may be null for tests
++      if (metaInfo != null) {
++        Component componentDef = metaInfo.getApplicationComponent(
++            AgentUtils.getMetainfoComponentName(name,
++                instanceDefinition.getAppConfOperations()));
+ 
+         // ensure that intance count is 0 for client components
+         if ("CLIENT".equals(componentDef.getCategory())) {
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/providers/agent/AgentKeys.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/providers/agent/AgentKeys.java
+index 01a3f1a..9ea984c 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/providers/agent/AgentKeys.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/providers/agent/AgentKeys.java
+@@ -69,6 +69,7 @@
+   String AGENT_MAIN_SCRIPT = "agent/main.py";
+ 
+   String APP_DEF = "application.def";
++  String APP_DEF_ORIGINAL = "application.def.original";
+   String ADDON_PREFIX = "application.addon.";
+   String ADDONS = "application.addons";
+   String AGENT_VERSION = "agent.version";
+@@ -104,6 +105,8 @@
+   String KEY_CONTAINER_LAUNCH_DELAY = "container.launch.delay.sec";
+   String TEST_RELAX_VERIFICATION = "test.relax.validation";
+   String AM_CONFIG_GENERATION = "am.config.generation";
++
++  String DEFAULT_METAINFO_MAP_KEY = "DEFAULT_KEY";
+ }
+ 
+ 
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java
+index 4ffae7c..2ab5c6f 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java
+@@ -75,6 +75,7 @@
+ import org.apache.slider.providers.ProviderUtils;
+ import org.apache.slider.providers.agent.application.metadata.AbstractComponent;
+ import org.apache.slider.providers.agent.application.metadata.Application;
++import org.apache.slider.providers.agent.application.metadata.CommandOrder;
+ import org.apache.slider.providers.agent.application.metadata.CommandScript;
+ import org.apache.slider.providers.agent.application.metadata.Component;
+ import org.apache.slider.providers.agent.application.metadata.ComponentCommand;
+@@ -128,6 +129,7 @@
+ import java.util.List;
+ import java.util.Locale;
+ import java.util.Map;
++import java.util.Map.Entry;
+ import java.util.Scanner;
+ import java.util.Set;
+ import java.util.TreeMap;
+@@ -135,7 +137,9 @@
+ import java.util.concurrent.CopyOnWriteArrayList;
+ import java.util.concurrent.TimeUnit;
+ import java.util.concurrent.atomic.AtomicInteger;
++import java.util.regex.Pattern;
+ 
++import static org.apache.slider.api.RoleKeys.ROLE_PREFIX;
+ import static org.apache.slider.server.appmaster.web.rest.RestPaths.SLIDER_PATH_AGENTS;
+ 
+ /**
+@@ -170,10 +174,10 @@
+   private int heartbeatMonitorInterval = 0;
+   private AgentClientProvider clientProvider;
+   private AtomicInteger taskId = new AtomicInteger(0);
+-  private volatile Metainfo metaInfo = null;
++  private volatile Map<String, MetainfoHolder> metaInfoMap = new HashMap<>();
+   private SliderFileSystem fileSystem = null;
+   private Map<String, DefaultConfig> defaultConfigs = null;
+-  private ComponentCommandOrder commandOrder = null;
++  private ComponentCommandOrder commandOrder = new ComponentCommandOrder();
+   private HeartbeatMonitor monitor;
+   private Boolean canAnyMasterPublish = null;
+   private AgentLaunchParameter agentLaunchParameter = null;
+@@ -208,6 +212,17 @@ protected boolean removeEldestEntry(Map.Entry eldest) {
+   private final Map<String, Set<String>> containerExportsMap =
+       new HashMap<String, Set<String>>();
+ 
++  private static class MetainfoHolder {
++    Metainfo metaInfo;
++    private Map<String, DefaultConfig> defaultConfigs = null;
++
++    public MetainfoHolder(Metainfo metaInfo,
++        Map<String, DefaultConfig> defaultConfigs) {
++      this.metaInfo = metaInfo;
++      this.defaultConfigs = defaultConfigs;
++    }
++  }
++
+   /**
+    * Create an instance of AgentProviderService
+    */
+@@ -252,10 +267,11 @@ public void validateInstanceDefinition(AggregateConf instanceDefinition)
+     Set<String> names = resources.getComponentNames();
+     names.remove(SliderKeys.COMPONENT_AM);
+     for (String name : names) {
+-      Component componentDef = getMetaInfo().getApplicationComponent(name);
++      Component componentDef = getApplicationComponent(name);
+       if (componentDef == null) {
+-        throw new BadConfigException(
+-            "Component %s is not a member of application.", name);
++        // component member is validated elsewhere, so we don't need to throw
++        // an exception here
++        continue;
+       }
+ 
+       MapOperations componentConfig = resources.getMandatoryComponent(name);
+@@ -277,32 +293,67 @@ public void validateInstanceDefinition(AggregateConf instanceDefinition)
+ 
+   // Reads the metainfo.xml in the application package and loads it
+   private void buildMetainfo(AggregateConf instanceDefinition,
+-                             SliderFileSystem fileSystem) throws IOException, SliderException {
+-    String appDef = SliderUtils.getApplicationDefinitionPath(instanceDefinition
+-        .getAppConfOperations());
++                             SliderFileSystem fileSystem,
++                             String roleGroup)
++      throws IOException, SliderException {
++    String mapKey = instanceDefinition.getAppConfOperations()
++        .getComponentOpt(roleGroup, ROLE_PREFIX, DEFAULT_METAINFO_MAP_KEY);
++    String appDef = SliderUtils.getApplicationDefinitionPath(
++        instanceDefinition.getAppConfOperations(), roleGroup);
++    MapOperations component = null;
++    if (roleGroup != null) {
++      component = instanceDefinition.getAppConfOperations().getComponent(roleGroup);
++    }
+ 
+-    if (metaInfo == null) {
++    MetainfoHolder metaInfoHolder = metaInfoMap.get(mapKey);
++    if (metaInfoHolder == null) {
+       synchronized (syncLock) {
+-        if (metaInfo == null) {
++        if (this.fileSystem == null) {
+           this.fileSystem = fileSystem;
++        }
++        metaInfoHolder = metaInfoMap.get(mapKey);
++        if (metaInfoHolder == null) {
+           readAndSetHeartbeatMonitoringInterval(instanceDefinition);
+           initializeAgentDebugCommands(instanceDefinition);
+ 
+-          metaInfo = getApplicationMetainfo(fileSystem, appDef, false);
++          Metainfo metaInfo = getApplicationMetainfo(fileSystem, appDef, false);
+           log.info("Master package metainfo: {}", metaInfo.toString());
+           if (metaInfo == null || metaInfo.getApplication() == null) {
+             log.error("metainfo.xml is unavailable or malformed at {}.", appDef);
+             throw new SliderException(
+                 "metainfo.xml is required in app package.");
+           }
+-          commandOrder = new ComponentCommandOrder(metaInfo.getApplication().getCommandOrders());
+-          defaultConfigs = initializeDefaultConfigs(fileSystem, appDef, metaInfo);
++          List<CommandOrder> commandOrders = metaInfo.getApplication()
++              .getCommandOrders();
++          if (!DEFAULT_METAINFO_MAP_KEY.equals(mapKey)) {
++            for (Component comp : metaInfo.getApplication().getComponents()) {
++              comp.setName(mapKey + comp.getName());
++              log.info("Modifying external metainfo component name to {}",
++                  comp.getName());
++            }
++            for (CommandOrder co : commandOrders) {
++              log.info("Adding prefix {} to command order {}",
++                  mapKey, co);
++              co.setCommand(mapKey + co.getCommand());
++              co.setRequires(mapKey + co.getRequires());
++            }
++          }
++          log.debug("Merging command orders {} for {}", commandOrders,
++              roleGroup);
++          commandOrder.mergeCommandOrders(commandOrders,
++              instanceDefinition.getResourceOperations());
++          Map<String, DefaultConfig> defaultConfigs =
++              initializeDefaultConfigs(fileSystem, appDef, metaInfo);
++          metaInfoMap.put(mapKey, new MetainfoHolder(metaInfo, defaultConfigs));
+           monitor = new HeartbeatMonitor(this, getHeartbeatMonitorInterval());
+           monitor.start();
+ 
+           // build a map from component to metainfo
+           String addonAppDefString = instanceDefinition.getAppConfOperations()
+               .getGlobalOptions().getOption(AgentKeys.ADDONS, null);
++          if (component != null) {
++            addonAppDefString = component.getOption(AgentKeys.ADDONS, addonAppDefString);
++          }
+           log.debug("All addon appdefs: {}", addonAppDefString);
+           if (addonAppDefString != null) {
+             Scanner scanner = new Scanner(addonAppDefString).useDelimiter(",");
+@@ -310,6 +361,9 @@ private void buildMetainfo(AggregateConf instanceDefinition,
+               String addonAppDef = scanner.next();
+               String addonAppDefPath = instanceDefinition
+                   .getAppConfOperations().getGlobalOptions().get(addonAppDef);
++              if (component != null) {
++                addonAppDefPath = component.getOption(addonAppDef, addonAppDefPath);
++              }
+               log.debug("Addon package {} is stored at: {}", addonAppDef
+                   + addonAppDefPath);
+               Metainfo addonMetaInfo = getApplicationMetainfo(fileSystem,
+@@ -328,9 +382,10 @@ private void buildMetainfo(AggregateConf instanceDefinition,
+ 
+   @Override
+   public void initializeApplicationConfiguration(
+-      AggregateConf instanceDefinition, SliderFileSystem fileSystem)
++      AggregateConf instanceDefinition, SliderFileSystem fileSystem,
++      String roleGroup)
+       throws IOException, SliderException {
+-    buildMetainfo(instanceDefinition, fileSystem);
++    buildMetainfo(instanceDefinition, fileSystem, roleGroup);
+   }
+ 
+   @Override
+@@ -349,9 +404,9 @@ public void buildContainerLaunchContext(ContainerLauncher launcher,
+     String roleName = providerRole.name;
+     String roleGroup = providerRole.group;
+     String appDef = SliderUtils.getApplicationDefinitionPath(instanceDefinition
+-        .getAppConfOperations());
++        .getAppConfOperations(), roleGroup);
+ 
+-    initializeApplicationConfiguration(instanceDefinition, fileSystem);
++    initializeApplicationConfiguration(instanceDefinition, fileSystem, roleGroup);
+ 
+     log.info("Build launch context for Agent");
+     log.debug(instanceDefinition.toString());
+@@ -439,7 +494,7 @@ public void buildContainerLaunchContext(ContainerLauncher launcher,
+         LocalResourceType.ARCHIVE);
+     launcher.addLocalResource(AgentKeys.APP_DEFINITION_DIR, appDefRes);
+ 
+-    for (Package pkg : getMetaInfo().getApplication().getPackages()) {
++    for (Package pkg : getMetaInfo(roleGroup).getApplication().getPackages()) {
+       Path pkgPath = fileSystem.buildResourcePath(pkg.getName());
+       if (!fileSystem.isFile(pkgPath)) {
+         pkgPath = fileSystem.buildResourcePath(getClusterName(),
+@@ -505,7 +560,7 @@ public void buildContainerLaunchContext(ContainerLauncher launcher,
+       Map<String, Map<String, String>> configurations =
+           buildCommandConfigurations(instanceDefinition.getAppConfOperations(),
+               container.getId().toString(), roleName, roleGroup);
+-      localizeConfigFiles(launcher, roleName, roleGroup, getMetaInfo(),
++      localizeConfigFiles(launcher, roleName, roleGroup, getMetaInfo(roleGroup),
+           configurations, launcher.getEnv(), fileSystem);
+     }
+ 
+@@ -597,7 +652,7 @@ public void buildContainerLaunchContext(ContainerLauncher launcher,
+     // initialize the component instance state
+     getComponentStatuses().put(label,
+                                new ComponentInstanceState(
+-                                   roleName,
++                                   roleGroup,
+                                    container.getId(),
+                                    getClusterInfoPropertyValue(OptionKeys.APPLICATION_NAME),
+                                    pkgStatuses));
+@@ -610,6 +665,22 @@ private void localizeContainerSecurityStores(ContainerLauncher launcher,
+                                                AggregateConf instanceDefinition,
+                                                MapOperations compOps)
+       throws SliderException, IOException {
++    // substitute CLUSTER_NAME into credentials
++    Map<String,List<String>> newcred = new HashMap<>();
++    for (Entry<String,List<String>> entry : instanceDefinition.getAppConf().credentials.entrySet()) {
++      List<String> resultList = new ArrayList<>();
++      for (String v : entry.getValue()) {
++        resultList.add(v.replaceAll(Pattern.quote("${CLUSTER_NAME}"),
++            clusterName).replaceAll(Pattern.quote("${CLUSTER}"),
++            clusterName));
++      }
++      newcred.put(entry.getKey().replaceAll(Pattern.quote("${CLUSTER_NAME}"),
++          clusterName).replaceAll(Pattern.quote("${CLUSTER}"),
++          clusterName),
++          resultList);
++    }
++    instanceDefinition.getAppConf().credentials = newcred;
++
+     // generate and localize security stores
+     SecurityStore[] stores = generateSecurityStores(container, role,
+                                                     instanceDefinition, compOps);
+@@ -858,11 +929,12 @@ public void rebuildContainerDetails(List<Container> liveContainers,
+                                                   .extractRole(container));
+       if (role != null) {
+         String roleName = role.name;
+-        String label = getContainerLabel(container, roleName, role.group);
++        String roleGroup = role.group;
++        String label = getContainerLabel(container, roleName, roleGroup);
+         log.info("Rebuilding in-memory: container {} in role {} in cluster {}",
+                  container.getId(), roleName, applicationId);
+         getComponentStatuses().put(label,
+-            new ComponentInstanceState(roleName, container.getId(),
++            new ComponentInstanceState(roleGroup, container.getId(),
+                                        applicationId));
+       } else {
+         log.warn("Role not found for container {} in cluster {}",
+@@ -983,7 +1055,7 @@ public HeartBeatResponse handleHeartBeat(HeartBeat heartBeat) {
+ 
+     StateAccessForProviders accessor = getAmState();
+     CommandScript cmdScript = getScriptPathForMasterPackage(roleGroup);
+-    List<ComponentCommand> commands = getMetaInfo().getApplicationComponent(roleGroup).getCommands();
++    List<ComponentCommand> commands = getApplicationComponent(roleGroup).getCommands();
+ 
+     if (!isDockerContainer(roleGroup) && !isYarnDockerContainer(roleGroup)
+         && (cmdScript == null || cmdScript.getScript() == null)
+@@ -1261,7 +1333,7 @@ public HeartBeatResponse handleHeartBeat(HeartBeat heartBeat) {
+   }
+ 
+   private boolean isDockerContainer(String roleGroup) {
+-    String type = getMetaInfo().getApplicationComponent(roleGroup).getType();
++    String type = getApplicationComponent(roleGroup).getType();
+     if (SliderUtils.isSet(type)) {
+       return type.toLowerCase().equals(SliderUtils.DOCKER) || type.toLowerCase().equals(SliderUtils.DOCKER_YARN);
+     }
+@@ -1269,7 +1341,7 @@ private boolean isDockerContainer(String roleGroup) {
+   }
+ 
+   private boolean isYarnDockerContainer(String roleGroup) {
+-    String type = getMetaInfo().getApplicationComponent(roleGroup).getType();
++    String type = getApplicationComponent(roleGroup).getType();
+     if (SliderUtils.isSet(type)) {
+       return type.toLowerCase().equals(SliderUtils.DOCKER_YARN);
+     }
+@@ -1393,23 +1465,21 @@ public void applyInitialRegistryDefinitions(URL amWebURI,
+       throw new IOException(e);
+     }
+ 
+-    for (ConfigFile configFile : getMetaInfo()
+-        .getComponentConfigFiles(client.getName())) {
++    for (ConfigFile configFile : getMetaInfo().getComponentConfigFiles(client.getName())) {
+       addNamedConfiguration(configFile.getDictionaryName(),
+           appConf.getGlobalOptions().options, configurations, tokens, null,
+-          client.getName());
++          client.getName(), client.getName());
+       if (appConf.getComponent(client.getName()) != null) {
+         addNamedConfiguration(configFile.getDictionaryName(),
+             appConf.getComponent(client.getName()).options, configurations,
+-            tokens, null, client.getName());
++            tokens, null, client.getName(), client.getName());
+       }
+     }
+ 
+     //do a final replacement of re-used configs
+     dereferenceAllConfigs(configurations);
+ 
+-    for (ConfigFile configFile : getMetaInfo()
+-        .getComponentConfigFiles(client.getName())) {
++    for (ConfigFile configFile : getMetaInfo().getComponentConfigFiles(client.getName())) {
+       ConfigFormat configFormat = ConfigFormat.resolve(configFile.getType());
+ 
+       Map<String, String> config = configurations.get(configFile.getDictionaryName());
+@@ -1525,9 +1595,23 @@ private void initializeAgentDebugCommands(AggregateConf instanceDefinition) {
+     return workFolderExports;
+   }
+ 
+-  @VisibleForTesting
+   protected Metainfo getMetaInfo() {
+-    return this.metaInfo;
++    return getMetaInfo(null);
++  }
++
++  @VisibleForTesting
++  protected Metainfo getMetaInfo(String roleGroup) {
++    String mapKey = DEFAULT_METAINFO_MAP_KEY;
++    if (roleGroup != null) {
++      ConfTreeOperations appConf = getAmState().getAppConfSnapshot();
++      mapKey = appConf.getComponentOpt(roleGroup, ROLE_PREFIX,
++          DEFAULT_METAINFO_MAP_KEY);
++    }
++    MetainfoHolder mh = this.metaInfoMap.get(mapKey);
++    if (mh == null) {
++      return null;
++    }
++    return mh.metaInfo;
+   }
+ 
+   @VisibleForTesting
+@@ -1597,8 +1681,11 @@ public void setAppStopInitiated(boolean appStopInitiated) {
+     return defaultConfigMap;
+   }
+ 
+-  protected Map<String, DefaultConfig> getDefaultConfigs() {
+-    return defaultConfigs;
++  protected Map<String, DefaultConfig> getDefaultConfigs(String roleGroup) {
++    ConfTreeOperations appConf = getAmState().getAppConfSnapshot();
++    String mapKey = appConf.getComponentOpt(roleGroup, ROLE_PREFIX,
++        DEFAULT_METAINFO_MAP_KEY);
++    return metaInfoMap.get(mapKey).defaultConfigs;
+   }
+ 
+   private int getHeartbeatMonitorInterval() {
+@@ -1764,9 +1851,9 @@ protected void publishConfigAndExportGroups(HeartBeat heartBeat,
+         log.info("Status report: {}", status.toString());
+ 
+         if (status.getConfigs() != null) {
+-          Application application = getMetaInfo().getApplication();
++          Application application = getMetaInfo(componentGroup).getApplication();
+ 
+-          if ((!canAnyMasterPublishConfig() || canPublishConfig(componentGroup)) &&
++          if ((!canAnyMasterPublishConfig(componentGroup) || canPublishConfig(componentGroup)) &&
+               !getAmState().getAppConfSnapshot().getComponentOptBool(
+                   componentGroup, AgentKeys.AM_CONFIG_GENERATION, false)) {
+             // If no Master can explicitly publish then publish if its a master
+@@ -1914,7 +2001,7 @@ protected void processAndPublishComponentSpecificData(Map<String, String> ports,
+     String hostNamePattern = "${THIS_HOST}";
+     Map<String, String> toPublish = new HashMap<String, String>();
+ 
+-    Application application = getMetaInfo().getApplication();
++    Application application = getMetaInfo(componentGroup).getApplication();
+     for (Component component : application.getComponents()) {
+       if (component.getName().equals(componentGroup)) {
+         if (component.getComponentExports().size() > 0) {
+@@ -1965,8 +2052,8 @@ protected void processAndPublishComponentSpecificExports(Map<String, String> por
+     String portVarFormat = "${site.%s}";
+     String hostNamePattern = "${" + compGroup + "_HOST}";
+ 
+-    List<ExportGroup> appExportGroups = getMetaInfo().getApplication().getExportGroups();
+-    Component component = getMetaInfo().getApplicationComponent(compGroup);
++    List<ExportGroup> appExportGroups = getMetaInfo(compGroup).getApplication().getExportGroups();
++    Component component = getApplicationComponent(compGroup);
+     if (component != null && SliderUtils.isSet(component.getCompExports())
+         && SliderUtils.isNotEmpty(appExportGroups)) {
+ 
+@@ -2068,7 +2155,11 @@ private void publishComponentInstanceData() {
+    * @return the component entry or null for no match
+    */
+   protected Component getApplicationComponent(String roleGroup) {
+-    return getMetaInfo().getApplicationComponent(roleGroup);
++    Metainfo metainfo = getMetaInfo(roleGroup);
++    if (metainfo == null) {
++      return null;
++    }
++    return metainfo.getApplicationComponent(roleGroup);
+   }
+ 
+   /**
+@@ -2137,9 +2228,9 @@ protected boolean isMarkedAutoRestart(String roleGroup) {
+    *
+    * @return true if the condition holds
+    */
+-  protected boolean canAnyMasterPublishConfig() {
++  protected boolean canAnyMasterPublishConfig(String roleGroup) {
+     if (canAnyMasterPublish == null) {
+-      Application application = getMetaInfo().getApplication();
++      Application application = getMetaInfo(roleGroup).getApplication();
+       if (application == null) {
+         log.error("Malformed app definition: Expect application as root element in the metainfo.xml");
+       } else {
+@@ -2214,7 +2305,7 @@ protected void addInstallCommand(String roleName,
+     cmd.setPkg(pkg);
+     Map<String, String> hostLevelParams = new TreeMap<String, String>();
+     hostLevelParams.put(JAVA_HOME, appConf.getGlobalOptions().getOption(JAVA_HOME, getJDKDir()));
+-    hostLevelParams.put(PACKAGE_LIST, getPackageList());
++    hostLevelParams.put(PACKAGE_LIST, getPackageList(roleGroup));
+     hostLevelParams.put(CONTAINER_ID, containerId);
+     cmd.setHostLevelParams(hostLevelParams);
+ 
+@@ -2263,7 +2354,7 @@ protected void addInstallDockerCommand(String roleName,
+     cmd.setComponentName(roleName);
+     cmd.setRole(roleName);
+     Map<String, String> hostLevelParams = new TreeMap<String, String>();
+-    hostLevelParams.put(PACKAGE_LIST, getPackageList());
++    hostLevelParams.put(PACKAGE_LIST, getPackageList(roleGroup));
+     hostLevelParams.put(CONTAINER_ID, containerId);
+     cmd.setHostLevelParams(hostLevelParams);
+ 
+@@ -2283,7 +2374,7 @@ protected void addInstallDockerCommand(String roleName,
+     configurations.get("global").put("exec_cmd", effectiveCommand.getExec());
+ 
+     cmd.setHostname(getClusterInfoPropertyValue(StatusKeys.INFO_AM_HOSTNAME));
+-    cmd.addContainerDetails(roleGroup, getMetaInfo());
++    cmd.addContainerDetails(roleGroup, getMetaInfo(roleGroup));
+ 
+     Map<String, String> dockerConfig = new HashMap<String, String>();
+     if(isYarnDockerContainer(roleGroup)){
+@@ -2366,8 +2457,8 @@ protected static String getPackageListFromApplication(Application application) {
+     }
+   }
+ 
+-  private String getPackageList() {
+-    return getPackageListFromApplication(getMetaInfo().getApplication());
++  private String getPackageList(String roleGroup) {
++    return getPackageListFromApplication(getMetaInfo(roleGroup).getApplication());
+   }
+ 
+   private void prepareExecutionCommand(ExecutionCommand cmd) {
+@@ -2532,7 +2623,7 @@ protected void addGetConfigDockerCommand(String roleName, String roleGroup,
+   private String getConfigFromMetaInfoWithAppConfigOverriding(String roleGroup,
+       String configName){
+     ConfTreeOperations appConf = getAmState().getAppConfSnapshot();
+-    String containerName = getMetaInfo().getApplicationComponent(roleGroup)
++    String containerName = getApplicationComponent(roleGroup)
+         .getDockerContainers().get(0).getName();
+     String composedConfigName = null;
+     String appConfigValue = null;
+@@ -2673,7 +2764,7 @@ protected void addStartDockerCommand(String roleName, String roleGroup,
+     
+     cmd.setConfigurations(configurations);
+    // configurations.get("global").put("exec_cmd", startCommand.getExec());
+-    cmd.addContainerDetails(roleGroup, getMetaInfo());
++    cmd.addContainerDetails(roleGroup, getMetaInfo(roleGroup));
+ 
+     log.info("Docker- command: {}", cmd.toString());
+ 
+@@ -2683,7 +2774,7 @@ protected void addStartDockerCommand(String roleName, String roleGroup,
+   private String getConfigFromMetaInfo(String roleGroup, String configName) {
+     String result = null;
+ 
+-    List<DockerContainer> containers = getMetaInfo().getApplicationComponent(
++    List<DockerContainer> containers = getApplicationComponent(
+         roleGroup).getDockerContainers();// to support multi container per
+                                              // component later
+     log.debug("Docker- containers metainfo: {}", containers.toString());
+@@ -2985,10 +3076,11 @@ protected static String getJDKDir() {
+ 
+     for (String configType : configs) {
+       addNamedConfiguration(configType, appConf.getGlobalOptions().options,
+-                            configurations, tokens, containerId, roleName);
++                            configurations, tokens, containerId, roleName,
++                            roleGroup);
+       if (appConf.getComponent(roleGroup) != null) {
+         addNamedConfiguration(configType, appConf.getComponent(roleGroup).options,
+-            configurations, tokens, containerId, roleName);
++            configurations, tokens, containerId, roleName, roleGroup);
+       }
+     }
+ 
+@@ -3058,15 +3150,32 @@ protected void dereferenceAllConfigs(Map<String, Map<String, String>> configurat
+     tokens.put("${NN_HOST}", URI.create(nnuri).getHost());
+     tokens.put("${ZK_HOST}", appConf.get(OptionKeys.ZOOKEEPER_HOSTS));
+     tokens.put("${DEFAULT_ZK_PATH}", appConf.get(OptionKeys.ZOOKEEPER_PATH));
++    String prefix = appConf.getComponentOpt(componentGroup, ROLE_PREFIX,
++        null);
++    String dataDirSuffix = "";
++    if (prefix == null) {
++      prefix = "";
++    } else {
++      dataDirSuffix = "_" + SliderUtils.trimPrefix(prefix);
++    }
+     tokens.put("${DEFAULT_DATA_DIR}", getAmState()
+         .getInternalsSnapshot()
+         .getGlobalOptions()
+-        .getMandatoryOption(InternalKeys.INTERNAL_DATA_DIR_PATH));
++        .getMandatoryOption(InternalKeys.INTERNAL_DATA_DIR_PATH) + dataDirSuffix);
+     tokens.put("${JAVA_HOME}", appConf.get(AgentKeys.JAVA_HOME));
+     tokens.put("${COMPONENT_NAME}", componentName);
++    tokens.put("${COMPONENT_NAME.lc}", componentName.toLowerCase());
++    tokens.put("${COMPONENT_PREFIX}", prefix);
++    tokens.put("${COMPONENT_PREFIX.lc}", prefix.toLowerCase());
+     if (!componentName.equals(componentGroup) && componentName.startsWith(componentGroup)) {
+       tokens.put("${COMPONENT_ID}", componentName.substring(componentGroup.length()));
+     }
++    tokens.put("${CLUSTER_NAME}", getClusterName());
++    tokens.put("${CLUSTER_NAME.lc}", getClusterName().toLowerCase());
++    tokens.put("${APP_NAME}", getClusterName());
++    tokens.put("${APP_NAME.lc}", getClusterName().toLowerCase());
++    tokens.put("${APP_COMPONENT_NAME}", componentName);
++    tokens.put("${APP_COMPONENT_NAME.lc}", componentName.toLowerCase());
+     return tokens;
+   }
+ 
+@@ -3091,12 +3200,12 @@ protected void dereferenceAllConfigs(Map<String, Map<String, String>> configurat
+     List<String> configList = new ArrayList<String>();
+     configList.add(GLOBAL_CONFIG_TAG);
+ 
+-    List<ConfigFile> configFiles = getMetaInfo().getApplication().getConfigFiles();
++    List<ConfigFile> configFiles = getMetaInfo(roleGroup).getApplication().getConfigFiles();
+     for (ConfigFile configFile : configFiles) {
+       log.info("Expecting config type {}.", configFile.getDictionaryName());
+       configList.add(configFile.getDictionaryName());
+     }
+-    for (Component component : getMetaInfo().getApplication().getComponents()) {
++    for (Component component : getMetaInfo(roleGroup).getApplication().getComponents()) {
+       if (!component.getName().equals(roleGroup)) {
+         continue;
+       }
+@@ -3121,7 +3230,7 @@ protected void dereferenceAllConfigs(Map<String, Map<String, String>> configurat
+   private void addNamedConfiguration(String configName, Map<String, String> sourceConfig,
+                                      Map<String, Map<String, String>> configurations,
+                                      Map<String, String> tokens, String containerId,
+-                                     String roleName) {
++                                     String roleName, String roleGroup) {
+     Map<String, String> config = new HashMap<String, String>();
+     if (configName.equals(GLOBAL_CONFIG_TAG)) {
+       addDefaultGlobalConfig(config, containerId, roleName);
+@@ -3150,9 +3259,9 @@ private void addNamedConfiguration(String configName, Map<String, String> source
+     }
+ 
+     //apply defaults only if the key is not present and value is not empty
+-    if (getDefaultConfigs().containsKey(configName)) {
++    if (getDefaultConfigs(roleGroup).containsKey(configName)) {
+       log.info("Adding default configs for type {}.", configName);
+-      for (PropertyInfo defaultConfigProp : getDefaultConfigs().get(configName).getPropertyInfos()) {
++      for (PropertyInfo defaultConfigProp : getDefaultConfigs(roleGroup).get(configName).getPropertyInfos()) {
+         if (!config.containsKey(defaultConfigProp.getName())) {
+           if (!defaultConfigProp.getName().isEmpty() &&
+               defaultConfigProp.getValue() != null &&
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/providers/agent/AgentUtils.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/providers/agent/AgentUtils.java
+index cfcfc5d..23e05a3 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/providers/agent/AgentUtils.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/providers/agent/AgentUtils.java
+@@ -21,6 +21,7 @@
+ import org.apache.hadoop.fs.Path;
+ import org.apache.slider.common.tools.SliderFileSystem;
+ import org.apache.slider.common.tools.SliderUtils;
++import org.apache.slider.core.conf.ConfTreeOperations;
+ import org.apache.slider.core.exceptions.BadConfigException;
+ import org.apache.slider.providers.agent.application.metadata.AbstractMetainfoParser;
+ import org.apache.slider.providers.agent.application.metadata.AddonPackageMetainfoParser;
+@@ -35,6 +36,8 @@
+ import java.io.IOException;
+ import java.io.InputStream;
+ 
++import static org.apache.slider.api.RoleKeys.ROLE_PREFIX;
++
+ /**
+  *
+  */
+@@ -131,4 +134,17 @@ static DefaultConfig getDefaultConfig(SliderFileSystem fileSystem,
+ 
+     return new DefaultConfigParser().parse(configStream);
+   }
++
++  static String getMetainfoComponentName(String roleGroup,
++      ConfTreeOperations appConf) throws BadConfigException {
++    String prefix = appConf.getComponentOpt(roleGroup, ROLE_PREFIX, null);
++    if (prefix == null) {
++      return roleGroup;
++    }
++    if (!roleGroup.startsWith(prefix)) {
++      throw new BadConfigException("Component " + roleGroup + " doesn't start" +
++          " with prefix " + prefix);
++    }
++    return roleGroup.substring(prefix.length());
++  }
+ }
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/providers/agent/ComponentCommandOrder.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/providers/agent/ComponentCommandOrder.java
+index 91f1259..4abac7a 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/providers/agent/ComponentCommandOrder.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/providers/agent/ComponentCommandOrder.java
+@@ -18,6 +18,8 @@
+ 
+ package org.apache.slider.providers.agent;
+ 
++import org.apache.slider.common.tools.SliderUtils;
++import org.apache.slider.core.conf.ConfTreeOperations;
+ import org.apache.slider.providers.agent.application.metadata.CommandOrder;
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
+@@ -25,9 +27,12 @@
+ import java.util.ArrayList;
+ import java.util.Collection;
+ import java.util.HashMap;
++import java.util.HashSet;
+ import java.util.List;
+ import java.util.Map;
+ 
++import static org.apache.slider.api.RoleKeys.ROLE_PREFIX;
++
+ /**
+  * Stores the command dependency order for all components in a service. <commandOrder>
+  * <command>SUPERVISOR-START</command> <requires>NIMBUS-STARTED</requires> </commandOrder> Means, SUPERVISOR START
+@@ -39,13 +44,36 @@
+   private static char SPLIT_CHAR = '-';
+   Map<Command, Map<String, List<ComponentState>>> dependencies =
+       new HashMap<Command, Map<String, List<ComponentState>>>();
++  Map<String, Collection<String>> prefixRoleMap = new HashMap<>();
++  Map<String, String> rolePrefixMap = new HashMap<>();
++
++  public ComponentCommandOrder() {}
+ 
+-  public ComponentCommandOrder(List<CommandOrder> commandOrders) {
++  public ComponentCommandOrder(List<CommandOrder> commandOrders,
++      ConfTreeOperations resources) {
++    mergeCommandOrders(commandOrders, resources);
++  }
++
++  void mergeCommandOrders(List<CommandOrder> commandOrders,
++      ConfTreeOperations resources) {
++    for (String component : resources.getComponentNames()) {
++      String prefix = SliderUtils.trimPrefix(
++          resources.getComponentOpt(component, ROLE_PREFIX, null));
++      if (prefix != null) {
++        rolePrefixMap.put(component, prefix);
++        if (!prefixRoleMap.containsKey(prefix)) {
++          prefixRoleMap.put(prefix, new HashSet<String>());
++        }
++        prefixRoleMap.get(prefix).add(component);
++      }
++    }
+     if (commandOrders != null && commandOrders.size() > 0) {
+       for (CommandOrder commandOrder : commandOrders) {
+-        ComponentCommand componentCmd = getComponentCommand(commandOrder.getCommand());
++        ComponentCommand componentCmd = getComponentCommand(
++            commandOrder.getCommand(), resources);
+         String requires = commandOrder.getRequires();
+-        List<ComponentState> requiredStates = parseRequiredStates(requires);
++        List<ComponentState> requiredStates = parseRequiredStates(requires,
++            resources);
+         if (requiredStates.size() > 0) {
+           Map<String, List<ComponentState>> compDep = dependencies.get(componentCmd.command);
+           if (compDep == null) {
+@@ -65,7 +93,8 @@ public ComponentCommandOrder(List<CommandOrder> commandOrders) {
+     }
+   }
+ 
+-  private List<ComponentState> parseRequiredStates(String requires) {
++  private List<ComponentState> parseRequiredStates(String requires,
++      ConfTreeOperations resources) {
+     if (requires == null || requires.length() < 2) {
+       throw new IllegalArgumentException("Input cannot be null and must contain component and state.");
+     }
+@@ -73,13 +102,14 @@ public ComponentCommandOrder(List<CommandOrder> commandOrders) {
+     String[] componentStates = requires.split(",");
+     List<ComponentState> retList = new ArrayList<ComponentState>();
+     for (String componentStateStr : componentStates) {
+-      retList.add(getComponentState(componentStateStr));
++      retList.add(getComponentState(componentStateStr, resources));
+     }
+ 
+     return retList;
+   }
+ 
+-  private ComponentCommand getComponentCommand(String compCmdStr) {
++  private ComponentCommand getComponentCommand(String compCmdStr,
++      ConfTreeOperations resources) {
+     if (compCmdStr == null || compCmdStr.trim().length() < 2) {
+       throw new IllegalArgumentException("Input cannot be null and must contain component and command.");
+     }
+@@ -92,6 +122,11 @@ private ComponentCommand getComponentCommand(String compCmdStr) {
+     String compStr = compCmdStr.substring(0, splitIndex);
+     String cmdStr = compCmdStr.substring(splitIndex + 1);
+ 
++    if (resources.getComponent(compStr) == null && !prefixRoleMap.containsKey(compStr)) {
++      throw new IllegalArgumentException("Component " + compStr + " specified" +
++          " in command order does not exist");
++    }
++
+     Command cmd = Command.valueOf(cmdStr);
+ 
+     if (cmd != Command.START) {
+@@ -100,7 +135,8 @@ private ComponentCommand getComponentCommand(String compCmdStr) {
+     return new ComponentCommand(compStr, cmd);
+   }
+ 
+-  private ComponentState getComponentState(String compStStr) {
++  private ComponentState getComponentState(String compStStr,
++      ConfTreeOperations resources) {
+     if (compStStr == null || compStStr.trim().length() < 2) {
+       throw new IllegalArgumentException("Input cannot be null.");
+     }
+@@ -113,6 +149,11 @@ private ComponentState getComponentState(String compStStr) {
+     String compStr = compStStr.substring(0, splitIndex);
+     String stateStr = compStStr.substring(splitIndex + 1);
+ 
++    if (resources.getComponent(compStr) == null && !prefixRoleMap.containsKey(compStr)) {
++      throw new IllegalArgumentException("Component " + compStr + " specified" +
++          " in command order does not exist");
++    }
++
+     State state = State.valueOf(stateStr);
+     if (state != State.STARTED && state != State.INSTALLED) {
+       throw new IllegalArgumentException("Dependency order can only be specified against STARTED/INSTALLED.");
+@@ -123,40 +164,43 @@ private ComponentState getComponentState(String compStStr) {
+   // dependency is still on component level, but not package level
+   // so use component name to check dependency, not component-package
+   public boolean canExecute(String component, Command command, Collection<ComponentInstanceState> currentStates) {
+-    boolean canExecute = true;
+-    if (dependencies.containsKey(command) && dependencies.get(command).containsKey(component)) {
+-      List<ComponentState> required = dependencies.get(command).get(component);
+-      for (ComponentState stateToMatch : required) {
+-        for (ComponentInstanceState currState : currentStates) {
+-          log.debug("Checking schedule {} {} against dependency {} is {}",
+-                    component, command, currState.getComponentName(), currState.getState());
+-          if (currState.getComponentName().equals(stateToMatch.componentName)) {
+-            if (currState.getState() != stateToMatch.state) {
+-              if (stateToMatch.state == State.STARTED) {
++    if (!dependencies.containsKey(command)) {
++      return true;
++    }
++    List<ComponentState> required = new ArrayList<>();
++    if (dependencies.get(command).containsKey(component)) {
++      required.addAll(dependencies.get(command).get(component));
++    }
++    String prefix = rolePrefixMap.get(component);
++    if (prefix != null && dependencies.get(command).containsKey(prefix)) {
++      required.addAll(dependencies.get(command).get(prefix));
++    }
++
++    for (ComponentState stateToMatch : required) {
++      for (ComponentInstanceState currState : currentStates) {
++        log.debug("Checking schedule {} {} against dependency {} is {}",
++            component, command, currState.getComponentName(), currState.getState());
++        if (currState.getComponentName().equals(stateToMatch.componentName) ||
++            (prefixRoleMap.containsKey(stateToMatch.componentName) &&
++                prefixRoleMap.get(stateToMatch.componentName).contains(currState.getComponentName()))) {
++          if (currState.getState() != stateToMatch.state) {
++            if (stateToMatch.state == State.STARTED) {
++              log.info("Cannot schedule {} {} as dependency {} is {}",
++                  component, command, currState.getComponentName(), currState.getState());
++              return false;
++            } else {
++              //state is INSTALLED
++              if (currState.getState() != State.STARTING && currState.getState() != State.STARTED) {
+                 log.info("Cannot schedule {} {} as dependency {} is {}",
+-                         component, command, currState.getComponentName(), currState.getState());
+-                canExecute = false;
+-              } else {
+-                //state is INSTALLED
+-                if (currState.getState() != State.STARTING && currState.getState() != State.STARTED) {
+-                  log.info("Cannot schedule {} {} as dependency {} is {}",
+-                           component, command, currState.getComponentName(), currState.getState());
+-                  canExecute = false;
+-                }
++                    component, command, currState.getComponentName(), currState.getState());
++                return false;
+               }
+             }
+           }
+-          if (!canExecute) {
+-            break;
+-          }
+-        }
+-        if (!canExecute) {
+-          break;
+         }
+       }
+     }
+-
+-    return canExecute;
++    return true;
+   }
+ 
+   static class ComponentState {
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/server/appmaster/SliderAppMaster.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/server/appmaster/SliderAppMaster.java
+index addb3f7..983b5ba 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/server/appmaster/SliderAppMaster.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/server/appmaster/SliderAppMaster.java
+@@ -20,6 +20,9 @@
+ 
+ import com.codahale.metrics.MetricRegistry;
+ import com.codahale.metrics.health.HealthCheckRegistry;
++import com.codahale.metrics.jvm.GarbageCollectorMetricSet;
++import com.codahale.metrics.jvm.MemoryUsageGaugeSet;
++import com.codahale.metrics.jvm.ThreadStatesGaugeSet;
+ import com.google.common.base.Preconditions;
+ import com.google.protobuf.BlockingService;
+ 
+@@ -879,7 +882,8 @@ private int createAndRunCluster(String clustername) throws Throwable {
+       Configuration providerConf =
+         providerService.loadProviderConfigurationInformation(confDir);
+ 
+-      providerService.initializeApplicationConfiguration(instanceDefinition, fs);
++      providerService.initializeApplicationConfiguration(instanceDefinition,
++          fs, null);
+ 
+       providerService.validateApplicationConfiguration(instanceDefinition,
+           confDir,
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/server/appmaster/state/AppState.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/server/appmaster/state/AppState.java
+index 16c2435..49e7b78 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/server/appmaster/state/AppState.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/server/appmaster/state/AppState.java
+@@ -1818,6 +1818,11 @@ public synchronized ClusterDescription refreshClusterStatus(Map<String, String>
+         SliderUtils.mergeMapsIgnoreDuplicateKeys(cd.getRole(rolename),
+             groupOptions.options);
+       }
++      String prefix = instanceDefinition.getAppConfOperations()
++          .getComponentOpt(role.getGroup(), ROLE_PREFIX, null);
++      if (SliderUtils.isSet(prefix)) {
++        cd.setRoleOpt(rolename, ROLE_PREFIX, SliderUtils.trimPrefix(prefix));
++      }
+       List<String> instances = instanceMap.get(rolename);
+       int nodeCount = instances != null ? instances.size(): 0;
+       cd.setRoleOpt(rolename, COMPONENT_INSTANCES,
+diff --git a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/AgentResource.java b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/AgentResource.java
+index f1e105a..20ef068 100644
+--- a/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/AgentResource.java
++++ b/hadoop-yarn-project/hadoop-yarn/hadoop-yarn-applications/hadoop-yarn-slider/hadoop-yarn-slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/AgentResource.java
+@@ -73,7 +73,7 @@ public Response endpointRoot() {
+   }
+ 
+   @POST
+-  @Path("/{agent_name: [a-zA-Z][a-zA-Z_0-9]*}/register")
++  @Path("/{agent_name: [a-zA-Z][a-zA-Z0-9_-]*}/register")
+   @Consumes({MediaType.APPLICATION_JSON})
+   @Produces({MediaType.APPLICATION_JSON})
+   public RegistrationResponse register(Register registration,
+@@ -87,7 +87,7 @@ public RegistrationResponse register(Register registration,
+   }
+ 
+   @POST
+-  @Path("/{agent_name: [a-zA-Z][a-zA-Z_0-9]*}/heartbeat")
++  @Path("/{agent_name: [a-zA-Z][a-zA-Z0-9_-]*}/heartbeat")
+   @Consumes(MediaType.APPLICATION_JSON)
+   @Produces({MediaType.APPLICATION_JSON})
+   public HeartBeatResponse heartbeat(HeartBeat message,

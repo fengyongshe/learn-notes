@@ -1,0 +1,2029 @@
+diff --git slider-core/src/main/java/org/apache/slider/api/ClusterNode.java slider-core/src/main/java/org/apache/slider/api/ClusterNode.java
+index d255db0..008c68d 100644
+--- slider-core/src/main/java/org/apache/slider/api/ClusterNode.java
++++ slider-core/src/main/java/org/apache/slider/api/ClusterNode.java
+@@ -19,6 +19,7 @@
+ package org.apache.slider.api;
+ 
+ import org.apache.hadoop.yarn.api.records.ContainerId;
++import org.apache.hadoop.yarn.api.records.Resource;
+ import org.apache.slider.api.proto.Messages;
+ import org.codehaus.jackson.JsonParseException;
+ import org.codehaus.jackson.annotate.JsonIgnore;
+@@ -99,6 +100,10 @@ public final class ClusterNode implements Cloneable {
+    */
+   public String[] environment;
+ 
++  public int memory;
++
++  public int vCores;
++
+   /**
+    * server-side ctor takes the container ID and builds the name from it
+    * @param containerId container ID; can be null
+diff --git slider-core/src/main/java/org/apache/slider/api/SliderClusterProtocol.java slider-core/src/main/java/org/apache/slider/api/SliderClusterProtocol.java
+index 33fce22..d1cc6fb 100644
+--- slider-core/src/main/java/org/apache/slider/api/SliderClusterProtocol.java
++++ slider-core/src/main/java/org/apache/slider/api/SliderClusterProtocol.java
+@@ -110,6 +110,17 @@ public interface SliderClusterProtocol extends VersionedProtocol {
+       throws IOException, YarnException;
+ 
+   /**
++   * Change resource of an identified container
++   * @param request request containing the container to be resized
++   * @return the response
++   * @throws IOException
++   * @throws YarnException
++   */
++  Messages.ResizeContainersResponseProto resizeContainer(
++      Messages.ResizeContainersRequestProto request)
++      throws IOException, YarnException;
++
++  /**
+    * AM to commit suicide. If the Hadoop halt entry point has not been disabled,
+    * this will fail rather than return with a response.
+    * @param request request
+diff --git slider-core/src/main/java/org/apache/slider/api/types/ContainerInformation.java slider-core/src/main/java/org/apache/slider/api/types/ContainerInformation.java
+index 6991340..626b9d5 100644
+--- slider-core/src/main/java/org/apache/slider/api/types/ContainerInformation.java
++++ slider-core/src/main/java/org/apache/slider/api/types/ContainerInformation.java
+@@ -42,6 +42,8 @@ public class ContainerInformation {
+   public String host;
+   public String hostURL;
+   public String placement;
++
++
+   /**
+    * What is the tail output from the executed process (or [] if not started
+    * or the log cannot be picked up
+diff --git slider-core/src/main/java/org/apache/slider/client/ipc/SliderClusterOperations.java slider-core/src/main/java/org/apache/slider/client/ipc/SliderClusterOperations.java
+index 392f451..69461d3 100644
+--- slider-core/src/main/java/org/apache/slider/client/ipc/SliderClusterOperations.java
++++ slider-core/src/main/java/org/apache/slider/client/ipc/SliderClusterOperations.java
+@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
+ import com.google.common.base.Preconditions;
+ import org.apache.hadoop.yarn.api.records.NodeReport;
+ import org.apache.hadoop.yarn.api.records.NodeState;
++import org.apache.hadoop.yarn.api.records.Resource;
+ import org.apache.hadoop.yarn.exceptions.YarnException;
+ import org.apache.slider.api.ClusterDescription;
+ import org.apache.slider.api.ClusterNode;
+@@ -196,6 +197,22 @@ public class SliderClusterOperations {
+     return response.getSuccess();
+   }
+ 
++  public boolean resizeContainer(Resource target, Collection<String> containers,
++      Collection<String> components) throws YarnException, IOException {
++    Messages.ResourceProto resource =
++        Messages.ResourceProto.newBuilder()
++            .setMemory(target.getMemory())
++            .setVirtualCores(target.getVirtualCores())
++            .build();
++    Messages.ResizeContainersRequestProto req =
++        Messages.ResizeContainersRequestProto.newBuilder()
++            .setTargetResource(resource)
++            .addAllContainer(containers)
++            .addAllComponent(components)
++            .build();
++    return appMaster.resizeContainer(req).getSuccess();
++  }
++
+   /**
+    * List all node UUIDs in a role
+    * @param role role name or "" for all
+diff --git slider-core/src/main/java/org/apache/slider/client/SliderClientAPI.java slider-core/src/main/java/org/apache/slider/client/SliderClientAPI.java
+index 5c5d96b..7d4d5f0 100644
+--- slider-core/src/main/java/org/apache/slider/client/SliderClientAPI.java
++++ slider-core/src/main/java/org/apache/slider/client/SliderClientAPI.java
+@@ -42,6 +42,7 @@ import org.apache.slider.common.params.ActionPackageArgs;
+ import org.apache.slider.common.params.ActionKillContainerArgs;
+ import org.apache.slider.common.params.ActionListArgs;
+ import org.apache.slider.common.params.ActionRegistryArgs;
++import org.apache.slider.common.params.ActionResizeContainerArgs;
+ import org.apache.slider.common.params.ActionResolveArgs;
+ import org.apache.slider.common.params.ActionStatusArgs;
+ import org.apache.slider.common.params.ActionThawArgs;
+@@ -246,6 +247,17 @@ public interface SliderClientAPI extends Service {
+       throws YarnException, IOException;
+ 
+   /**
++   * Kill a specific container of the cluster
++   * @param name cluster name
++   * @param args arguments
++   * @return exit code
++   * @throws YarnException
++   * @throws IOException
++   */
++  int actionResizeContainer(String name, ActionResizeContainerArgs args)
++      throws YarnException, IOException;
++
++  /**
+    * Echo operation (not currently wired up to command line)
+    * @param name cluster name
+    * @param args arguments
+diff --git slider-core/src/main/java/org/apache/slider/client/SliderClient.java slider-core/src/main/java/org/apache/slider/client/SliderClient.java
+index 28727cb..dba215a 100644
+--- slider-core/src/main/java/org/apache/slider/client/SliderClient.java
++++ slider-core/src/main/java/org/apache/slider/client/SliderClient.java
+@@ -56,6 +56,7 @@ import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
+ import org.apache.hadoop.yarn.api.records.LocalResource;
+ import org.apache.hadoop.yarn.api.records.NodeReport;
+ import org.apache.hadoop.yarn.api.records.NodeState;
++import org.apache.hadoop.yarn.api.records.Resource;
+ import org.apache.hadoop.yarn.api.records.YarnApplicationState;
+ import org.apache.hadoop.yarn.conf.YarnConfiguration;
+ import org.apache.hadoop.yarn.exceptions.ApplicationAttemptNotFoundException;
+@@ -98,6 +99,7 @@ import org.apache.slider.common.params.ActionLookupArgs;
+ import org.apache.slider.common.params.ActionNodesArgs;
+ import org.apache.slider.common.params.ActionPackageArgs;
+ import org.apache.slider.common.params.ActionRegistryArgs;
++import org.apache.slider.common.params.ActionResizeContainerArgs;
+ import org.apache.slider.common.params.ActionResolveArgs;
+ import org.apache.slider.common.params.ActionStatusArgs;
+ import org.apache.slider.common.params.ActionThawArgs;
+@@ -402,6 +404,11 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
+             serviceArgs.getActionKillContainerArgs());
+         break;
+ 
++      case ACTION_RESIZE_CONTAINERS:
++        exitCode = actionResizeContainer(clusterName,
++            serviceArgs.getActionResizeContainerArgs());
++      break;
++
+       case ACTION_INSTALL_KEYTAB:
+         exitCode = actionInstallKeytab(serviceArgs.getActionInstallKeytabArgs());
+         break;
+@@ -720,6 +727,39 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
+   }
+ 
+   @Override
++  public int actionResizeContainer(String name, ActionResizeContainerArgs args)
++      throws YarnException, IOException {
++    // not an error to try to resize a stopped cluster, just return success
++    // code, appropriate log messages have already been dumped
++    if (!isAppInRunningState(name)) {
++      return EXIT_SUCCESS;
++    }
++
++    int memory = args.memory;
++    int vCores = args.vCores;
++    Set<String> containers = new HashSet<>();
++    Set<String> components = new HashSet<>();
++
++    containers.addAll(args.containers);
++    components.addAll(args.components);
++    if (containers.isEmpty() && components.isEmpty()) {
++      return EXIT_NOT_FOUND;
++    }
++    // check validity of component names and running containers here
++    Set<String> validContainers = new HashSet<>();
++    Set<String> validComponents = new HashSet<>();
++    if (!getValidContainersAndComponents(name,
++        containers, components, validContainers, validComponents)) {
++      return EXIT_NOT_FOUND;
++    }
++    SliderClusterOperations clusterOps =
++        new SliderClusterOperations(bondToCluster(name));
++    clusterOps.resizeContainer(
++        Resource.newInstance(memory, vCores), validContainers, validComponents);
++    return EXIT_SUCCESS;
++  }
++
++  @Override
+   public int actionUpgrade(String clustername, ActionUpgradeArgs upgradeArgs)
+       throws YarnException, IOException {
+     File template = upgradeArgs.template;
+@@ -799,44 +839,14 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
+       components.addAll(new ArrayList<>(upgradeArgs.components));
+     }
+ 
++    if (containers.isEmpty() && components.isEmpty()) {
++      return EXIT_NOT_FOUND;
++    }
+     // check validity of component names and running containers here
+-    List<ContainerInformation> liveContainers = getContainers(clustername);
+     Set<String> validContainers = new HashSet<>();
+     Set<String> validComponents = new HashSet<>();
+-    for (ContainerInformation liveContainer : liveContainers) {
+-      boolean allContainersAndComponentsAccountedFor = true;
+-      if (CollectionUtils.isNotEmpty(containers)) {
+-        if (containers.contains(liveContainer.containerId)) {
+-          containers.remove(liveContainer.containerId);
+-          validContainers.add(liveContainer.containerId);
+-        }
+-        allContainersAndComponentsAccountedFor = false;
+-      }
+-      if (CollectionUtils.isNotEmpty(components)) {
+-        if (components.contains(liveContainer.component)) {
+-          components.remove(liveContainer.component);
+-          validComponents.add(liveContainer.component);
+-        }
+-        allContainersAndComponentsAccountedFor = false;
+-      }
+-      if (allContainersAndComponentsAccountedFor) {
+-        break;
+-      }
+-    }
+-
+-    // If any item remains in containers or components then they are invalid.
+-    // Log warning for them and proceed.
+-    if (CollectionUtils.isNotEmpty(containers)) {
+-      log.warn("Invalid set of containers provided {}", containers);
+-    }
+-    if (CollectionUtils.isNotEmpty(components)) {
+-      log.warn("Invalid set of components provided {}", components);
+-    }
+-
+-    // If not a single valid container or component is specified do not proceed
+-    if (CollectionUtils.isEmpty(validContainers)
+-        && CollectionUtils.isEmpty(validComponents)) {
+-      log.error("Not a single valid container or component specified. Nothing to do.");
++    if (!getValidContainersAndComponents(clustername,
++        containers, components, validContainers, validComponents)) {
+       return EXIT_NOT_FOUND;
+     }
+ 
+@@ -892,6 +902,53 @@ public class SliderClient extends AbstractSliderLaunchedService implements RunSe
+     return true;
+   }
+ 
++  private boolean getValidContainersAndComponents(String clustername,
++      Set<String> containers, Set<String> components,
++      Set<String> validContainers, Set<String> validComponents)
++      throws YarnException, IOException {
++    // check validity of component names and running containers here
++    List<ContainerInformation> liveContainers = getContainers(clustername);
++    for (ContainerInformation liveContainer : liveContainers) {
++      boolean allContainersAndComponentsAccountedFor = true;
++      if (CollectionUtils.isNotEmpty(containers)) {
++        if (containers.contains(liveContainer.containerId)) {
++          containers.remove(liveContainer.containerId);
++          validContainers.add(liveContainer.containerId);
++        }
++        allContainersAndComponentsAccountedFor = false;
++      }
++      if (CollectionUtils.isNotEmpty(components)) {
++        if (components.contains(liveContainer.component)) {
++          components.remove(liveContainer.component);
++          validComponents.add(liveContainer.component);
++        }
++        allContainersAndComponentsAccountedFor = false;
++      }
++      if (allContainersAndComponentsAccountedFor) {
++        break;
++      }
++    }
++
++    // If any item remains in containers or components then they are invalid.
++    // Log warning for them and proceed.
++    if (CollectionUtils.isNotEmpty(containers)) {
++      log.warn("Invalid set of containers provided {}", containers);
++    }
++    if (CollectionUtils.isNotEmpty(components)) {
++      log.warn("Invalid set of components provided {}", components);
++    }
++
++    // If not a single valid container or component is specified do not proceed
++    if (CollectionUtils.isEmpty(validContainers)
++        && CollectionUtils.isEmpty(validComponents)) {
++      log.error("Not a single valid container or component specified. "
++          + "Nothing to do.");
++      return false;
++    }
++
++    return true;
++  }
++
+   private static void checkForCredentials(Configuration conf,
+       ConfTree tree) throws IOException {
+     if (tree.credentials == null || tree.credentials.isEmpty()) {
+diff --git slider-core/src/main/java/org/apache/slider/common/params/ActionResizeContainerArgs.java slider-core/src/main/java/org/apache/slider/common/params/ActionResizeContainerArgs.java
+new file mode 100644
+index 0000000..203be7c
+--- /dev/null
++++ slider-core/src/main/java/org/apache/slider/common/params/ActionResizeContainerArgs.java
+@@ -0,0 +1,74 @@
++/*
++ * Licensed to the Apache Software Foundation (ASF) under one
++ * or more contributor license agreements.  See the NOTICE file
++ * distributed with this work for additional information
++ * regarding copyright ownership.  The ASF licenses this file
++ * to you under the Apache License, Version 2.0 (the
++ * "License"); you may not use this file except in compliance
++ * with the License.  You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package org.apache.slider.common.params;
++
++import com.beust.jcommander.Parameter;
++import com.beust.jcommander.Parameters;
++import org.apache.slider.core.exceptions.BadCommandArgumentsException;
++import org.apache.slider.core.exceptions.UsageException;
++
++import java.util.ArrayList;
++import java.util.List;
++
++@Parameters(commandNames = {SliderActions.ACTION_RESIZE_CONTAINERS},
++    commandDescription = SliderActions.DESCRIBE_ACTION_RESIZE_CONTAINERS)
++
++public class ActionResizeContainerArgs extends AbstractActionArgs {
++  @Override
++  public String getActionName() {
++    return SliderActions.ACTION_RESIZE_CONTAINERS;
++  }
++
++  @Parameter(names = {ARG_CONTAINERS}, variableArity = true,
++      description = "resize specific containers")
++  public List<String> containers = new ArrayList<>(0);
++
++  @Parameter(names = {ARG_COMPONENTS}, variableArity = true,
++      description = "resize all containers of specific components")
++  public List<String> components = new ArrayList<>(0);
++
++  @Parameter(names = {ARG_CONTAINER_MEM},
++      description = "Target memory of the container")
++  public int memory;
++
++  @Parameter(names = {ARG_CONTAINER_VCORES},
++      description = "Target virtual cores of the container")
++  public int vCores;
++
++  @Override
++  public void validate() throws BadCommandArgumentsException, UsageException {
++    super.validate();
++    if (containers.isEmpty() && components.isEmpty()) {
++      throw new BadCommandArgumentsException(ARG_CONTAINERS + " and "
++          + ARG_COMPONENTS + " cannot be empty at the same time");
++    }
++    if (memory < 0) {
++      throw new BadCommandArgumentsException(ARG_CONTAINER_MEM
++          + " cannot be set to a negative number");
++    }
++    if (vCores < 0) {
++      throw new BadCommandArgumentsException(ARG_CONTAINER_VCORES
++          + " cannot be set to a negative number");
++    }
++    if (memory == 0 && vCores == 0) {
++      throw new BadCommandArgumentsException(ARG_CONTAINER_MEM + " and "
++          + ARG_CONTAINER_VCORES + " cannot be zero at the same time");
++    }
++  }
++}
+diff --git slider-core/src/main/java/org/apache/slider/common/params/Arguments.java slider-core/src/main/java/org/apache/slider/common/params/Arguments.java
+index 62e5e0d..ce2379f 100644
+--- slider-core/src/main/java/org/apache/slider/common/params/Arguments.java
++++ slider-core/src/main/java/org/apache/slider/common/params/Arguments.java
+@@ -35,6 +35,8 @@ public interface Arguments {
+   String ARG_BASE_PATH = "--basepath";
+   String ARG_CLIENT = "--client";
+   String ARG_CONFDIR = "--appconf";
++  String ARG_CONTAINER_MEM = "--memory";
++  String ARG_CONTAINER_VCORES = "--vcores";
+   String ARG_COMPONENT = "--component";
+   String ARG_COMPONENT_SHORT = "--comp";
+   String ARG_COMPONENTS = "--components";
+diff --git slider-core/src/main/java/org/apache/slider/common/params/ClientArgs.java slider-core/src/main/java/org/apache/slider/common/params/ClientArgs.java
+index e5e6888..0e9db95 100644
+--- slider-core/src/main/java/org/apache/slider/common/params/ClientArgs.java
++++ slider-core/src/main/java/org/apache/slider/common/params/ClientArgs.java
+@@ -64,7 +64,7 @@ public class ClientArgs extends CommonArgs {
+   private final ActionKDiagArgs actionKDiagArgs = new ActionKDiagArgs();
+   private final ActionKeytabArgs actionKeytabArgs = new ActionKeytabArgs();
+   private final ActionKillContainerArgs actionKillContainerArgs =
+-    new ActionKillContainerArgs();
++      new ActionKillContainerArgs();
+   private final ActionListArgs actionListArgs = new ActionListArgs();
+   private final ActionLookupArgs actionLookupArgs = new ActionLookupArgs();
+   private final ActionNodesArgs actionNodesArgs = new ActionNodesArgs();
+@@ -75,6 +75,8 @@ public class ClientArgs extends CommonArgs {
+   private final ActionUpdateArgs actionUpdateArgs = new ActionUpdateArgs();
+   private final ActionVersionArgs actionVersionArgs = new ActionVersionArgs();
+   private final ActionUpgradeArgs actionUpgradeArgs = new ActionUpgradeArgs();
++  private final ActionResizeContainerArgs actionResizeContainerArgs =
++      new ActionResizeContainerArgs();
+ 
+   public ClientArgs(String[] args) {
+     super(args);
+@@ -109,6 +111,7 @@ public class ClientArgs extends CommonArgs {
+         actionNodesArgs,
+         actionPackageArgs,
+         actionRegistryArgs,
++        actionResizeContainerArgs,
+         actionResolveArgs,
+         actionStatusArgs,
+         actionThawArgs,
+@@ -200,6 +203,10 @@ public class ClientArgs extends CommonArgs {
+     return actionKillContainerArgs;
+   }
+ 
++  public ActionResizeContainerArgs getActionResizeContainerArgs() {
++    return actionResizeContainerArgs;
++  }
++
+   public ActionListArgs getActionListArgs() {
+     return actionListArgs;
+   }
+@@ -311,6 +318,10 @@ public class ClientArgs extends CommonArgs {
+         bindCoreAction(actionKillContainerArgs);
+         break;
+ 
++      case ACTION_RESIZE_CONTAINERS:
++        bindCoreAction(actionResizeContainerArgs);
++        break;
++
+       case ACTION_LIST:
+         bindCoreAction(actionListArgs);
+         break;
+diff --git slider-core/src/main/java/org/apache/slider/common/params/SliderActions.java slider-core/src/main/java/org/apache/slider/common/params/SliderActions.java
+index 5849e5e..768f4c7 100644
+--- slider-core/src/main/java/org/apache/slider/common/params/SliderActions.java
++++ slider-core/src/main/java/org/apache/slider/common/params/SliderActions.java
+@@ -38,6 +38,7 @@ public interface SliderActions {
+   String ACTION_HELP = "help";
+   String ACTION_KDIAG = "kdiag";
+   String ACTION_KILL_CONTAINER = "kill-container";
++  String ACTION_RESIZE_CONTAINERS = "resize-containers";
+   String ACTION_LIST = "list";
+   String ACTION_LOOKUP = "lookup";
+   String ACTION_NODES = "nodes";
+@@ -78,6 +79,8 @@ public interface SliderActions {
+   String DESCRIBE_ACTION_KDIAG = "Diagnose Kerberos problems";
+   String DESCRIBE_ACTION_KILL_CONTAINER =
+     "Kill a container in the application";
++  String DESCRIBE_ACTION_RESIZE_CONTAINERS =
++      "Change resource of containers in the application";
+   String DESCRIBE_ACTION_HELP = "Print help information";
+   String DESCRIBE_ACTION_LIST =
+                   "List running Slider applications";
+diff --git slider-core/src/main/java/org/apache/slider/providers/AbstractProviderService.java slider-core/src/main/java/org/apache/slider/providers/AbstractProviderService.java
+index 61b2655..1baf220 100644
+--- slider-core/src/main/java/org/apache/slider/providers/AbstractProviderService.java
++++ slider-core/src/main/java/org/apache/slider/providers/AbstractProviderService.java
+@@ -23,6 +23,7 @@ import org.apache.hadoop.service.Service;
+ import org.apache.hadoop.yarn.api.records.Container;
+ import org.apache.hadoop.yarn.api.records.ContainerId;
+ import org.apache.hadoop.yarn.api.records.Priority;
++import org.apache.hadoop.yarn.api.records.Resource;
+ import org.apache.hadoop.yarn.client.api.AMRMClient;
+ import org.apache.hadoop.registry.client.binding.RegistryTypeUtils;
+ import org.apache.hadoop.registry.client.exceptions.InvalidRecordException;
+@@ -397,6 +398,12 @@ public abstract class AbstractProviderService
+   }
+ 
+   @Override
++  public void requestContainerResourceChange(
++      Container container, Resource capability) {
++    // no-op
++  }
++
++  @Override
+   public void cancelSingleRequest(AMRMClient.ContainerRequest request) {
+     // no-op
+   }
+diff --git slider-core/src/main/java/org/apache/slider/server/appmaster/actions/ActionIncreaseContainerResource.java slider-core/src/main/java/org/apache/slider/server/appmaster/actions/ActionIncreaseContainerResource.java
+new file mode 100644
+index 0000000..0cfbd77
+--- /dev/null
++++ slider-core/src/main/java/org/apache/slider/server/appmaster/actions/ActionIncreaseContainerResource.java
+@@ -0,0 +1,46 @@
++/*
++ * Licensed to the Apache Software Foundation (ASF) under one
++ * or more contributor license agreements.  See the NOTICE file
++ * distributed with this work for additional information
++ * regarding copyright ownership.  The ASF licenses this file
++ * to you under the Apache License, Version 2.0 (the
++ * "License"); you may not use this file except in compliance
++ * with the License.  You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package org.apache.slider.server.appmaster.actions;
++
++import org.apache.hadoop.yarn.api.records.Container;
++import org.apache.slider.server.appmaster.SliderAppMaster;
++import org.apache.slider.server.appmaster.state.AppState;
++
++import java.util.Locale;
++import java.util.concurrent.TimeUnit;
++
++public class ActionIncreaseContainerResource extends AsyncAction {
++
++  private final Container container;
++
++  public ActionIncreaseContainerResource(
++      String name, Container container, long delay, TimeUnit timeUnit) {
++    super(String.format(
++        Locale.ENGLISH, "%s %s: /", name , container.getId().toString()),
++        delay, timeUnit);
++    this.container = container;
++  }
++
++  @Override
++  public void execute(SliderAppMaster appMaster,
++                      QueueAccess queueService,
++                      AppState appState) throws Exception {
++    appMaster.increaseContainerResource(container);
++  }
++}
+diff --git slider-core/src/main/java/org/apache/slider/server/appmaster/actions/ActionRequestContainersResize.java slider-core/src/main/java/org/apache/slider/server/appmaster/actions/ActionRequestContainersResize.java
+new file mode 100644
+index 0000000..b24310b
+--- /dev/null
++++ slider-core/src/main/java/org/apache/slider/server/appmaster/actions/ActionRequestContainersResize.java
+@@ -0,0 +1,136 @@
++/*
++ * Licensed to the Apache Software Foundation (ASF) under one
++ * or more contributor license agreements.  See the NOTICE file
++ * distributed with this work for additional information
++ * regarding copyright ownership.  The ASF licenses this file
++ * to you under the Apache License, Version 2.0 (the
++ * "License"); you may not use this file except in compliance
++ * with the License.  You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package org.apache.slider.server.appmaster.actions;
++
++import com.google.common.base.Preconditions;
++import org.apache.hadoop.yarn.api.records.Container;
++import org.apache.hadoop.yarn.api.records.ContainerId;
++import org.apache.hadoop.yarn.api.records.Resource;
++import org.apache.hadoop.yarn.util.resource.Resources;
++import org.apache.slider.server.appmaster.SliderAppMaster;
++import org.apache.slider.server.appmaster.operations.AbstractRMOperation;
++import org.apache.slider.server.appmaster.operations
++    .ContainerChangeRequestOperation;
++import org.apache.slider.server.appmaster.operations.RMOperationHandlerActions;
++import org.apache.slider.server.appmaster.state.AppState;
++import org.apache.slider.server.appmaster.state.RoleInstance;
++
++import java.util.HashSet;
++import java.util.LinkedList;
++import java.util.List;
++import java.util.Map;
++import java.util.Set;
++import java.util.concurrent.TimeUnit;
++
++public class ActionRequestContainersResize extends AsyncAction {
++
++  private final Resource targetResource;
++  private final Set<String> containerIds = new HashSet<>();
++  private final Set<String> components = new HashSet<>();
++  private final RMOperationHandlerActions operationHandler;
++
++  /**
++   * Change resource of a container
++   * @param containerIds a list of container Ids
++   * @param components a list of components
++   * @param targetResource resource to change to
++   * @param operationHandler handler for the operation
++   */
++  public ActionRequestContainersResize(
++      Resource targetResource,
++      List<String> containerIds,
++      List<String> components,
++      long delay,
++      TimeUnit timeUnit,
++      RMOperationHandlerActions operationHandler) {
++    super("request container resize", delay, timeUnit);
++    this.targetResource = targetResource;
++    this.operationHandler = operationHandler;
++    this.containerIds.addAll(containerIds);
++    this.components.addAll(components);
++  }
++
++  private boolean verifyContainerResourceChangeRequest(RoleInstance instance) {
++    ContainerId containerId = instance.getContainerId();
++    Resource currentResource = instance.getContainerResource();
++    if (currentResource == null) {
++      SliderAppMaster.getLog().warn("Skip resizing container {} whose"
++          + " current resource allocation is unknown.", containerId);
++      return false;
++    }
++    if (!Resources.fitsIn(currentResource, targetResource) &&
++        !Resources.fitsIn(targetResource, currentResource)) {
++      SliderAppMaster.getLog().warn("Skip resizing container {} from {} to {}. "
++          + "Not all indices of the target resource are larger or smaller than "
++          + "the original resource.", containerId, currentResource,
++          targetResource);
++      return false;
++    }
++    // It is ok to have target resource equal to original resource. This may
++    // be needed to cancel a resource increase reservation.
++    return true;
++  }
++
++  @Override
++  public void execute(
++      SliderAppMaster appMaster, QueueAccess queueService, AppState appState)
++      throws Exception {
++    Resource maxResource = appState.getMaxContainerResource();
++    Resource minResource = appState.getMinContainerResource();
++    if (!Resources.fitsIn(minResource, targetResource) ||
++        !Resources.fitsIn(targetResource, maxResource)) {
++      SliderAppMaster.getLog().error("Failed to resize containers. The target "
++          + "resource {} is beyond container resource limit. "
++          + "The minimum resource is {}. The maximum resource is {}.",
++          targetResource, minResource, maxResource);
++      return;
++    }
++    // Get all containers that we are interested in
++    if (!components.isEmpty()) {
++      Map<String, List<String>> roleToInstanceMap =
++          appState.createRoleToInstanceMap();
++      for (String component : components) {
++        List<String> roleContainers = roleToInstanceMap.get(component);
++        if (roleContainers != null) {
++          containerIds.addAll(roleContainers);
++        }
++      }
++    }
++    List<RoleInstance> instances =
++        appState.getLiveInstancesByContainerIDs(containerIds);
++    if (instances.isEmpty()) {
++      SliderAppMaster.getLog().error("Failed to resize containers. The "
++          + "containers {} and components {} cannot be found.",
++          containerIds, components);
++      return;
++    }
++    List<AbstractRMOperation> opsList = new LinkedList<>();
++    for (RoleInstance instance : instances) {
++      if (!verifyContainerResourceChangeRequest(instance)) {
++        continue;
++      }
++      ContainerChangeRequestOperation resize =
++          new ContainerChangeRequestOperation(
++              instance.getContainer(), targetResource);
++      opsList.add(resize);
++    }
++    //now apply the operations
++    operationHandler.execute(opsList);
++  }
++}
+diff --git slider-core/src/main/java/org/apache/slider/server/appmaster/operations/AsyncRMOperationHandler.java slider-core/src/main/java/org/apache/slider/server/appmaster/operations/AsyncRMOperationHandler.java
+index 03231ef..6753d5f 100644
+--- slider-core/src/main/java/org/apache/slider/server/appmaster/operations/AsyncRMOperationHandler.java
++++ slider-core/src/main/java/org/apache/slider/server/appmaster/operations/AsyncRMOperationHandler.java
+@@ -18,6 +18,7 @@
+ 
+ package org.apache.slider.server.appmaster.operations;
+ 
++import org.apache.hadoop.yarn.api.records.Container;
+ import org.apache.hadoop.yarn.api.records.ContainerId;
+ import org.apache.hadoop.yarn.api.records.Priority;
+ import org.apache.hadoop.yarn.api.records.Resource;
+@@ -103,6 +104,12 @@ public class AsyncRMOperationHandler extends RMOperationHandler {
+   }
+ 
+   @Override
++  public void requestContainerResourceChange(
++      Container container, Resource capability) {
++    client.requestContainerResourceChange(container, capability);
++  }
++
++  @Override
+   @SuppressWarnings("unchecked")
+   public void addContainerRequest(AMRMClient.ContainerRequest req) {
+     client.addContainerRequest(req);
+diff --git slider-core/src/main/java/org/apache/slider/server/appmaster/operations/ContainerChangeRequestOperation.java slider-core/src/main/java/org/apache/slider/server/appmaster/operations/ContainerChangeRequestOperation.java
+new file mode 100644
+index 0000000..0c74bb4
+--- /dev/null
++++ slider-core/src/main/java/org/apache/slider/server/appmaster/operations/ContainerChangeRequestOperation.java
+@@ -0,0 +1,51 @@
++/*
++ * Licensed to the Apache Software Foundation (ASF) under one
++ * or more contributor license agreements.  See the NOTICE file
++ * distributed with this work for additional information
++ * regarding copyright ownership.  The ASF licenses this file
++ * to you under the Apache License, Version 2.0 (the
++ * "License"); you may not use this file except in compliance
++ * with the License.  You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package org.apache.slider.server.appmaster.operations;
++
++
++import com.google.common.base.Preconditions;
++import org.apache.hadoop.yarn.api.records.Container;
++import org.apache.hadoop.yarn.api.records.Resource;
++
++public class ContainerChangeRequestOperation extends AbstractRMOperation {
++
++  private final Container container;
++  private final Resource targetResource;
++
++  public ContainerChangeRequestOperation(
++      Container container, Resource targetResource) {
++    Preconditions.checkArgument(container != null, "Null container");
++    Preconditions.checkArgument(targetResource != null, "Null target resource");
++    this.container = container;
++    this.targetResource = targetResource;
++  }
++
++  public Container getContainer() {
++    return this.container;
++  }
++
++  public Resource getTargetResource() {
++    return this.targetResource;
++  }
++
++  @Override
++  public void execute(RMOperationHandlerActions handler) {
++    handler.requestContainerResourceChange(container, targetResource);
++  }
++}
+diff --git slider-core/src/main/java/org/apache/slider/server/appmaster/operations/ProviderNotifyingOperationHandler.java slider-core/src/main/java/org/apache/slider/server/appmaster/operations/ProviderNotifyingOperationHandler.java
+index 184a36a..ec45796 100644
+--- slider-core/src/main/java/org/apache/slider/server/appmaster/operations/ProviderNotifyingOperationHandler.java
++++ slider-core/src/main/java/org/apache/slider/server/appmaster/operations/ProviderNotifyingOperationHandler.java
+@@ -18,8 +18,10 @@
+ 
+ package org.apache.slider.server.appmaster.operations;
+ 
++import org.apache.hadoop.yarn.api.records.Container;
+ import org.apache.hadoop.yarn.api.records.ContainerId;
+ import org.apache.hadoop.yarn.api.records.Priority;
++import org.apache.hadoop.yarn.api.records.Resource;
+ import org.apache.hadoop.yarn.client.api.AMRMClient;
+ import org.apache.slider.providers.ProviderService;
+ 
+@@ -42,6 +44,12 @@ public class ProviderNotifyingOperationHandler extends RMOperationHandler {
+   }
+ 
+   @Override
++  public void requestContainerResourceChange(
++      Container container, Resource capability) {
++    providerService.requestContainerResourceChange(container, capability);
++  }
++
++  @Override
+   public int cancelContainerRequests(Priority priority1,
+       Priority priority2,
+       int count) {
+diff --git slider-core/src/main/java/org/apache/slider/server/appmaster/operations/RMOperationHandlerActions.java slider-core/src/main/java/org/apache/slider/server/appmaster/operations/RMOperationHandlerActions.java
+index b7794ed..7956971 100644
+--- slider-core/src/main/java/org/apache/slider/server/appmaster/operations/RMOperationHandlerActions.java
++++ slider-core/src/main/java/org/apache/slider/server/appmaster/operations/RMOperationHandlerActions.java
+@@ -18,8 +18,10 @@
+ 
+ package org.apache.slider.server.appmaster.operations;
+ 
++import org.apache.hadoop.yarn.api.records.Container;
+ import org.apache.hadoop.yarn.api.records.ContainerId;
+ import org.apache.hadoop.yarn.api.records.Priority;
++import org.apache.hadoop.yarn.api.records.Resource;
+ import org.apache.hadoop.yarn.client.api.AMRMClient;
+ 
+ import java.util.List;
+@@ -39,6 +41,13 @@ public interface RMOperationHandlerActions {
+   void addContainerRequest(AMRMClient.ContainerRequest request);
+ 
+   /**
++   * Issue a container resource change request
++   * @param container the existing container
++   * @param capability the target resource capability
++   */
++  void requestContainerResourceChange(Container container, Resource capability);
++
++  /**
+    * Cancel a specific request
+    * @param request request to cancel
+    */
+diff --git slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderClusterProtocolPBImpl.java slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderClusterProtocolPBImpl.java
+index f0d9063..9267df7 100644
+--- slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderClusterProtocolPBImpl.java
++++ slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderClusterProtocolPBImpl.java
+@@ -22,6 +22,7 @@ import com.google.protobuf.RpcController;
+ import com.google.protobuf.ServiceException;
+ import org.apache.slider.api.SliderClusterProtocol;
+ import org.apache.slider.api.proto.Messages;
++import org.apache.slider.core.exceptions.ExceptionConverter;
+ 
+ import java.io.IOException;
+ 
+@@ -153,7 +154,18 @@ public class SliderClusterProtocolPBImpl implements SliderClusterProtocolPB {
+       throw wrap(e);
+     }
+   }
+-  
++
++  @Override
++  public Messages.ResizeContainersResponseProto resizeContainer(
++      RpcController controller, Messages.ResizeContainersRequestProto request)
++      throws ServiceException {
++    try {
++      return real.resizeContainer(request);
++    } catch (Exception e) {
++      throw wrap(e);
++    }
++  }
++
+   @Override
+   public Messages.AMSuicideResponseProto amSuicide(RpcController controller,
+       Messages.AMSuicideRequestProto request) throws ServiceException {
+diff --git slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderClusterProtocolProxy.java slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderClusterProtocolProxy.java
+index b230816..2c84555 100644
+--- slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderClusterProtocolProxy.java
++++ slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderClusterProtocolProxy.java
+@@ -203,6 +203,17 @@ public class SliderClusterProtocolProxy implements SliderClusterProtocol {
+   }
+ 
+   @Override
++  public Messages.ResizeContainersResponseProto resizeContainer(
++      Messages.ResizeContainersRequestProto request)
++      throws YarnException, IOException {
++    try {
++      return endpoint.resizeContainer(NULL_CONTROLLER, request);
++    } catch (ServiceException e) {
++      throw convert(e);
++    }
++  }
++
++  @Override
+   public Messages.AMSuicideResponseProto amSuicide(Messages.AMSuicideRequestProto request) throws
+                                                                                            IOException {
+     try {
+diff --git slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderIPCService.java slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderIPCService.java
+index fda23aa..4886de5 100644
+--- slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderIPCService.java
++++ slider-core/src/main/java/org/apache/slider/server/appmaster/rpc/SliderIPCService.java
+@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
+ import org.apache.hadoop.ipc.ProtocolSignature;
+ import org.apache.hadoop.service.AbstractService;
+ import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
++import org.apache.hadoop.yarn.api.records.Resource;
+ import org.apache.hadoop.yarn.exceptions.YarnException;
+ import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
+ import org.apache.slider.api.ClusterDescription;
+@@ -43,6 +44,7 @@ import org.apache.slider.server.appmaster.AppMasterActionOperations;
+ import org.apache.slider.server.appmaster.actions.ActionFlexCluster;
+ import org.apache.slider.server.appmaster.actions.ActionHalt;
+ import org.apache.slider.server.appmaster.actions.ActionKillContainer;
++import org.apache.slider.server.appmaster.actions.ActionRequestContainersResize;
+ import org.apache.slider.server.appmaster.actions.ActionStopSlider;
+ import org.apache.slider.server.appmaster.actions.ActionUpgradeContainers;
+ import org.apache.slider.server.appmaster.actions.AsyncAction;
+@@ -212,6 +214,24 @@ public class SliderIPCService extends AbstractService
+     return Messages.UpgradeContainersResponseProto.getDefaultInstance();
+   }
+ 
++  @Override
++  public Messages.ResizeContainersResponseProto resizeContainer(
++      Messages.ResizeContainersRequestProto request)
++      throws IOException, YarnException {
++    onRpcCall("resizecontainer");
++    Resource targetResource = Resource.newInstance(
++        request.getTargetResource().getMemory(),
++        request.getTargetResource().getVirtualCores());
++    log.info("Received request to resize containers to {}", targetResource);
++    queue(new ActionRequestContainersResize(
++        targetResource,
++        request.getContainerList(),
++        request.getComponentList(),
++        0, TimeUnit.MILLISECONDS, amOperations));
++    return Messages.ResizeContainersResponseProto.newBuilder().setSuccess(true)
++        .build();
++  }
++
+   @Override //SliderClusterProtocol
+   public Messages.FlexClusterResponseProto flexCluster(Messages.FlexClusterRequestProto request)
+       throws IOException {
+@@ -236,6 +256,7 @@ public class SliderIPCService extends AbstractService
+     ClusterDescription cd = state.refreshClusterStatus();
+     result = cd.toJsonString();
+     String stat = result;
++    log.debug("stat = " + stat);
+     return Messages.GetJSONClusterStatusResponseProto.newBuilder()
+                                                      .setClusterSpec(stat)
+                                                      .build();
+@@ -341,7 +362,6 @@ public class SliderIPCService extends AbstractService
+     return builder.build();
+   }
+ 
+-
+   @Override
+   public Messages.AMSuicideResponseProto amSuicide(
+       Messages.AMSuicideRequestProto request)
+diff --git slider-core/src/main/java/org/apache/slider/server/appmaster/SliderAppMaster.java slider-core/src/main/java/org/apache/slider/server/appmaster/SliderAppMaster.java
+index a01dde9..77e735e 100644
+--- slider-core/src/main/java/org/apache/slider/server/appmaster/SliderAppMaster.java
++++ slider-core/src/main/java/org/apache/slider/server/appmaster/SliderAppMaster.java
+@@ -20,9 +20,6 @@ package org.apache.slider.server.appmaster;
+ 
+ import com.codahale.metrics.MetricRegistry;
+ import com.codahale.metrics.health.HealthCheckRegistry;
+-import com.codahale.metrics.jvm.GarbageCollectorMetricSet;
+-import com.codahale.metrics.jvm.MemoryUsageGaugeSet;
+-import com.codahale.metrics.jvm.ThreadStatesGaugeSet;
+ import com.google.common.base.Preconditions;
+ import com.google.protobuf.BlockingService;
+ 
+@@ -69,6 +66,8 @@ import org.apache.hadoop.yarn.client.api.async.impl.NMClientAsyncImpl;
+ import org.apache.hadoop.yarn.conf.YarnConfiguration;
+ import static org.apache.hadoop.yarn.conf.YarnConfiguration.*;
+ import org.apache.hadoop.yarn.exceptions.InvalidApplicationMasterRequestException;
++
++import org.apache.hadoop.yarn.exceptions.InvalidResourceRequestException;
+ import org.apache.hadoop.yarn.exceptions.YarnException;
+ import org.apache.hadoop.yarn.ipc.YarnRPC;
+ import org.apache.hadoop.registry.client.api.RegistryOperations;
+@@ -107,6 +106,7 @@ import org.apache.slider.core.conf.ConfTree;
+ import org.apache.slider.core.conf.ConfTreeOperations;
+ import org.apache.slider.core.conf.MapOperations;
+ import org.apache.slider.core.exceptions.BadConfigException;
++import org.apache.slider.core.exceptions.NoSuchNodeException;
+ import org.apache.slider.core.exceptions.SliderException;
+ import org.apache.slider.core.exceptions.SliderInternalStateException;
+ import org.apache.slider.core.exceptions.TriggerClusterTeardownException;
+@@ -199,10 +199,8 @@ import java.util.concurrent.locks.ReentrantLock;
+ /**
+  * This is the AM, which directly implements the callbacks from the AM and NM
+  */
+-public class SliderAppMaster extends AbstractSliderLaunchedService 
+-  implements AMRMClientAsync.CallbackHandler,
+-    NMClientAsync.CallbackHandler,
+-    RunService,
++public class SliderAppMaster extends AbstractSliderLaunchedService
++    implements RunService,
+     SliderExitCodes,
+     SliderKeys,
+     ServiceStateChangeListener,
+@@ -422,6 +420,222 @@ public class SliderAppMaster extends AbstractSliderLaunchedService
+    */
+   private Resource maximumResourceCapability;
+ 
++
++
++/* =================================================================== */
++/* AMRMClientAsync callbacks */
++/* =================================================================== */
++  class RMCallbackHandler
++      extends AMRMClientAsync.AbstractCallbackHandler {
++
++    /**
++     * Callback event when a container is allocated.
++     *
++     * The app state is updated with the allocation, and builds up a list
++     * of assignments and RM operations. The assignments are
++     * handed off into the pool of service launchers to asynchronously schedule
++     * container launch operations.
++     *
++     * The operations are run in sequence; they are expected to be 0 or more
++     * release operations (to handle over-allocations)
++     *
++     * @param allocatedContainers list of containers that are now ready to be
++     * given work.
++     */
++    @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
++    @Override
++    public void onContainersAllocated(List<Container> allocatedContainers) {
++      LOG_YARN.info("onContainersAllocated({})", allocatedContainers.size());
++      List<ContainerAssignment> assignments = new ArrayList<>();
++      List<AbstractRMOperation> operations = new ArrayList<>();
++
++      //app state makes all the decisions
++      appState.onContainersAllocated(
++          allocatedContainers, assignments, operations);
++
++      //for each assignment: instantiate that role
++      for (ContainerAssignment assignment : assignments) {
++        launchService.launchRole(
++            assignment, getInstanceDefinition());
++      }
++
++      //for all the operations, exec them
++      execute(operations);
++      log.info("Diagnostics: {}", getContainerDiagnosticInfo());
++    }
++
++    @Override
++    public synchronized void onContainersResourceChanged(
++        List<Container> changedContainers) {
++      LOG_YARN.info(
++          "onContainersResourceChanged([{}])", changedContainers.size());
++      List<AsyncAction> actions = new ArrayList<>();
++      appState.onContainersResourceChanged(changedContainers, actions);
++      for (AsyncAction action : actions) {
++        queue(action);
++      }
++    }
++
++    @Override
++    public synchronized void onContainersCompleted(
++        List<ContainerStatus> completedContainers) {
++      LOG_YARN.info("onContainersCompleted([{}]", completedContainers.size());
++      for (ContainerStatus status : completedContainers) {
++        ContainerId containerId = status.getContainerId();
++        LOG_YARN.info("Container Completion for" +
++                " containerID={}," +
++                " state={}," +
++                " exitStatus={}," +
++                " diagnostics={}",
++            containerId, status.getState(),
++            status.getExitStatus(),
++            status.getDiagnostics());
++
++        // non complete containers should not be here
++        assert (status.getState() == ContainerState.COMPLETE);
++        AppState.NodeCompletionResult result =
++            appState.onCompletedNode(status);
++        if (result.containerFailed) {
++          RoleInstance ri = result.roleInstance;
++          log.error("Role instance {} failed ", ri);
++        }
++
++        //  known nodes trigger notifications
++        if(!result.unknownNode) {
++          getProviderService().notifyContainerCompleted(containerId);
++          queue(new UnregisterComponentInstance(containerId, 0,
++              TimeUnit.MILLISECONDS));
++        }
++      }
++
++      reviewRequestAndReleaseNodes("onContainersCompleted");
++    }
++    /**
++     * RM wants to shut down the AM
++     */
++    @Override
++    public void onShutdownRequest() {
++      LOG_YARN.info("Shutdown Request received");
++      signalAMComplete(new ActionStopSlider("stop",
++          EXIT_SUCCESS,
++          FinalApplicationStatus.SUCCEEDED,
++          "Shutdown requested from RM"));
++    }
++
++    /**
++     * Monitored nodes have been changed
++     * @param updatedNodes list of updated nodes
++     */
++    @Override //AMRMClientAsync
++    public void onNodesUpdated(List<NodeReport> updatedNodes) {
++      LOG_YARN.info("onNodesUpdated({})", updatedNodes.size());
++      log.info("Updated nodes {}", updatedNodes);
++      // Check if any nodes are lost or revived and update state accordingly
++
++      AppState.NodeUpdatedOutcome outcome = appState.onNodesUpdated(updatedNodes);
++      if (!outcome.operations.isEmpty()) {
++        execute(outcome.operations);
++      }
++      // trigger a review if the cluster changed
++      if (outcome.clusterChanged) {
++        reviewRequestAndReleaseNodes("nodes updated");
++      }
++    }
++
++    /**
++     * heartbeat operation; return the ratio of requested
++     * to actual
++     * @return progress
++     */
++    @Override
++    public float getProgress() {
++      return appState.getApplicationProgressPercentage();
++    }
++
++    @Override
++    public void onError(Throwable e) {
++      //callback says it's time to finish
++      LOG_YARN.error("AMRMClientAsync.onError() received {}", e, e);
++      signalAMComplete(new ActionStopSlider("stop",
++          EXIT_EXCEPTION_THROWN,
++          FinalApplicationStatus.FAILED,
++          "AMRMClientAsync.onError() received " + e));
++    }
++  }
++
++  class NMCallbackHandler extends NMClientAsync.AbstractCallbackHandler {
++
++    @Override
++    public void onContainerStopped(ContainerId containerId) {
++      // do nothing but log: container events from the AM
++      // are the source of container halt details to react to
++      log.info("onContainerStopped {} ", containerId);
++    }
++
++    @Override
++    public void onContainerStarted(ContainerId containerId,
++        Map<String, ByteBuffer> allServiceResponse) {
++      LOG_YARN.info("Started Container {} ", containerId);
++      RoleInstance cinfo = appState.onNodeManagerContainerStarted(containerId);
++      if (cinfo != null) {
++        LOG_YARN.info("Deployed instance of role {} onto {}",
++            cinfo.role, containerId);
++        //trigger an async container status
++        nmClientAsync.getContainerStatusAsync(containerId,
++            cinfo.getHost());
++        // push out a registration
++        queue(new RegisterComponentInstance(
++            containerId, cinfo.role, 0, TimeUnit.MILLISECONDS));
++
++      } else {
++        //this is a hypothetical path not seen. We react by warning
++        log.error(
++            "Notified of started container that isn't pending {} - releasing",
++            containerId);
++        //then release it
++        asyncRMClient.releaseAssignedContainer(containerId);
++      }
++    }
++
++    @Override
++    public void onStartContainerError(ContainerId containerId, Throwable t) {
++      LOG_YARN.error("Failed to start Container {}", containerId, t);
++      appState.onNodeManagerContainerStartFailed(containerId, t);
++    }
++
++    @Override
++    public void onContainerStatusReceived(ContainerId containerId,
++        ContainerStatus containerStatus) {
++      LOG_YARN.debug("Container Status: id={}, status={}", containerId,
++          containerStatus);
++    }
++
++    @Override
++    public void onGetContainerStatusError(
++        ContainerId containerId, Throwable t) {
++      LOG_YARN.error("Failed to query the status of Container {}", containerId);
++    }
++
++    @Override
++    public void onStopContainerError(ContainerId containerId, Throwable t) {
++      LOG_YARN.warn("Failed to stop Container {}", containerId);
++    }
++
++    @Override
++    public void onContainerResourceIncreased(
++        ContainerId containerId, Resource resource) {
++      LOG_YARN.info(
++          "Successfully increased resource of container {}", containerId);
++    }
++
++    @Override
++    public void onIncreaseContainerResourceError(
++        ContainerId containerId, Throwable t) {
++      LOG_YARN.error(
++          "Failed to increase resource of container {}", containerId);
++    }
++  }
++
+   /**
+    * Service Constructor
+    */
+@@ -722,14 +936,16 @@ public class SliderAppMaster extends AbstractSliderLaunchedService
+       int heartbeatInterval = HEARTBEAT_INTERVAL;
+ 
+       // add the RM client -this brings the callbacks in
+-      asyncRMClient = AMRMClientAsync.createAMRMClientAsync(heartbeatInterval, this);
++      asyncRMClient = AMRMClientAsync.createAMRMClientAsync(
++          heartbeatInterval, new RMCallbackHandler());
+       addService(asyncRMClient);
+       //now bring it up
+       deployChildService(asyncRMClient);
+ 
+ 
+       // nmclient relays callbacks back to this class
+-      nmClientAsync = new NMClientAsyncImpl("nmclient", this);
++      nmClientAsync = new NMClientAsyncImpl(
++          "nmclient", new NMCallbackHandler());
+       deployChildService(nmClientAsync);
+ 
+       // set up secret manager
+@@ -1668,77 +1884,6 @@ public class SliderAppMaster extends AbstractSliderLaunchedService
+   }
+ 
+ 
+-/* =================================================================== */
+-/* AMRMClientAsync callbacks */
+-/* =================================================================== */
+-
+-  /**
+-   * Callback event when a container is allocated.
+-   * 
+-   * The app state is updated with the allocation, and builds up a list
+-   * of assignments and RM operations. The assignments are 
+-   * handed off into the pool of service launchers to asynchronously schedule
+-   * container launch operations.
+-   * 
+-   * The operations are run in sequence; they are expected to be 0 or more
+-   * release operations (to handle over-allocations)
+-   * 
+-   * @param allocatedContainers list of containers that are now ready to be
+-   * given work.
+-   */
+-  @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
+-  @Override //AMRMClientAsync
+-  public void onContainersAllocated(List<Container> allocatedContainers) {
+-    LOG_YARN.info("onContainersAllocated({})", allocatedContainers.size());
+-    List<ContainerAssignment> assignments = new ArrayList<>();
+-    List<AbstractRMOperation> operations = new ArrayList<>();
+-    
+-    //app state makes all the decisions
+-    appState.onContainersAllocated(allocatedContainers, assignments, operations);
+-
+-    //for each assignment: instantiate that role
+-    for (ContainerAssignment assignment : assignments) {
+-      launchService.launchRole(assignment, getInstanceDefinition());
+-    }
+-    
+-    //for all the operations, exec them
+-    execute(operations);
+-    log.info("Diagnostics: {}", getContainerDiagnosticInfo());
+-  }
+-
+-  @Override //AMRMClientAsync
+-  public synchronized void onContainersCompleted(List<ContainerStatus> completedContainers) {
+-    LOG_YARN.info("onContainersCompleted([{}]", completedContainers.size());
+-    for (ContainerStatus status : completedContainers) {
+-      ContainerId containerId = status.getContainerId();
+-      LOG_YARN.info("Container Completion for" +
+-                    " containerID={}," +
+-                    " state={}," +
+-                    " exitStatus={}," +
+-                    " diagnostics={}",
+-                    containerId, status.getState(),
+-                    status.getExitStatus(),
+-                    status.getDiagnostics());
+-
+-      // non complete containers should not be here
+-      assert (status.getState() == ContainerState.COMPLETE);
+-      AppState.NodeCompletionResult result = appState.onCompletedNode(status);
+-      if (result.containerFailed) {
+-        RoleInstance ri = result.roleInstance;
+-        log.error("Role instance {} failed ", ri);
+-      }
+-
+-      //  known nodes trigger notifications
+-      if(!result.unknownNode) {
+-        getProviderService().notifyContainerCompleted(containerId);
+-        queue(new UnregisterComponentInstance(containerId, 0,
+-            TimeUnit.MILLISECONDS));
+-      }
+-    }
+-
+-    reviewRequestAndReleaseNodes("onContainersCompleted");
+-  }
+-
+   /**
+    * Signal that containers are being upgraded. Containers specified with
+    * --containers option and all containers of all roles specified with
+@@ -1763,14 +1908,11 @@ public class SliderAppMaster extends AbstractSliderLaunchedService
+     // If components are specified as well, then grab all the containers of
+     // each of the components (roles)
+     if (CollectionUtils.isNotEmpty(components)) {
+-      Map<ContainerId, RoleInstance> liveContainers = appState.getLiveContainers();
+-      if (CollectionUtils.isNotEmpty(liveContainers.keySet())) {
+-        Map<String, Set<String>> roleContainerMap = prepareRoleContainerMap(liveContainers);
+-        for (String component : components) {
+-          Set<String> roleContainers = roleContainerMap.get(component);
+-          if (roleContainers != null) {
+-            containers.addAll(roleContainers);
+-          }
++      Map<String, List<String>> roleToInstanceMap = appState.createRoleToInstanceMap();
++      for (String component : components) {
++        List<String> roleContainers = roleToInstanceMap.get(component);
++        if (roleContainers != null) {
++          containers.addAll(roleContainers);
+         }
+       }
+     }
+@@ -1783,25 +1925,6 @@ public class SliderAppMaster extends AbstractSliderLaunchedService
+     }
+   }
+ 
+-  // create a reverse map of roles -> set of all live containers
+-  private Map<String, Set<String>> prepareRoleContainerMap(
+-      Map<ContainerId, RoleInstance> liveContainers) {
+-    // liveContainers is ensured to be not empty
+-    Map<String, Set<String>> roleContainerMap = new HashMap<>();
+-    for (Map.Entry<ContainerId, RoleInstance> liveContainer : liveContainers
+-        .entrySet()) {
+-      RoleInstance role = liveContainer.getValue();
+-      if (roleContainerMap.containsKey(role.role)) {
+-        roleContainerMap.get(role.role).add(liveContainer.getKey().toString());
+-      } else {
+-        Set<String> containers = new HashSet<String>();
+-        containers.add(liveContainer.getKey().toString());
+-        roleContainerMap.put(role.role, containers);
+-      }
+-    }
+-    return roleContainerMap;
+-  }
+-
+   /**
+    * Implementation of cluster flexing.
+    * It should be the only way that anything -even the AM itself on startup-
+@@ -1982,58 +2105,6 @@ public class SliderAppMaster extends AbstractSliderLaunchedService
+     return timeoutInMillis;
+   }
+ 
+-  /**
+-   * RM wants to shut down the AM
+-   */
+-  @Override //AMRMClientAsync
+-  public void onShutdownRequest() {
+-    LOG_YARN.info("Shutdown Request received");
+-    signalAMComplete(new ActionStopSlider("stop",
+-        EXIT_SUCCESS,
+-        FinalApplicationStatus.SUCCEEDED,
+-        "Shutdown requested from RM"));
+-  }
+-
+-  /**
+-   * Monitored nodes have been changed
+-   * @param updatedNodes list of updated nodes
+-   */
+-  @Override //AMRMClientAsync
+-  public void onNodesUpdated(List<NodeReport> updatedNodes) {
+-    LOG_YARN.info("onNodesUpdated({})", updatedNodes.size());
+-    log.info("Updated nodes {}", updatedNodes);
+-    // Check if any nodes are lost or revived and update state accordingly
+-
+-    AppState.NodeUpdatedOutcome outcome = appState.onNodesUpdated(updatedNodes);
+-    if (!outcome.operations.isEmpty()) {
+-      execute(outcome.operations);
+-    }
+-    // trigger a review if the cluster changed
+-    if (outcome.clusterChanged) {
+-      reviewRequestAndReleaseNodes("nodes updated");
+-    }
+-  }
+-
+-  /**
+-   * heartbeat operation; return the ratio of requested
+-   * to actual
+-   * @return progress
+-   */
+-  @Override //AMRMClientAsync
+-  public float getProgress() {
+-    return appState.getApplicationProgressPercentage();
+-  }
+-
+-  @Override //AMRMClientAsync
+-  public void onError(Throwable e) {
+-    //callback says it's time to finish
+-    LOG_YARN.error("AMRMClientAsync.onError() received {}", e, e);
+-    signalAMComplete(new ActionStopSlider("stop",
+-        EXIT_EXCEPTION_THROWN,
+-        FinalApplicationStatus.FAILED,
+-        "AMRMClientAsync.onError() received " + e));
+-  }
+-  
+ /* =================================================================== */
+ /* RMOperationHandlerActions */
+ /* =================================================================== */
+@@ -2055,6 +2126,12 @@ public class SliderAppMaster extends AbstractSliderLaunchedService
+   }
+ 
+   @Override
++  public void requestContainerResourceChange(
++      Container container, Resource capability) {
++    rmOperationHandler.requestContainerResourceChange(container, capability);
++  }
++
++  @Override
+   public int cancelContainerRequests(Priority priority1,
+       Priority priority2,
+       int count) {
+@@ -2192,6 +2269,11 @@ public class SliderAppMaster extends AbstractSliderLaunchedService
+     return providerService.getExitCode();
+   }
+ 
++  public void increaseContainerResource(Container container)
++      throws IOException {
++    nmClientAsync.increaseContainerResourceAsync(container);
++  }
++
+   /**
+    *  Async start container request
+    * @param container container
+@@ -2241,61 +2323,6 @@ public class SliderAppMaster extends AbstractSliderLaunchedService
+     return tokens;
+   }
+ 
+-  @Override //  NMClientAsync.CallbackHandler 
+-  public void onContainerStopped(ContainerId containerId) {
+-    // do nothing but log: container events from the AM
+-    // are the source of container halt details to react to
+-    log.info("onContainerStopped {} ", containerId);
+-  }
+-
+-  @Override //  NMClientAsync.CallbackHandler 
+-  public void onContainerStarted(ContainerId containerId,
+-      Map<String, ByteBuffer> allServiceResponse) {
+-    LOG_YARN.info("Started Container {} ", containerId);
+-    RoleInstance cinfo = appState.onNodeManagerContainerStarted(containerId);
+-    if (cinfo != null) {
+-      LOG_YARN.info("Deployed instance of role {} onto {}",
+-          cinfo.role, containerId);
+-      //trigger an async container status
+-      nmClientAsync.getContainerStatusAsync(containerId,
+-                                            cinfo.container.getNodeId());
+-      // push out a registration
+-      queue(new RegisterComponentInstance(containerId, cinfo.role,
+-          0, TimeUnit.MILLISECONDS));
+-      
+-    } else {
+-      //this is a hypothetical path not seen. We react by warning
+-      log.error("Notified of started container that isn't pending {} - releasing",
+-                containerId);
+-      //then release it
+-      asyncRMClient.releaseAssignedContainer(containerId);
+-    }
+-  }
+-
+-  @Override //  NMClientAsync.CallbackHandler 
+-  public void onStartContainerError(ContainerId containerId, Throwable t) {
+-    LOG_YARN.error("Failed to start Container {}", containerId, t);
+-    appState.onNodeManagerContainerStartFailed(containerId, t);
+-  }
+-
+-  @Override //  NMClientAsync.CallbackHandler 
+-  public void onContainerStatusReceived(ContainerId containerId,
+-      ContainerStatus containerStatus) {
+-    LOG_YARN.debug("Container Status: id={}, status={}", containerId,
+-        containerStatus);
+-  }
+-
+-  @Override //  NMClientAsync.CallbackHandler 
+-  public void onGetContainerStatusError(
+-      ContainerId containerId, Throwable t) {
+-    LOG_YARN.error("Failed to query the status of Container {}", containerId);
+-  }
+-
+-  @Override //  NMClientAsync.CallbackHandler 
+-  public void onStopContainerError(ContainerId containerId, Throwable t) {
+-    LOG_YARN.warn("Failed to stop Container {}", containerId);
+-  }
+-
+   public AggregateConf getInstanceDefinition() {
+     return appState.getInstanceDefinition();
+   }
+diff --git slider-core/src/main/java/org/apache/slider/server/appmaster/state/AppState.java slider-core/src/main/java/org/apache/slider/server/appmaster/state/AppState.java
+index c8369c1..c049e90 100644
+--- slider-core/src/main/java/org/apache/slider/server/appmaster/state/AppState.java
++++ slider-core/src/main/java/org/apache/slider/server/appmaster/state/AppState.java
+@@ -66,6 +66,9 @@ import org.apache.slider.core.persist.ConfTreeSerDeser;
+ import org.apache.slider.providers.PlacementPolicy;
+ import org.apache.slider.providers.ProviderRole;
+ import org.apache.slider.server.appmaster.management.LongGauge;
++import org.apache.slider.server.appmaster.actions
++    .ActionIncreaseContainerResource;
++import org.apache.slider.server.appmaster.actions.AsyncAction;
+ import org.apache.slider.server.appmaster.management.MetricsAndMonitoring;
+ import org.apache.slider.server.appmaster.management.MetricsConstants;
+ import org.apache.slider.server.appmaster.operations.AbstractRMOperation;
+@@ -85,6 +88,7 @@ import java.util.Map;
+ import java.util.Set;
+ import java.util.concurrent.ConcurrentHashMap;
+ import java.util.concurrent.ConcurrentMap;
++import java.util.concurrent.TimeUnit;
+ import java.util.concurrent.atomic.AtomicInteger;
+ 
+ import static org.apache.slider.api.ResourceKeys.*;
+@@ -470,6 +474,14 @@ public class AppState {
+     maxResource = recordFactory.newResource(containerMaxMemory, containerMaxCores);
+   }
+ 
++  public Resource getMaxContainerResource() {
++      return maxResource;
++  }
++
++  public Resource getMinContainerResource() {
++    return minResource;
++  }
++
+   public ConfTreeOperations getResourcesSnapshot() {
+     return resourcesSnapshot;
+   }
+@@ -1107,7 +1119,7 @@ public class AppState {
+    * Build an instance map.
+    * @return the map of Role name to list of role instances
+    */
+-  private synchronized Map<String, List<String>> createRoleToInstanceMap() {
++  public synchronized Map<String, List<String>> createRoleToInstanceMap() {
+     Map<String, List<String>> map = new HashMap<String, List<String>>();
+     for (RoleInstance node : getLiveContainers().values()) {
+       List<String> containers = map.get(node.role);
+@@ -1149,7 +1161,6 @@ public class AppState {
+   public void containerStartSubmitted(Container container,
+                                       RoleInstance instance) {
+     instance.state = STATE_SUBMITTED;
+-    instance.container = container;
+     instance.createTime = now();
+     getStartingContainers().put(container.getId(), instance);
+     putOwnedContainer(container.getId(), instance);
+@@ -1180,7 +1191,7 @@ public class AppState {
+         "Container %s already queued for release", id);
+     }
+     instance.released = true;
+-    containersBeingReleased.put(id, instance.container);
++    containersBeingReleased.put(id, instance.getContainer());
+     RoleStatus role = lookupRoleStatus(instance.roleId);
+     role.incReleasing();
+     roleHistory.onContainerReleaseSubmitted(container);
+@@ -1318,18 +1329,16 @@ public class AppState {
+ 
+   /**
+    * add a launched container to the node map for status responses
+-   * @param container id
+    * @param node node details
+    */
+-  private void addLaunchedContainer(Container container, RoleInstance node) {
+-    node.container = container;
++  private void addLaunchedContainer(RoleInstance node) {
+     if (node.role == null) {
+       throw new RuntimeException(
+         "Unknown role for node " + node);
+     }
+     getLiveContainers().put(node.getContainerId(), node);
+     //tell role history
+-    roleHistory.onContainerStarted(container);
++    roleHistory.onContainerStarted(node.getContainer());
+   }
+ 
+   /**
+@@ -1376,8 +1385,7 @@ public class AppState {
+     instance.state = STATE_LIVE;
+     RoleStatus roleStatus = lookupRoleStatus(instance.roleId);
+     roleStatus.incStarted();
+-    Container container = instance.container;
+-    addLaunchedContainer(container, instance);
++    addLaunchedContainer(instance);
+     return instance;
+   }
+ 
+@@ -1408,7 +1416,7 @@ public class AppState {
+       instance.diagnostics = text;
+       roleStatus.noteFailed(true, text, ContainerOutcome.Failed);
+       getFailedContainers().put(containerId, instance);
+-      roleHistory.onNodeManagerContainerStartFailed(instance.container);
++      roleHistory.onNodeManagerContainerStartFailed(instance.getContainer());
+     }
+   }
+ 
+@@ -1554,7 +1562,7 @@ public class AppState {
+           roleStatus.decActual();
+           boolean shortLived = isShortLived(roleInstance);
+           String message;
+-          Container failedContainer = roleInstance.container;
++          Container failedContainer = roleInstance.getContainer();
+ 
+           //build the failure message
+           if (failedContainer != null) {
+@@ -2067,7 +2075,7 @@ public class AppState {
+         // then build up a release operation, logging each container as released
+         for (RoleInstance possible : finalCandidates) {
+           log.info("Targeting for release: {}", possible);
+-          containerReleaseSubmitted(possible.container);
++          containerReleaseSubmitted(possible.getContainer());
+           operations.add(new ContainerReleaseOperation(possible.getId()));
+         }
+       }
+@@ -2119,8 +2127,8 @@ public class AppState {
+     List<AbstractRMOperation> operations = new ArrayList<AbstractRMOperation>();
+     List<RoleInstance> activeRoleInstances = cloneOwnedContainerList();
+     for (RoleInstance role : activeRoleInstances) {
+-      if (role.container.getId().equals(containerId)) {
+-        containerReleaseSubmitted(role.container);
++      if (role.getContainerId().equals(containerId)) {
++        containerReleaseSubmitted(role.getContainer());
+         operations.add(new ContainerReleaseOperation(role.getId()));
+       }
+     }
+@@ -2141,7 +2149,7 @@ public class AppState {
+     Collection<RoleInstance> targets = cloneOwnedContainerList();
+     String hostname = node.hostname;
+     for (RoleInstance ri : targets) {
+-      if (hostname.equals(RoleHistoryUtils.hostnameOf(ri.container))
++      if (hostname.equals(RoleHistoryUtils.hostnameOf(ri.getContainer()))
+                          && ri.roleId == roleId
+         && containersBeingReleased.get(ri.getContainerId()) == null) {
+         return ri;
+@@ -2165,7 +2173,7 @@ public class AppState {
+         // don't worry about the AM
+         continue;
+       }
+-      Container possible = instance.container;
++      Container possible = instance.getContainer();
+       ContainerId id = possible.getId();
+       if (!instance.released) {
+         String url = getLogsURLForContainer(possible);
+@@ -2270,6 +2278,28 @@ public class AppState {
+     }
+   }
+ 
++  public synchronized  void onContainersResourceChanged(
++      List<Container> changedContainers, List<AsyncAction> actions) {
++    for (Container container : changedContainers) {
++      try {
++        RoleInstance instance =
++            getLiveInstanceByContainerID(container.getId().toString());
++        Resource oldResource = instance.getContainerResource();
++        instance.setContainer(container);
++        log.info("Container {} resource allocation"
++                + " has been changed from {} to {}.", container.getId(),
++            oldResource, container.getResource());
++        if (Resources.fitsIn(oldResource, container.getResource())) {
++          actions.add(new ActionIncreaseContainerResource(
++              "increase resource of container " + container.getId(),
++                  container, 0, TimeUnit.SECONDS));
++        }
++      } catch (NoSuchNodeException e) {
++        log.warn("Container " + container.getId() + " has already finished.");
++      }
++    }
++  }
++
+   /**
+    * Get diagnostics info about containers
+    */
+@@ -2336,7 +2366,6 @@ public class AppState {
+     instance.role = roleName;
+     instance.roleId = roleId;
+     instance.environment = new String[0];
+-    instance.container = container;
+     instance.createTime = now();
+     instance.state = STATE_LIVE;
+     instance.appVersion = SliderKeys.APP_VERSION_UNKNOWN;
+diff --git slider-core/src/main/java/org/apache/slider/server/appmaster/state/ProviderAppState.java slider-core/src/main/java/org/apache/slider/server/appmaster/state/ProviderAppState.java
+index c409114..afc12b3 100644
+--- slider-core/src/main/java/org/apache/slider/server/appmaster/state/ProviderAppState.java
++++ slider-core/src/main/java/org/apache/slider/server/appmaster/state/ProviderAppState.java
+@@ -20,6 +20,7 @@ package org.apache.slider.server.appmaster.state;
+ 
+ import org.apache.hadoop.yarn.api.records.Container;
+ import org.apache.hadoop.yarn.api.records.ContainerId;
++import org.apache.hadoop.yarn.api.records.Resource;
+ import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
+ import org.apache.slider.api.ClusterDescription;
+ import org.apache.slider.api.ClusterNode;
+@@ -130,6 +131,16 @@ public class ProviderAppState implements StateAccessForProviders {
+   }
+ 
+   @Override
++  public Resource getMaxContainerResource() {
++    return appState.getMaxContainerResource();
++  }
++
++  @Override
++  public Resource getMinContainerResource() {
++    return appState.getMinContainerResource();
++  }
++
++  @Override
+   public ClusterDescription getClusterStatus() {
+     return appState.getClusterStatus();
+   }
+diff --git slider-core/src/main/java/org/apache/slider/server/appmaster/state/RoleInstance.java slider-core/src/main/java/org/apache/slider/server/appmaster/state/RoleInstance.java
+index 30a2bb0..b3c3f62 100644
+--- slider-core/src/main/java/org/apache/slider/server/appmaster/state/RoleInstance.java
++++ slider-core/src/main/java/org/apache/slider/server/appmaster/state/RoleInstance.java
+@@ -25,6 +25,8 @@ import org.apache.hadoop.registry.client.types.ProtocolTypes;
+ import org.apache.hadoop.yarn.api.records.Container;
+ import org.apache.hadoop.yarn.api.records.ContainerId;
+ import org.apache.hadoop.yarn.api.records.NodeId;
++import org.apache.hadoop.yarn.api.records.Resource;
++import org.apache.hadoop.yarn.util.resource.Resources;
+ import org.apache.slider.api.ClusterNode;
+ import org.apache.slider.api.proto.Messages;
+ import org.apache.slider.api.types.ContainerInformation;
+@@ -39,7 +41,7 @@ import java.util.List;
+  */
+ public final class RoleInstance implements Cloneable {
+ 
+-  public Container container;
++  private Container container;
+   /**
+    * Container ID
+    */
+@@ -132,11 +134,27 @@ public final class RoleInstance implements Cloneable {
+     }
+   }
+ 
+-  public ContainerId getId() {
++  public synchronized ContainerId getId() {
++    return getContainerId();
++  }
++
++  public synchronized ContainerId getContainerId() {
+     return container.getId();
+   }
+-  
+-  public NodeId getHost() {
++
++  public synchronized Container getContainer() {
++    return container;
++  }
++
++  public synchronized void setContainer(Container container) {
++    this.container = container;
++  }
++
++  public synchronized Resource getContainerResource() {
++    return container.getResource();
++  }
++
++  public synchronized NodeId getHost() {
+     return container.getNodeId();
+   }
+ 
+@@ -146,7 +164,7 @@ public final class RoleInstance implements Cloneable {
+       new StringBuilder("RoleInstance{");
+     sb.append("role='").append(role).append('\'');
+     sb.append(", id='").append(id).append('\'');
+-    sb.append(", container=").append(SliderUtils.containerToString(container));
++    sb.append(", container=").append(SliderUtils.containerToString(getContainer()));
+     sb.append(", createTime=").append(createTime);
+     sb.append(", startTime=").append(startTime);
+     sb.append(", released=").append(released);
+@@ -164,10 +182,6 @@ public final class RoleInstance implements Cloneable {
+     return sb.toString();
+   }
+ 
+-  public ContainerId getContainerId() {
+-    return container != null ? container.getId() : null;
+-  }
+-
+   /**
+    * Generate the protobuf format of a request
+    * @return protobuf format. This excludes the Container info
+@@ -175,11 +189,8 @@ public final class RoleInstance implements Cloneable {
+   public Messages.RoleInstanceState toProtobuf() {
+     Messages.RoleInstanceState.Builder builder =
+       Messages.RoleInstanceState.newBuilder();
+-    if (container != null) {
+-      builder.setName(container.getId().toString());
+-    } else {
+-      builder.setName("unallocated instance");
+-    }
++    // Container and ContainerId are guaranteed to be non-null
++    builder.setName(getContainerId().toString());
+     if (command != null) {
+       builder.setCommand(command);
+     }
+@@ -218,12 +229,7 @@ public final class RoleInstance implements Cloneable {
+    */
+   public ClusterNode toClusterNode() {
+     ClusterNode node;
+-    if (container != null) {
+-      node = new ClusterNode(container.getId());
+-    } else {
+-      node = new ClusterNode();
+-      node.name = "unallocated instance";
+-    }
++    node = new ClusterNode(getContainerId());
+     node.command = command;
+     node.createTime = createTime;
+     node.diagnostics = diagnostics;
+@@ -241,7 +247,11 @@ public final class RoleInstance implements Cloneable {
+     node.roleId = roleId;
+     node.startTime = startTime ;
+     node.state = state;
+-    
++    Resource resource = container.getResource();
++    if (resource != null && Resources.fitsIn(Resources.none(), resource)) {
++      node.memory = resource.getMemory();
++      node.vCores = resource.getVirtualCores();
++    }
+     return node;
+   }
+   
+diff --git slider-core/src/main/java/org/apache/slider/server/appmaster/state/StateAccessForProviders.java slider-core/src/main/java/org/apache/slider/server/appmaster/state/StateAccessForProviders.java
+index ad91183..8193551 100644
+--- slider-core/src/main/java/org/apache/slider/server/appmaster/state/StateAccessForProviders.java
++++ slider-core/src/main/java/org/apache/slider/server/appmaster/state/StateAccessForProviders.java
+@@ -20,6 +20,7 @@ package org.apache.slider.server.appmaster.state;
+ 
+ import org.apache.hadoop.yarn.api.records.Container;
+ import org.apache.hadoop.yarn.api.records.ContainerId;
++import org.apache.hadoop.yarn.api.records.Resource;
+ import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
+ import org.apache.slider.api.ClusterDescription;
+ import org.apache.slider.api.ClusterNode;
+@@ -102,6 +103,20 @@ public interface StateAccessForProviders {
+   Map<ContainerId, RoleInstance> getLiveContainers();
+ 
+   /**
++   * Get the maximum resource of a container.
++   *
++   * @return the maximum resource
++   */
++  Resource getMaxContainerResource();
++
++  /**
++   * Get the minimum resource of a container.
++   *
++   * @return the minimum resource
++   */
++  Resource getMinContainerResource();
++
++  /**
+    * Get the current cluster description 
+    * @return the actual state of the cluster
+    */
+diff --git slider-core/src/main/java/org/apache/slider/server/appmaster/web/view/ContainerStatsBlock.java slider-core/src/main/java/org/apache/slider/server/appmaster/web/view/ContainerStatsBlock.java
+index 56285c2..67ac8b7 100644
+--- slider-core/src/main/java/org/apache/slider/server/appmaster/web/view/ContainerStatsBlock.java
++++ slider-core/src/main/java/org/apache/slider/server/appmaster/web/view/ContainerStatsBlock.java
+@@ -129,10 +129,10 @@ public class ContainerStatsBlock extends SliderHamletBlock {
+               
+               if (containerInstances.containsKey(containerId)) {
+                 RoleInstance roleInst = containerInstances.get(containerId);
+-                if (roleInst.container.getNodeHttpAddress() != null) {
++                if (roleInst.getContainer().getNodeHttpAddress() != null) {
+                   return Maps.<TableContent,String> immutableEntry(
+                     new TableAnchorContent(containerId,
+-                        buildNodeUrlForContainer(roleInst.container.getNodeHttpAddress(), containerId)), null);
++                        buildNodeUrlForContainer(roleInst.getContainer().getNodeHttpAddress(), containerId)), null);
+                 }
+               }
+               return Maps.immutableEntry(new TableContent(input.name), null);
+diff --git slider-core/src/main/proto/SliderClusterMessages.proto slider-core/src/main/proto/SliderClusterMessages.proto
+index b8bdc59..c0d9736 100644
+--- slider-core/src/main/proto/SliderClusterMessages.proto
++++ slider-core/src/main/proto/SliderClusterMessages.proto
+@@ -80,6 +80,16 @@ message UpgradeContainersRequestProto {
+ message UpgradeContainersResponseProto {
+ }
+ 
++message ResizeContainersRequestProto {
++  optional ResourceProto targetResource = 1;
++  repeated string container = 2;
++  repeated string component = 3;
++}
++
++message ResizeContainersResponseProto {
++  optional bool success = 1;
++}
++
+ /**
+  * flex the cluster
+  */
+@@ -166,6 +176,10 @@ message EchoResponseProto {
+   required string text = 1;
+ }
+ 
++message ResourceProto {
++  optional int32 memory = 1;
++  optional int32 virtual_cores = 2;
++}
+ 
+ /**
+  * Kill a container
+diff --git slider-core/src/main/proto/SliderClusterProtocol.proto slider-core/src/main/proto/SliderClusterProtocol.proto
+index 4221b1d..279f6d6 100644
+--- slider-core/src/main/proto/SliderClusterProtocol.proto
++++ slider-core/src/main/proto/SliderClusterProtocol.proto
+@@ -68,6 +68,12 @@ service SliderClusterProtocolPB {
+     returns(FlexClusterResponseProto);
+ 
+   /**
++   * change resource of a container
++   */
++  rpc resizeContainer(ResizeContainersRequestProto)
++    returns(ResizeContainersResponseProto);
++
++  /**
+    * Get the current cluster status
+    */
+   rpc getJSONClusterStatus(GetJSONClusterStatusRequestProto)
+@@ -100,21 +106,21 @@ service SliderClusterProtocolPB {
+   rpc getClusterNodes(GetClusterNodesRequestProto)
+     returns(GetClusterNodesResponseProto);
+     
+-   /**
++  /**
+     * echo some text
+     */
+-   rpc echo(EchoRequestProto)
+-     returns(EchoResponseProto); 
++  rpc echo(EchoRequestProto)
++    returns(EchoResponseProto);
+ 
+-   /**
+-    * kill a container
+-    */
+-   rpc killContainer(KillContainerRequestProto)
+-     returns(KillContainerResponseProto);
+-      
+-   /**
+-    * kill the AM
+-    */
++  /**
++   * kill a container
++   */
++  rpc killContainer(KillContainerRequestProto)
++    returns(KillContainerResponseProto);
++
++  /**
++   * kill the AM
++   */
+    rpc amSuicide(AMSuicideRequestProto)
+      returns(AMSuicideResponseProto);
+ 
+diff --git slider-core/src/test/groovy/org/apache/slider/server/appmaster/model/mock/MockContainerStatus.groovy slider-core/src/test/groovy/org/apache/slider/server/appmaster/model/mock/MockContainerStatus.groovy
+index 4237f1e..c0e9956 100644
+--- slider-core/src/test/groovy/org/apache/slider/server/appmaster/model/mock/MockContainerStatus.groovy
++++ slider-core/src/test/groovy/org/apache/slider/server/appmaster/model/mock/MockContainerStatus.groovy
+@@ -29,6 +29,5 @@ class MockContainerStatus extends ContainerStatus {
+   ContainerState state
+   String diagnostics
+   int exitStatus
+-
+-  Resource capability;
++  Resource capability
+ }
+diff --git slider-core/src/test/groovy/org/apache/slider/server/appmaster/model/mock/MockProviderService.groovy slider-core/src/test/groovy/org/apache/slider/server/appmaster/model/mock/MockProviderService.groovy
+index 44415f4..df0c1c1 100644
+--- slider-core/src/test/groovy/org/apache/slider/server/appmaster/model/mock/MockProviderService.groovy
++++ slider-core/src/test/groovy/org/apache/slider/server/appmaster/model/mock/MockProviderService.groovy
+@@ -27,6 +27,7 @@ import org.apache.hadoop.service.ServiceStateChangeListener
+ import org.apache.hadoop.yarn.api.records.Container
+ import org.apache.hadoop.yarn.api.records.ContainerId
+ import org.apache.hadoop.yarn.api.records.Priority
++import org.apache.hadoop.yarn.api.records.Resource
+ import org.apache.hadoop.yarn.client.api.AMRMClient
+ import org.apache.slider.api.ClusterDescription
+ import org.apache.slider.common.tools.SliderFileSystem
+@@ -276,6 +277,12 @@ class MockProviderService implements ProviderService {
+   }
+ 
+   @Override
++  public void requestContainerResourceChange(
++      Container container, Resource capability) {
++    // no-op
++  }
++
++  @Override
+   void cancelSingleRequest(AMRMClient.ContainerRequest request) {
+ 
+   }
+diff --git slider-core/src/test/groovy/org/apache/slider/server/appmaster/model/mock/MockRMOperationHandler.groovy slider-core/src/test/groovy/org/apache/slider/server/appmaster/model/mock/MockRMOperationHandler.groovy
+index c803b54..9288e23 100644
+--- slider-core/src/test/groovy/org/apache/slider/server/appmaster/model/mock/MockRMOperationHandler.groovy
++++ slider-core/src/test/groovy/org/apache/slider/server/appmaster/model/mock/MockRMOperationHandler.groovy
+@@ -19,10 +19,13 @@
+ package org.apache.slider.server.appmaster.model.mock
+ 
+ import groovy.util.logging.Slf4j
++import org.apache.hadoop.yarn.api.records.Container
+ import org.apache.hadoop.yarn.api.records.ContainerId
+ import org.apache.hadoop.yarn.api.records.Priority
++import org.apache.hadoop.yarn.api.records.Resource
+ import org.apache.hadoop.yarn.client.api.AMRMClient
+ import org.apache.slider.server.appmaster.operations.AbstractRMOperation
++import org.apache.slider.server.appmaster.operations.ContainerChangeRequestOperation
+ import org.apache.slider.server.appmaster.operations.ContainerReleaseOperation
+ import org.apache.slider.server.appmaster.operations.ContainerRequestOperation
+ import org.apache.slider.server.appmaster.operations.RMOperationHandler
+@@ -51,6 +54,16 @@ class MockRMOperationHandler extends RMOperationHandler {
+   }
+ 
+   @Override
++  public void requestContainerResourceChange(
++      Container container, Resource capability) {
++    operations.add(new ContainerChangeRequestOperation(container, capability));
++    log.info("Requesting resource change for container "
++        + container.getId() + " from " + container.getResource()
++            + " to " + capability);
++    requests++;
++  }
++
++  @Override
+   int cancelContainerRequests(
+       Priority priority1,
+       Priority priority2,

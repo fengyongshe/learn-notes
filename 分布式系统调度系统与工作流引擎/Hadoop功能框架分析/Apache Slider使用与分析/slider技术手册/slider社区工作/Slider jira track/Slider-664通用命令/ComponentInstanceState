@@ -1,0 +1,50 @@
+Index: slider-core/src/main/java/org/apache/slider/providers/agent/ComponentInstanceState.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/providers/agent/ComponentInstanceState.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/providers/agent/ComponentInstanceState.java	(working copy)
+@@ -115,12 +115,12 @@
+   }
+ 
+   public void commandIssued(Command command) {
+-    commandIssued(command, false ,false,false);
++    commandIssued(command, false ,false,null);
+   }
+ 
+   public void commandIssued(Command command, boolean isInUpgradeMode,
+-                            boolean hasUploadingFileCmd,boolean hasDeletingFileCmd) {
+-    Command expected = getNextCommand(isInUpgradeMode,hasUploadingFileCmd,hasDeletingFileCmd);
++                            boolean doOperate,String cmdName) {
++    Command expected = getNextCommand(isInUpgradeMode,doOperate,cmdName);
+     if (expected != command) {
+       throw new IllegalArgumentException("Command " + command + " is not allowed in state " + state);
+     }
+@@ -195,15 +195,17 @@
+   }
+ 
+   public Command getNextCommand() {
+-    return getNextCommand(false,false,false);
++    return getNextCommand(false,false,null);
+   }
+ 
+-  public Command getNextCommand(boolean isInUpgradeMode,boolean hasUploadingFileCmd,boolean hasDeletingFileCmd) {
+-    if (!hasPendingCommand()&&!hasUploadingFileCmd&&!hasDeletingFileCmd) {
++  public Command getNextCommand(boolean isInUpgradeMode,
++                                boolean doOperate,
++                                String cmdName) {
++    if (!hasPendingCommand()&&!doOperate) {
+       nextPkgToInstall = null;
+       return Command.NOP;
+     }
+-    log.info("In getNextCommand,checking for component:{}");
++
+     log.debug("In getNextCommand, checking for component: {} ", componentName);
+     // if the master pkg is just installed, check if any add on pkg need to be
+     // installed
+@@ -235,7 +237,8 @@
+         return Command.INSTALL_ADDON;
+       }
+     }
+-    return this.state.getSupportedCommand(isInUpgradeMode,hasUploadingFileCmd,hasDeletingFileCmd);
++    return this.state.getSupportedCommand(isInUpgradeMode,
++        doOperate,cmdName);
+   }

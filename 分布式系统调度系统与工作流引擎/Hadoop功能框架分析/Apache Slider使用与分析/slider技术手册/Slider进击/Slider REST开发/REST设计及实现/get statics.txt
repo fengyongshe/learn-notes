@@ -1,0 +1,40 @@
+{
+  "name" : "hbase",
+  "state" : "RUNNING",
+  "componentsCount" : {
+    "HBASE_REGIONSERVER" : 1,
+    "HBASE_MASTER" : 1,
+    "slider-appmaster" : 1
+  },
+  "allocatedVcores" : 3,
+  "allocatedMemory" : 25312,
+  "exports" : {
+    "hbase" : {
+      "description" : "QuickLinks",
+      "updated" : 1457574837902,
+      "updatedTime" : "Thu Mar 10 09:53:57 CST 2016",
+      "entries" : {
+        "org.apache.slider.jmx" : [ {
+          "value" : "http://bditest3.cmss.com:48975/jmx",
+          "level" : "application",
+          "updatedTime" : "Thu Mar 10 09:53:57 CST 2016"
+        } ],
+        "org.apache.slider.metrics" : [ {
+          "value" : "http://nn:6188/ws/v1/timeline/metrics",
+          "level" : "application",
+          "updatedTime" : "Thu Mar 10 09:53:57 CST 2016"
+        } ],
+        "org.apache.slider.monitor" : [ {
+          "value" : "http://bditest3.cmss.com:48975/master-status",
+          "level" : "application",
+          "updatedTime" : "Thu Mar 10 09:53:57 CST 2016"
+        } ],
+        "org.apache.slider.hbase.zk-path" : [ {
+          "value" : "bditest1.cmss.com:/hbasetest",
+          "level" : "application",
+          "updatedTime" : "Thu Mar 10 09:53:57 CST 2016"
+        } ]
+      },
+      "empty" : false
+    }
+  }

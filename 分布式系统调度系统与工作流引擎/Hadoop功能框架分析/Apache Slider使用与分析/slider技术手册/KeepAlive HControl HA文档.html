@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>HControl HA文档</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<style type="text/css">
+/* GitHub stylesheet for MarkdownPad (http://markdownpad.com) */
+/* Author: Nicolas Hery - http://nicolashery.com */
+/* Version: b13fe65ca28d2e568c6ed5d7f06581183df8f2ff */
+/* Source: https://github.com/nicolahery/markdownpad-github */
+
+/* RESET
+=============================================================================*/
+
+html, body, div, span, applet, object, iframe, h1, h2, h3, h4, h5, h6, p, blockquote, pre, a, abbr, acronym, address, big, cite, code, del, dfn, em, img, ins, kbd, q, s, samp, small, strike, strong, sub, sup, tt, var, b, u, i, center, dl, dt, dd, ol, ul, li, fieldset, form, label, legend, table, caption, tbody, tfoot, thead, tr, th, td, article, aside, canvas, details, embed, figure, figcaption, footer, header, hgroup, menu, nav, output, ruby, section, summary, time, mark, audio, video {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* BODY
+=============================================================================*/
+
+body {
+  font-family: Helvetica, arial, freesans, clean, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #333;
+  background-color: #fff;
+  padding: 20px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+body>*:first-child {
+  margin-top: 0 !important;
+}
+
+body>*:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* BLOCKS
+=============================================================================*/
+
+p, blockquote, ul, ol, dl, table, pre {
+  margin: 15px 0;
+}
+
+/* HEADERS
+=============================================================================*/
+
+h1, h2, h3, h4, h5, h6 {
+  margin: 20px 0 10px;
+  padding: 0;
+  font-weight: bold;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1 tt, h1 code, h2 tt, h2 code, h3 tt, h3 code, h4 tt, h4 code, h5 tt, h5 code, h6 tt, h6 code {
+  font-size: inherit;
+}
+
+h1 {
+  font-size: 28px;
+  color: #000;
+}
+
+h2 {
+  font-size: 24px;
+  border-bottom: 1px solid #ccc;
+  color: #000;
+}
+
+h3 {
+  font-size: 18px;
+}
+
+h4 {
+  font-size: 16px;
+}
+
+h5 {
+  font-size: 14px;
+}
+
+h6 {
+  color: #777;
+  font-size: 14px;
+}
+
+body>h2:first-child, body>h1:first-child, body>h1:first-child+h2, body>h3:first-child, body>h4:first-child, body>h5:first-child, body>h6:first-child {
+  margin-top: 0;
+  padding-top: 0;
+}
+
+a:first-child h1, a:first-child h2, a:first-child h3, a:first-child h4, a:first-child h5, a:first-child h6 {
+  margin-top: 0;
+  padding-top: 0;
+}
+
+h1+p, h2+p, h3+p, h4+p, h5+p, h6+p {
+  margin-top: 10px;
+}
+
+/* LINKS
+=============================================================================*/
+
+a {
+  color: #4183C4;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* LISTS
+=============================================================================*/
+
+ul, ol {
+  padding-left: 30px;
+}
+
+ul li > :first-child, 
+ol li > :first-child, 
+ul li ul:first-of-type, 
+ol li ol:first-of-type, 
+ul li ol:first-of-type, 
+ol li ul:first-of-type {
+  margin-top: 0px;
+}
+
+ul ul, ul ol, ol ol, ol ul {
+  margin-bottom: 0;
+}
+
+dl {
+  padding: 0;
+}
+
+dl dt {
+  font-size: 14px;
+  font-weight: bold;
+  font-style: italic;
+  padding: 0;
+  margin: 15px 0 5px;
+}
+
+dl dt:first-child {
+  padding: 0;
+}
+
+dl dt>:first-child {
+  margin-top: 0px;
+}
+
+dl dt>:last-child {
+  margin-bottom: 0px;
+}
+
+dl dd {
+  margin: 0 0 15px;
+  padding: 0 15px;
+}
+
+dl dd>:first-child {
+  margin-top: 0px;
+}
+
+dl dd>:last-child {
+  margin-bottom: 0px;
+}
+
+/* CODE
+=============================================================================*/
+
+pre, code, tt {
+  font-size: 12px;
+  font-family: Consolas, "Liberation Mono", Courier, monospace;
+}
+
+code, tt {
+  margin: 0 0px;
+  padding: 0px 0px;
+  white-space: nowrap;
+  border: 1px solid #eaeaea;
+  background-color: #f8f8f8;
+  border-radius: 3px;
+}
+
+pre>code {
+  margin: 0;
+  padding: 0;
+  white-space: pre;
+  border: none;
+  background: transparent;
+}
+
+pre {
+  background-color: #f8f8f8;
+  border: 1px solid #ccc;
+  font-size: 13px;
+  line-height: 19px;
+  overflow: auto;
+  padding: 6px 10px;
+  border-radius: 3px;
+}
+
+pre code, pre tt {
+  background-color: transparent;
+  border: none;
+}
+
+kbd {
+    -moz-border-bottom-colors: none;
+    -moz-border-left-colors: none;
+    -moz-border-right-colors: none;
+    -moz-border-top-colors: none;
+    background-color: #DDDDDD;
+    background-image: linear-gradient(#F1F1F1, #DDDDDD);
+    background-repeat: repeat-x;
+    border-color: #DDDDDD #CCCCCC #CCCCCC #DDDDDD;
+    border-image: none;
+    border-radius: 2px 2px 2px 2px;
+    border-style: solid;
+    border-width: 1px;
+    font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
+    line-height: 10px;
+    padding: 1px 4px;
+}
+
+/* QUOTES
+=============================================================================*/
+
+blockquote {
+  border-left: 4px solid #DDD;
+  padding: 0 15px;
+  color: #777;
+}
+
+blockquote>:first-child {
+  margin-top: 0px;
+}
+
+blockquote>:last-child {
+  margin-bottom: 0px;
+}
+
+/* HORIZONTAL RULES
+=============================================================================*/
+
+hr {
+  clear: both;
+  margin: 15px 0;
+  height: 0px;
+  overflow: hidden;
+  border: none;
+  background: transparent;
+  border-bottom: 4px solid #ddd;
+  padding: 0;
+}
+
+/* TABLES
+=============================================================================*/
+
+table th {
+  font-weight: bold;
+}
+
+table th, table td {
+  border: 1px solid #ccc;
+  padding: 6px 13px;
+}
+
+table tr {
+  border-top: 1px solid #ccc;
+  background-color: #fff;
+}
+
+table tr:nth-child(2n) {
+  background-color: #f8f8f8;
+}
+
+/* IMAGES
+=============================================================================*/
+
+img {
+  max-width: 100%
+}
+</style>
+</head>
+<body>
+<h2>HControl HA安装与配置文档</h2>
+<p>作者：姚磊</p>
+<p>本文用来描叙实现HControl HA具体步骤。假设已经成功申请了虚拟IP(10.133.17.241)，主从节点分别是bdi_A(10.133.17.5)、bdi_B(10.133.17.9)。<br/>
+安装时请注意在HControl Server(主/从)节点上除了Server本身、HControl Agent和Client,最好不要安装HControl的其他服务组件。</p>
+<h3>1 配置/etc/hosts(各节点)</h3>
+<p>vi /etc/hosts 加入以下配置<br/></p>
+<pre><code>10.133.17.241   bdi_hcontrol_server
+10.133.17.5     bdi_A
+10.133.17.9     bdi_B
+#其它agent配置
+</code></pre>
+
+<h3>2 安装配置PostgreSQL 9.3(主/从)</h3>
+<p>yum install http://yum.postgresql.org/9.3/redhat/rhel-6-x86_64/pgdg-redhat93-9.3-1.noarch.rpm<br/>
+yum install postgresql93-server postgresql93-contrib<br/>
+service postgresql-9.3 initdb<br/></p>
+<p>vi /etc/profile<br/></p>
+<pre><code>export PGDATA=/var/lib/pgsql/9.3/data
+export PATH=$PATH:/usr/pgsql-9.3/bin
+</code></pre>
+
+<p>vi /var/lib/pgsql/9.3/data/postgresql.conf<br/></p>
+<pre><code>listen_addresses = '*'
+wal_level = hot_standby
+max_wal_senders = 3
+hot_standby = on
+</code></pre>
+
+<p>vi /var/lib/pgsql/9.3/data/pg_hba.conf<br/></p>
+<pre><code>local   all             all                                    trust
+host    all             all             127.0.0.1/32           md5
+host    all             all             10.133.17.0/24         md5
+host    replication     repuser         10.133.17.0/24         md5
+</code></pre>
+
+<p>service postgresql-9.3 start<br/>
+psql -U postgres<br/></p>
+<pre><code>create user ambari with password 'bigdata';
+create user repuser with replication login password 'repuser';
+CREATE DATABASE ambari owner ambari;
+GRANT ALL PRIVILEGES ON DATABASE ambari to ambari;
+</code></pre>
+
+<p>在主/从节点安装完HControl Server后，执行<br/>
+psql -U ambari ambari &lt; /var/lib/ambari-server/resources/Ambari-DDL-Postgres-CREATE.sql</p>
+<p>在主/从节点的/var/lib/pgsql/9.3/data目录下，各自建立recovery.done(主)和recovery.conf(从)文件，内容如下：<br/></p>
+<pre><code>standby_mode=on
+primary_conninfo='host=bdi_hcontrol_server user=repuser port=5432 password=repuser'
+trigger_file='/tmp/trigger_file'
+recovery_target_timeline = 'latest'
+</code></pre>
+
+<p>在主节点上运行：<br/>
+rsync -ravztopg --exclude=recovery.done --exclude=pg_log   /var/lib/pgsql/9.3/data/ root@bdi_B:/var/lib/pgsql/9.3/data/</p>
+<p>重启主/从节点上的Postgresql 9.3<br/>
+service postgresql-9.3 restart</p>
+<h3>3 安装配置HControl Server(主/从)</h3>
+<p>yum install ambari-server<br/>
+ambari-server setup<br/>
+在Enter advanced database configuration [y/n] (n)? 输入y<br/>
+并选择[4] - PostgreSQL，其它设置成默认值即可。</p>
+<h3>4 安装配置HControl Agent</h3>
+<p>yum install ambari-agent<br/>
+vim /etc/ambari-agent/conf/ambari-agent.ini</p>
+<pre><code>hostname=bdi_hcontrol_server
+</code></pre>
+
+<h3>5 安装配置Keepalived</h3>
+<p>CentOS自带了Keepalived,直接 yum install keepalived即可。如果是其它linux，需要下载keepalived rpm包。</p>
+<p>安装完毕后，主/从节点上修改/etc/keepalived/keepalived.conf配置文件如下：<br></p>
+<pre><code>! Configuration File for keepalived
+global_defs {
+  notification_email {
+  alert@cmss.chinamobile.com
+  }
+  notification_email_from  alert@cmss.chinamobile.com
+  smtp_server 127.0.0.1
+  smtp_connect_timeout 30
+  router_id HCONTROL_SERVER #此处可以设置为主机名
+}
+vrrp_script check_ambari_pg_status {
+  script &quot;/var/lib/ambari-server/resources/scripts/check_ambari_pg_status.sh&quot;
+  interval 3
+}
+vrrp_instance VI_1 {
+  state BACKUP
+  interface eth0 #此处根据实际情况调整
+  virtual_router_id 51
+  priority 50
+  nopreempt  #减少不必要的主从切换
+  advert_int 1
+  authentication {
+    auth_type PASS
+    auth_pass 1111
+  }
+  virtual_ipaddress {
+   10.133.17.241/24
+  }
+  notify_master &quot;/var/lib/ambari-server/resources/scripts/to_master.sh&quot;
+  notify_backup &quot;/var/lib/ambari-server/resources/scripts/to_backup.sh&quot;
+  notify_stop   &quot;/var/lib/ambari-server/resources/scripts/to_stop.sh&quot;
+  track_script {
+    check_ambari_pg_status
+ }
+}
+</code></pre>
+
+<p>当前配置下，先启动Keepalived的节点为Master节点。
+启动命令为:/etc/init.d/keepalived start</p>
+<p>check_ambari_pg_status.sh内容如下：</p>
+<pre><code>#!/bin/bash
+count=$(ps -ef| grep -v grep | grep org.apache.ambari.server.controller.AmbariServer | wc -l)
+if [ &quot;${counter}&quot; = &quot;0&quot; ]; then
+   /etc/init.d/keepalived stop
+   exit 1
+fi
+
+count=$(ps -ef| grep -v grep | grep postmaster | wc -l)
+if [ &quot;${counter}&quot; = &quot;0&quot; ]; then
+   /etc/init.d/keepalived stop
+   exit 1
+fi
+</code></pre>
+
+<p>to_master.sh内容如下：</p>
+<pre><code>#!/bin/bash
+su -l postgres -c &quot;touch /tmp/trigger_file&quot;
+</code></pre>
+
+<p>to_backup.sh内容如下：</p>
+<pre><code>#!/bin/bash
+su -l postgres -c &quot;rm -rf /tmp/trigger_file&quot;
+</code></pre>
+
+<p>to_stop.sh内容如下：</p>
+<pre><code>#!/bin/bash
+service postgresql-9.3 stop
+ambari-server stop
+</code></pre>
+
+<h3>6 测试</h3>
+<p>在bdi_A和bdi_B上运行ip a命令，若发现节点绑定了虚拟IP(10.133.17.241),即为Master节点。
+在Master节点运行如下命令：</p>
+<pre><code>psql -U postgres
+select * from pg_stat_replication;
+</code></pre>
+
+<p>若发现一条client_addr为Slave节点IP的流复制的记录，则可认为流复制搭建成功。<br/>
+在两边节点依次检查Keepalived、Postgresql、HControl Server进程，若都正常，则可认为HA 环境搭建成功。</p>
+<h3>7 故障恢复</h3>
+<p>假设场景：bdi_A为主服务器，bdi_B为从服务器，倘若bdi_A由于某种原因down掉导致bdi_B变为主服务器。在解除故障后，可以按如下步骤把bdi_A变为从服务器。<br/>
+1.确保bdi_A上的keepalived,hcontrol server,postgresql9.3服务均关闭。<br/>
+2.确保bdi_B上存在/var/lib/pgsql/9.3/data/recovery.done。如果不存在把recovery.conf变成recovery.done,内容见第2部分所描述。<br/>
+3.在bdi_A上运行如下命令：</p>
+<pre><code>cd /var/lib/pgsql/9.3/data
+rm -rf `ls | grep -v &quot;pg_log&quot;`
+rm -rf pg_log/*
+rsync -ravztopg  --exclude=postmaster.pid --exclude=pg_log  root@bdi_hcontrol_server:/var/lib/pgsql/9.3/data/  .
+mv recovery.done recovery.conf
+service postgresql-9.3 start
+ambari-server start
+service keepalived start
+</code></pre>
+
+<p>4.参考第6部分进行测试，若成功则表明成功把bdi_B变为从服务器。</p>
+<h3>附录 p8.4升级9.3方案</h3>
+<p>1.//停止ambari<br/>
+ambari-server stop<br/>
+2.//导出数据,密码是bigdata<br/>
+pg<em>dump -U ambari ambari &gt;/usr/lib/hcontrol.bak<br/>
+3.安装pg9.3<br/>
+4.service postgresql-9.3 initdb<br/>
+5.service postgresql stop //停止pg8.4<br/>
+6.//修改pg9.3配置<br/>
+  vi /var/lib/pgsql/9.3/data/pg</em>hba.conf<br/>
+  把第一行的peer改成trust<br/>
+  vi /var/lib/pgsql/9.3/data/postgresql.conf<br/>
+  listen_addresses = '*'<br/>
+7.//启动pg9.3<br/>
+  service postgresql-9.3 start <br/>
+8./usr/pgsql-9.3/bin/psql -U postgres<br/></p>
+<pre><code>//创建用户
+create user ambari with password 'bigdata';
+//创建数据库
+CREATE DATABASE ambari owner ambari;
+//赋权限给ambari
+GRANT ALL PRIVILEGES ON DATABASE ambari to ambari;
+//退出
+\q
+</code></pre>
+
+<p>9.//导入pg8.4数据<br/>
+  /usr/pgsql-9.3/bin/psql -U ambari ambari &lt;/usr/lib/hcontrol.bak<br/>
+10.//重置ambari-server数据库<br/>
+   ambari-server stop<br/>
+   ambari-server setup<br/>
+   回车即可，但在Enter advanced database configuration [y/n] (n)?输入y，并选择4。<br/>
+11.chkconfig postgresql off //关闭pg8.4自启动<br/>
+12.ambari-server start<br/></p>
+
+</body>
+</html>
+<!-- This document was created with MarkdownPad, the Markdown editor for Windows (http://markdownpad.com) -->

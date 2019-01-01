@@ -1,0 +1,160 @@
+From 98cba0bd196ea94a983540de9e4d313689d49971 Mon Sep 17 00:00:00 2001
+From: Tim Israel <tim@timisrael.com>
+Date: Fri, 4 Mar 2016 23:38:00 -0500
+Subject: SLIDER-1097 add port range restriction to AgentWebApp
+
+---
+ .../slider/server/appmaster/SliderAppMaster.java      |  6 ++++--
+ .../server/appmaster/web/rest/agent/AgentWebApp.java  | 19 ++++++++++++++++---
+ .../web/rest/agent/TestAMAgentWebServices.java        | 19 +++++++++++++++++++
+ 3 files changed, 39 insertions(+), 5 deletions(-)
+
+diff --git a/slider-core/src/main/java/org/apache/slider/server/appmaster/SliderAppMaster.java b/slider-core/src/main/java/org/apache/slider/server/appmaster/SliderAppMaster.java
+index 019ec71..af37502 100644
+--- a/slider-core/src/main/java/org/apache/slider/server/appmaster/SliderAppMaster.java
++++ b/slider-core/src/main/java/org/apache/slider/server/appmaster/SliderAppMaster.java
+@@ -1127,7 +1127,7 @@ public class SliderAppMaster extends AbstractSliderLaunchedService
+    * @throws IOException
+    */
+   private void startAgentWebApp(MapOperations appInformation,
+-      Configuration serviceConf, WebAppApiImpl webAppApi) throws IOException {
++      Configuration serviceConf, WebAppApiImpl webAppApi) throws IOException, SliderException {
+     URL[] urls = ((URLClassLoader) AgentWebApp.class.getClassLoader() ).getURLs();
+     StringBuilder sb = new StringBuilder("AM classpath:");
+     for (URL url : urls) {
+@@ -1144,7 +1144,9 @@ public class SliderAppMaster extends AbstractSliderLaunchedService
+         webAppApi,
+                      RestPaths.AGENT_WS_CONTEXT)
+         .withComponentConfig(appMasterConfig)
+-        .start();
++        .withPort(getPortToRequest())
++        .withSecuredPort(getPortToRequest())
++            .start();
+     agentOpsUrl =
+         "https://" + appMasterHostname + ":" + agentWebApp.getSecuredPort();
+     agentStatusUrl =
+diff --git a/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/AgentWebApp.java b/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/AgentWebApp.java
+index f9ea06d..200fbc2 100644
+--- a/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/AgentWebApp.java
++++ b/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/AgentWebApp.java
+@@ -56,6 +56,8 @@ public class AgentWebApp implements Closeable {
+     final String name;
+     final String wsName;
+     final WebAppApi application;
++    int port;
++    int securedPort;
+     MapOperations configsMap;
+ 
+     public Builder(String name, String wsName, WebAppApi application) {
+@@ -69,6 +71,16 @@ public class AgentWebApp implements Closeable {
+       return this;
+     }
+ 
++    public Builder withPort (int port) {
++      this.port = port;
++      return this;
++    }
++
++    public Builder withSecuredPort (int securedPort) {
++      this.securedPort = securedPort;
++      return this;
++    }
++
+     public AgentWebApp start() throws IOException {
+       if (configsMap == null) {
+         throw new IllegalStateException("No SSL Configuration Available");
+@@ -80,11 +92,11 @@ public class AgentWebApp implements Closeable {
+               configsMap.getOptionInt("agent.threadpool.size.max", 25)));
+       agentServer.setStopAtShutdown(true);
+ 
+-      SslSelectChannelConnector ssl1WayConnector = createSSLConnector(false);
++      SslSelectChannelConnector ssl1WayConnector = createSSLConnector(false, port);
+       SslSelectChannelConnector ssl2WayConnector =
+           createSSLConnector(Boolean.valueOf(
+               configsMap.getOption(AgentKeys.KEY_AGENT_TWO_WAY_SSL_ENABLED,
+-                                   "false")));
++                                   "false")), securedPort);
+       agentServer.setConnectors(new Connector[]{ssl1WayConnector,
+           ssl2WayConnector});
+ 
+@@ -119,7 +131,7 @@ public class AgentWebApp implements Closeable {
+ 
+     }
+ 
+-    private SslSelectChannelConnector createSSLConnector(boolean needClientAuth) {
++    private SslSelectChannelConnector createSSLConnector(boolean needClientAuth, int port) {
+       SslSelectChannelConnector sslConnector = new
+           SslSelectChannelConnector();
+ 
+@@ -135,6 +147,7 @@ public class AgentWebApp implements Closeable {
+       sslConnector.setTruststoreType("PKCS12");
+       sslConnector.setNeedClientAuth(needClientAuth);
+ 
++      sslConnector.setPort(port);
+       sslConnector.setAcceptors(2);
+       return sslConnector;
+     }
+diff --git a/slider-core/src/test/java/org/apache/slider/server/appmaster/web/rest/agent/TestAMAgentWebServices.java b/slider-core/src/test/java/org/apache/slider/server/appmaster/web/rest/agent/TestAMAgentWebServices.java
+index d37fcea..d9b207c 100644
+--- a/slider-core/src/test/java/org/apache/slider/server/appmaster/web/rest/agent/TestAMAgentWebServices.java
++++ b/slider-core/src/test/java/org/apache/slider/server/appmaster/web/rest/agent/TestAMAgentWebServices.java
+@@ -31,6 +31,7 @@ import org.apache.hadoop.fs.FileSystem;
+ import org.apache.hadoop.io.IOUtils;
+ import org.apache.hadoop.yarn.conf.YarnConfiguration;
+ import org.apache.slider.common.SliderKeys;
++import org.apache.slider.common.tools.PortScanner;
+ import org.apache.slider.common.tools.SliderUtils;
+ import org.apache.slider.core.conf.MapOperations;
+ import org.apache.slider.core.exceptions.SliderException;
+@@ -59,6 +60,7 @@ import java.io.File;
+ import java.net.URI;
+ 
+ import static org.junit.Assert.assertEquals;
++import static org.junit.Assert.assertTrue;
+ 
+ public class TestAMAgentWebServices {
+ 
+@@ -88,6 +90,8 @@ public class TestAMAgentWebServices {
+   public static final int RM_MAX_CORES = 64;
+   public static final String AGENT_URL =
+     "https://localhost:${PORT}/ws/v1/slider/agents/";
++  public static final int MIN_PORT = 50000;
++  public static final int MAX_PORT = 50050;
+   
+   static MockFactory factory = new MockFactory();
+   private static Configuration conf = new Configuration();
+@@ -148,9 +152,14 @@ public class TestAMAgentWebServices {
+ 
+     MapOperations compOperations = new MapOperations();
+ 
++    PortScanner portScanner = new PortScanner();
++    portScanner.setPortRange(Integer.toString(MIN_PORT) + "-" + Integer.toString(MAX_PORT));
++
+     webApp = AgentWebApp.$for(AgentWebApp.BASE_PATH, slider,
+                               RestPaths.WS_AGENT_CONTEXT_ROOT)
+         .withComponentConfig(compOperations)
++        .withPort(portScanner.getAvailablePort())
++        .withSecuredPort(portScanner.getAvailablePort())
+         .start();
+     base_url = AGENT_URL.replace("${PORT}",
+                                  Integer.toString(webApp.getSecuredPort()));
+@@ -201,6 +210,16 @@ public class TestAMAgentWebServices {
+     assertEquals(200, response.getStatus());
+   }
+ 
++  @Test
++  public void testAllowedPortRange() throws Exception {
++    assertTrue(webApp.getPort() >= MIN_PORT && webApp.getPort() <= MAX_PORT);
++  }
++
++  @Test
++  public void testAllowedSecurePortRange() throws Exception {
++    assertTrue(webApp.getSecuredPort() >= MIN_PORT && webApp.getSecuredPort() <= MAX_PORT);
++  }
++
+ //  @Test
+ //  public void testSleepForAWhile() throws Throwable {
+ //    log.info("Agent is running at {}", base_url);
+-- 
+1.9.1
+

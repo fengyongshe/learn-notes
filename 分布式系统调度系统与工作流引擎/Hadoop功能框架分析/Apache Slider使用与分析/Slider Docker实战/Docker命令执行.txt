@@ -1,0 +1,53 @@
+安装：docker.repo
+[dockerrepo]
+name=Docker Repository
+baseurl=https://yum.dockerproject.org/repo/main/centos/7/
+enabled=1
+gpgcheck=1
+gpgkey=https://yum.dockerproject.org/gpg
+
+安装命令：
+	yum -y install docker-engine
+
+安装结果
+[root@dbserver ~]# docker version
+Client:
+ Version:      1.12.3
+ API version:  1.24
+ Go version:   go1.6.3
+ Git commit:   6b644ec
+ Built:        
+ OS/Arch:      linux/amd64
+
+Server:
+ Version:      1.12.3
+ API version:  1.24
+ Go version:   go1.6.3
+ Git commit:   6b644ec
+ Built:        
+ OS/Arch:      linux/amd64
+
+启动docker-daemon
+	systemctl start docker
+
+1）查看container
+    docker ps    //查看正在运行的container
+    docker ps -a  //查看所有的container
+
+2）删除container
+    docker rm {containerId} {ID2}
+
+3) 删除images
+    docker rmi {image}
+
+4）根据DockerFile构建image
+   docker build -t {imageName} .
+
+5) Docker container的运行
+   docker run -d -P {image-name}
+
+6）Docker停止命令
+    docker stop [app]
+    docker kill [app]
+
+  

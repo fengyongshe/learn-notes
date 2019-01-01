@@ -1,0 +1,24 @@
+Index: slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java	(revision 10002)
++++ slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java	(working copy)
+@@ -2956,4 +2956,19 @@
+     }
+   }
+ 
++
++  @Override
++  public void releaseAssignedContainer(ContainerId containerId) {
++      log.info("Unregistering component {}", containerId);
++      if (yarnRegistry == null) {
++          log.warn("Processing unregister component event before initialization");
++          return;
++      }
++      String cid = RegistryPathUtils.encodeYarnID(containerId.toString());
++      try {
++          yarnRegistry.deleteComponent(cid);
++      } catch (IOException e) {
++          log.warn("Failed to delete container {} : {}", containerId, e, e);
++      }
++   }
+ }

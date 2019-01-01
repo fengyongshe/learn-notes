@@ -1,0 +1,28 @@
+Index: slider-core/src/main/java/org/apache/slider/api/SliderClusterProtocol.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/api/SliderClusterProtocol.java  (revision 93663)
++++ slider-core/src/main/java/org/apache/slider/api/SliderClusterProtocol.java  (working copy)
+@@ -63,21 +63,10 @@
+    * @throws IOException
+    * @throws YarnException
+    * */
+-  Messages.UploadFileResponseProto uploadFile(
+-      Messages.UploadFileRequestProto request) throws IOException,
++  Messages.OperateContainersResponseProto operateContainers(
++      Messages.OperateContainersRequestProto request) throws IOException,
+       YarnException;
+ 
+-  /**
+-   * Delete the file from containers
+-   * @param request remove request object
+-   * @return remove response object
+-   * @throws IOException
+-   * @throws YarnException
+-   * */
+-  Messages.DeleteFileResponseProto deleteFile(
+-      Messages.DeleteFileRequestProto request) throws IOException,
+-      YarnException;
+-
+    /**
+    * Flex the cluster. 
+    */

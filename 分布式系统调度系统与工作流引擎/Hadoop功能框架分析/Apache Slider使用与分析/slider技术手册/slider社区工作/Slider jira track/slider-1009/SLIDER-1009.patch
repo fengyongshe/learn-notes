@@ -1,0 +1,77 @@
+diff --git a/slider-agent/src/main/python/agent/PythonExecutor.py b/slider-agent/src/main/python/agent/PythonExecutor.py
+index ac0327d..83fc291 100644
+--- a/slider-agent/src/main/python/agent/PythonExecutor.py
++++ b/slider-agent/src/main/python/agent/PythonExecutor.py
+@@ -92,7 +92,11 @@ class PythonExecutor:
+     thread = Thread(target=self.python_watchdog_func, args=(process, timeout))
+     thread.start()
+     # Waiting for the process to be either finished or killed
+-    process.communicate()
++    if self._is_stop_command(pythonCommand):
++      out, err = process.communicate()
++      logger.info("stop command output: " + str(out) + " err: " + str(err))
++    else:
++      process.communicate()
+     self.event.set()
+     thread.join()
+     # Building results
+@@ -120,6 +124,13 @@ class PythonExecutor:
+     self.agentToggleLogger.log("Result: %s" % result)
+     return result
+ 
++  def _is_stop_command(self, command):
++    for cmd in command:
++      if cmd == "STOP":
++        return True
++
++    return False
++
+ 
+   def launch_python_subprocess(self, command, tmpout, tmperr,
+                                environment_vars=None):
+@@ -133,9 +144,18 @@ class PythonExecutor:
+       for k, v in environment_vars:
+         self.agentToggleLogger.log("Setting env: %s to %s", k, v)
+         env[k] = v
+-    return subprocess.Popen(command,
+-                            stdout=tmpout,
+-                            stderr=tmperr, close_fds=close_fds, env=env)
++    if self._is_stop_command(command):
++      command_str = ''
++      for itr in command:
++        command_str = command_str + ' ' + itr
++
++      logger.info("command str: " + command_str)
++      return subprocess.Popen(command_str, stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell=True)
++
++    else:
++      return subprocess.Popen(command,
++                              stdout=tmpout,
++                              stderr=tmperr, close_fds=close_fds, env=env)
+ 
+   def isSuccessfull(self, returncode):
+     return not self.python_process_has_been_killed and returncode == 0
+diff --git a/slider-agent/src/main/python/agent/main.py b/slider-agent/src/main/python/agent/main.py
+index 68f46b7..f764371 100644
+--- a/slider-agent/src/main/python/agent/main.py
++++ b/slider-agent/src/main/python/agent/main.py
+@@ -59,8 +59,19 @@ def signal_handler(signum, frame):
+     docker_mode = controller.actionQueue.docker_mode
+     if docker_mode:
+       tmpdir = controller.actionQueue.dockerManager.stop_container()
++
++  controller.stopCommand = _increment_task_id(controller.stopCommand)
++  controller.appGracefulStopQueued = True
++  controller.actionQueue.execute_command(controller.stopCommand)
++
+   ProcessHelper.stopAgent()
+ 
++def _increment_task_id(stored_command):
++  taskId = int(stored_command['taskId'])
++  taskId = taskId + 1
++  stored_command['taskId'] = taskId
++  stored_command['commandId'] = "{0}-1".format(taskId)
++  return stored_command
+ 
+ def debug(sig, frame):
+   """Interrupt running process, and provide a python prompt for

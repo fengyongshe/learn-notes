@@ -1,0 +1,1680 @@
+<!DOCTYPE html>
+<!-- saved from url=(0061)http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288 -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+            <title>Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台</title>
+    
+        
+
+                        
+    
+                        
+    
+
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE,chrome=IE7">
+<meta charset="UTF-8">
+<!-- Deprecated since 3.4. To be removed in a future version of Confluence; use AJS.Confluence.getContextPath() -->
+<meta id="confluence-context-path" name="confluence-context-path" content="">
+<meta id="confluence-base-url" name="confluence-base-url" content="http://wiki.qiyi.domain">
+
+<meta id="atlassian-token" name="atlassian-token" content="97cd0396ef9989b755fd6d4d4bd7e5fbaaa6eaeb">
+
+<meta id="confluence-space-key" name="confluence-space-key" content="cloud">
+<script type="text/javascript">
+    // Deprecated global variables. To be removed in a future version of Confluence.
+    var contextPath = '';
+</script>
+
+    
+
+<!-- include system css resources -->
+
+
+    <link type="text/css" rel="stylesheet" href="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/batch.css" media="all">
+<!--[if lt IE 9]>
+<link type="text/css" rel="stylesheet" href="/s/zh_CN/3281/1/69/_/download/superbatch/css/batch.css?conditionalComment=lt+IE+9" media="all">
+<![endif]-->
+<!--[if IE 9]>
+<link type="text/css" rel="stylesheet" href="/s/zh_CN/3281/1/69/_/download/superbatch/css/batch.css?conditionalComment=IE+9" media="all">
+<![endif]-->
+<!--[if lte IE 9]>
+<link type="text/css" rel="stylesheet" href="/s/zh_CN/3281/1/69/_/download/superbatch/css/batch.css?conditionalComment=lte+IE+9" media="all">
+<![endif]-->
+<link type="text/css" rel="stylesheet" href="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/batch(1).css" media="print">
+<link type="text/css" rel="stylesheet" href="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/batch(2).css" media="all">
+<link type="text/css" rel="stylesheet" href="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/batch(3).css" media="all">
+<!--[if lt IE 9]>
+<link type="text/css" rel="stylesheet" href="/s/zh_CN/3281/1/944e20344664a5ac3565efc7d932ac15/_/download/contextbatch/css/viewcontent,main/batch.css?conditionalComment=lt+IE+9" media="all">
+<![endif]-->
+<link type="text/css" rel="stylesheet" href="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/batch(4).css" media="all">
+<link type="text/css" rel="stylesheet" href="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/com.atlassian.confluence.ext.newcode-macro-plugin-syntaxhighlighter.css" media="all">
+<link type="text/css" rel="stylesheet" href="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/com.atlassian.confluence.ext.newcode-macro-plugin-sh-theme-confluence.css" media="all">
+<link type="text/css" rel="stylesheet" href="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/colors.css" media="all">
+<link type="text/css" rel="stylesheet" href="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/default-theme.css" media="all">
+
+<!-- end system css resources -->
+
+    <meta name="confluence-request-time" content="1420600672214">
+<!-- Deprecated since 3.4. To be removed in a future version of Confluence; use atl.header -->
+        
+            <script type="text/x-template" title="share-content-popup">
+    <form action="#" method="post" class="aui share-content-popup">
+        <fieldset>
+            <label for="users">用户名或电子邮件</label>
+            <div class="autocomplete-user-target">
+                <input class="text autocomplete-sharepage" id="users" data-max="10" data-dropdown-target=".autocomplete-user-target" data-none-message="没有找到匹配的用户或电子邮件"/>
+            </div>
+            <ol class="recipients">
+            </ol>
+            <div><label for="note">说明</label></div>
+            <textarea class="textarea" id="note" placeholder="添加一个可选的说明"/>
+        </fieldset>
+        <div class="button-panel">
+            <div class="progress-messages-icon"></div>
+            <div class="progress-messages">
+            </div>
+            <input class="button submit" type="submit" value="分享" disabled/>
+            <a class="close-dialog" href="#">取消</a>
+        </div>
+    </form>
+</script>
+
+<script type="text/x-template" title="share-content-popup-recipient-username">
+    <li data-username="{username}" style="display: none">
+        <span>
+            <img src="{thumbnailLink.href}" title="{title}">
+            <span>{title}</span>
+            <span class="remove-recipient"/>
+        </span>
+    </li>
+</script>
+
+<script type="text/x-template" title="share-content-popup-recipient-email">
+    <li data-email="{email}" style="display: none">
+        <span>
+            <img src="{icon}" title="{email}">
+            <span>{email}</span>
+            <span class="remove-recipient"/>
+        </span>
+    </li>
+</script>
+    
+        
+            <meta name="ajs-keyboardshortcut-hash" content="15dae08e5d0ffa4d859e2d5fef8de95d">
+            <meta name="ajs-use-keyboard-shortcuts" content="true">
+            
+    
+    
+            <meta name="ajs-page-id" content="21961288">
+            <meta name="ajs-page-title" content="Apache Slider项目调研">
+            <meta name="ajs-parent-page-title" content="YARN深入研究">
+            <meta name="ajs-parent-page-id" content="16385051">
+            <meta name="ajs-space-key" content="cloud">
+            <meta name="ajs-space-name" content="云平台">
+            <meta name="ajs-from-page-title" content="">
+            <meta name="ajs-browse-page-tree-mode" content="view">
+            <meta name="ajs-user-display-name" content="郭磊涛">
+            <meta name="ajs-context-path" content="">
+            <meta name="ajs-version-number" content="4.2.4">
+            <meta name="ajs-build-number" content="3281">
+            <meta name="ajs-remote-user" content="guoleitao">
+            <meta name="ajs-static-resource-url-prefix" content="/s/zh_CN/3281/1/_">
+            <meta name="ajs-global-settings-attachment-max-size" content="20971520">
+            <meta name="ajs-user-locale" content="zh_CN">
+            <meta name="ajs-enabled-dark-features" content="">
+            <meta name="ajs-atl-token" content="97cd0396ef9989b755fd6d4d4bd7e5fbaaa6eaeb">
+            <meta name="ajs-confluence-flavour" content="VANILLA">
+            <meta name="ajs-quick.comment.resources" content="&lt;!--[if lt IE 9]&gt;
+&lt;link type=&quot;text/css&quot; rel=&quot;stylesheet&quot; href=&quot;/s/zh_CN/3281/1/50245e4990dc10f7d5756e5195039f90/_/download/contextbatch/css/editor,macro-browser,-viewcontent/batch.css?conditionalComment=lt+IE+9&quot; media=&quot;all&quot;&gt;
+&lt;![endif]--&gt;
+&lt;link type=&quot;text/css&quot; rel=&quot;stylesheet&quot; href=&quot;/s/zh_CN/3281/1/50245e4990dc10f7d5756e5195039f90/_/download/contextbatch/css/editor,macro-browser,-viewcontent/batch.css&quot; media=&quot;all&quot;&gt;
+&lt;script type=&quot;text/javascript&quot; src=&quot;/s/zh_CN/3281/1/50245e4990dc10f7d5756e5195039f90/_/download/contextbatch/js/editor,macro-browser,-viewcontent/batch.js&quot; &gt;&lt;/script&gt;
+&lt;script type=&quot;text/javascript&quot; src=&quot;/s/zh_CN/3281/1/1.1.2/_/download/batch/com.atlassian.confluence.plugins.editor.confluence-source-editor:atlassian-source-editor-javascript/com.atlassian.confluence.plugins.editor.confluence-source-editor:atlassian-source-editor-javascript.js&quot; &gt;&lt;/script&gt;
+">
+    
+    <link rel="shortcut icon" href="http://wiki.qiyi.domain/favicon.ico">
+    <link rel="icon" type="image/x-icon" href="http://wiki.qiyi.domain/favicon.ico">
+
+<link rel="search" type="application/opensearchdescription+xml" href="http://wiki.qiyi.domain/opensearch/osd.action" title="奇艺技术产品中心统一文档平台">
+
+        <!-- include system javascript resources -->
+                        
+    
+    <!--[if lt IE 9]>
+<script type="text/javascript" src="/s/zh_CN/3281/1/69/_/download/superbatch/js/batch.js?conditionalComment=lt+IE+9" ></script>
+<![endif]-->
+<script type="text/javascript" src="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/batch.js"></script>
+<!--[if lte IE 8]>
+<script type="text/javascript" src="/s/zh_CN/3281/1/69/_/download/superbatch/js/batch.js?conditionalComment=lte+IE+8" ></script>
+<![endif]-->
+<script type="text/javascript" src="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/batch(5).js"></script>
+<script type="text/javascript" src="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/batch(6).js"></script>
+<script type="text/javascript" src="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/batch(7).js"></script>
+<script type="text/javascript" src="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/batch(8).js"></script>
+<script type="text/javascript" src="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/com.atlassian.confluence.ext.newcode-macro-plugin-syntaxhighlighter.js"></script>
+<script type="text/javascript" src="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/com.atlassian.confluence.ext.newcode-macro-plugin-syntaxhighlighter-brushes.js"></script>
+
+    
+    <!-- end system javascript resources -->
+
+    
+
+    
+    <link rel="canonical" href="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台.html">
+    <link rel="shortlink" href="http://wiki.qiyi.domain/x/SBpPAQ">
+    <meta name="wikilink" content="[cloud:Apache Slider项目调研]">
+    <meta name="page-version" content="14">
+	<meta name="ajs-canonical-url" content="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288">
+
+<!--[if lt IE 9]>
+<link type="text/css" rel="stylesheet" href="/s/zh_CN/3281/1/50245e4990dc10f7d5756e5195039f90/_/download/contextbatch/css/editor,macro-browser,-viewcontent/batch.css?conditionalComment=lt+IE+9" media="all">
+<![endif]--><link type="text/css" rel="stylesheet" href="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/batch(9).css" media="all">
+            <meta name="ajs-content-type" content="comment">
+            <meta name="ajs-min-editor-height" content="150">
+            <meta name="ajs-editor-plugin-resource-prefix" content="/s/zh_CN/3281/1/4.2.4/_">
+            <meta name="ajs-num-attachments" content="">
+            <meta name="ajs-auto-start" content="false">
+            <meta name="ajs-content-id" content="21961288">
+            <meta name="ajs-save-drafts" content="false">
+            <meta name="ajs-action-locale" content="zh_CN">
+            <meta name="ajs-heartbeat" content="true">
+            <meta name="ajs-new-page" content="">
+            <meta name="ajs-form-name" content="inlinecommentform">
+            <meta name="ajs-attachment-source-content-id" content="21961288">
+            <meta name="ajs-editor-mode" content="richtext">
+            <meta name="ajs-draft-type" content="">
+            <meta name="ajs-can-attach-files" content="true">
+                
+            		    <meta name="ajs-max-thumb-width" content="300">
+		    <meta name="ajs-is-dev-mode" content="false">
+		    <meta name="ajs-draft-save-interval" content="30000">
+		    <meta name="ajs-show-hidden-user-macros" content="false">
+		    <meta name="ajs-is-admin" content="false">
+		    <meta name="ajs-confluence.prefs.editor.disable.autocomplete" content="false">
+		    <meta name="ajs-confluence.prefs.editor.disable.autoformat" content="false">
+		    <meta name="ajs-heartbeat-interval" content="30000">
+	
+    </head>
+    
+<body onload="placeFocus()" id="com-atlassian-confluence" class="theme-default ">
+
+        
+    <ul id="assistive-skip-links" class="assistive">
+    <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#title-heading">转至内容</a></li>
+    <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#breadcrumbs">转至导航栏</a></li>
+    <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#header-menu-bar">转至主菜单</a></li>
+    <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#navigation">转至动作菜单</a></li>
+    <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#quick-search-query">转至快速搜索</a></li>
+</ul>
+<div id="page">
+<div id="full-height-container">
+    <div id="header-precursor">
+        <div class="cell">
+            
+                        </div>
+    </div>
+
+    <div id="header" class="">
+    <div class="cell">
+                          
+    <form id="quick-search" class="quick-search" method="get" action="http://wiki.qiyi.domain/dosearchsite.action">
+        <fieldset>
+            <label class="assistive" for="quick-search-query">快速搜索</label>
+            <input id="quick-search-query" class="quick-search-query" type="search" accesskey="q" autocomplete="off" name="queryString" size="25" title="快速搜索 ( 类型 &#39;/&#39; )" results="10" placeholder="搜索">
+            <input id="quick-search-submit" class="quick-search-submit" type="submit" value="搜索">
+            <div class="aui-dd-parent quick-nav-drop-down"></div>
+        </fieldset>
+        <div class="hidden parameters">
+                                        <!-- putMetadata failed to add value for key "quick-nav-enabled" so rendering metadata inline - see server debug log for details -->
+        <meta name="ajs-quick-nav-enabled" content="true">
+                                                    </div>
+    </form>
+        <ul id="header-menu-bar" class="ajs-menu-bar">
+                        
+        
+            <li class="normal ajs-menu-item">
+        <a id="browse-menu-link" class="browse trigger ajs-menu-title" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#"><span><span>浏览</span></span></a>         <div class="ajs-drop-down assistive" hidden="">
+                        <ul id="browse-menu-link-leading" class="section-leading first">
+                                        <li>
+    
+        
+    
+    <a id="space-pages-link" href="http://wiki.qiyi.domain/pages/listpages.action?key=cloud" class="" title="浏览云平台空间的页面 ( 类型 &#39;g&#39; 然后 &#39;s&#39; )">
+                   <span>页面</span></a>        </li>
+                                        <li>
+    
+        
+    
+    <a id="space-blogposts-link" href="http://wiki.qiyi.domain/pages/viewrecentblogposts.action?key=cloud" class="" title="浏览云平台空间的博文">
+                   <span>博文</span></a>        </li>
+                                        <li>
+    
+        
+    
+    <a id="space-labels-link" href="http://wiki.qiyi.domain/labels/listlabels-heatmap.action?key=cloud" class="" title="浏览云平台空间的标签">
+                   <span>标签</span></a>        </li>
+                                        <li>
+    
+        
+    
+    <a id="space-attachments-link" href="http://wiki.qiyi.domain/spaces/listattachmentsforspace.action?key=cloud" class="" title="浏览云平台空间的附件">
+                   <span>附件</span></a>        </li>
+                                        <li>
+    
+        
+    
+    <a id="space-mail-link" href="http://wiki.qiyi.domain/mail/archive/viewmailarchive.action?key=cloud" class="" title="浏览云平台空间的邮件">
+                   <span>邮件</span></a>        </li>
+                                        <li>
+    
+        
+    
+    <a id="space-advanced-link" href="http://wiki.qiyi.domain/spaces/viewspacesummary.action?key=cloud" class="" title="浏览云平台空间的附加功能">
+                   <span>高级</span></a>        </li>
+                            </ul>
+                        <ul id="browse-menu-link-global" class="section-global">
+                                        <li>
+    
+        
+    
+    <a id="whats-new-menu-link" href="http://docs.atlassian.com/confluence/docs-42/whatsnew/iframe" class="" title="">
+                   <span>最新功能</span></a>        </li>
+                                        <li>
+    
+        
+    
+    <a id="people-directory-link" href="http://wiki.qiyi.domain/peopledirectory.action" class="" title="浏览Confluence用户目录">
+                   <span>用户目录</span></a>        </li>
+                                        <li>
+    
+        
+    
+    <a id="space-directory-link" href="http://wiki.qiyi.domain/spacedirectory/view.action" class="" title="浏览Confluence空间目录">
+                   <span>空间目录</span></a>        </li>
+                                        <li>
+    
+        
+    
+    <a id="feed-builder-link" href="http://wiki.qiyi.domain/dashboard/configurerssfeed.action" class="" title="创建个性化的 RSS源。">
+                   <span>RSS源建立器</span></a>        </li>
+                                        <li>
+    
+            
+    
+    <a id="keyboard-shortcuts-link" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" class="" title="查看可用的键盘快捷方式 ( 类型 &#39;?&#39; )">
+                   <span>键盘快捷方式</span></a>        </li>
+                                        <li>
+    
+            
+    
+    <a id="gadget-directory-link" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" class="user-item administration-link" title="浏览小工具">
+                   <span>小工具</span></a>        </li>
+                            </ul>
+                    </div>
+    </li>
+        
+                                                                        
+            <li class="normal ajs-menu-item">
+        <a id="user-menu-link" class="user trigger ajs-menu-title" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#"><span><span>郭磊涛</span></span></a>         <div class="ajs-drop-down assistive" hidden="">
+                        <ul id="user-menu-link-user-preferences" class="section-user-preferences first">
+                                        <li>
+        
+        
+    
+    <a id="create-personal-space-link" href="http://wiki.qiyi.domain/spaces/createpersonalspace.action" class="user-item personal-space" title="">
+                   <span>添加个人空间;</span></a>        </li>
+                                        <li>
+    
+        
+    
+    <a id="view-user-history-link" href="http://wiki.qiyi.domain/users/viewuserhistory.action" class="user-item user-history popup-link" title="">
+                   <span>最近浏览</span></a>        </li>
+                            </ul>
+                        <ul id="user-menu-link-user-content" class="section-user-content">
+                                        <li>
+    
+        
+    
+    <a href="http://wiki.qiyi.domain/users/plugins/groupdocs/account.action" class="" title="">
+                   <span>My GroupDocs</span></a>        </li>
+                                        <li>
+    
+        
+    
+    <a id="view-user-profile-link" href="http://wiki.qiyi.domain/users/viewmyprofile.action" class="user-item user-profile" title="">
+                   <span>用户信息</span></a>        </li>
+                                        <li>
+    
+        
+    
+    <a href="http://wiki.qiyi.domain/users/viewfollow.action?username=guoleitao" class="follow-link" title="">
+                   <span>网络</span></a>        </li>
+                                        <li>
+    
+        
+    
+    <a id="user-favourites-link" href="http://wiki.qiyi.domain/users/viewmyfavourites.action" class="user-item" title="">
+                   <span>Favourites</span></a>        </li>
+                                        <li>
+    
+        
+    
+    <a id="user-watches-link" href="http://wiki.qiyi.domain/users/viewnotifications.action" class="user-item" title="">
+                   <span>关注</span></a>        </li>
+                                        <li>
+    
+        
+    
+    <a id="user-drafts-link" href="http://wiki.qiyi.domain/users/viewmydrafts.action" class="user-item" title="">
+                   <span>草稿</span></a>        </li>
+                                        <li>
+    
+        
+    
+    <a id="user-settings-link" href="http://wiki.qiyi.domain/users/viewmysettings.action" class="user-item" title="">
+                   <span>设置</span></a>        </li>
+                            </ul>
+                        <ul id="user-menu-link-user-operations" class="section-user-operations">
+                                        <li>
+    
+        
+    
+    <a id="logout-link" href="http://wiki.qiyi.domain/logout.action" class="user-item logout-link" title="">
+                   <span>注销</span></a>        </li>
+                            </ul>
+                    </div>
+    </li>
+                        </ul>
+        
+    
+    <ol id="breadcrumbs">
+                    
+                        
+        <li class="first">
+                                    <span><a href="http://wiki.qiyi.domain/dashboard.action" title="转至数字面板 ( 类型 &#39;g&#39; 然后 &#39;d&#39; )">数字面板</a></span>
+                </li>
+                    
+                
+        <li>
+                                    <span><a href="http://wiki.qiyi.domain/display/cloud">云平台</a></span>
+                </li>
+                                        <li id="ellipsis" title="显示全部导航项"><span><strong>…</strong></span></li>
+                                    
+                
+        <li class="hidden-crumb">
+                                    <span><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=819280">云平台 首页</a></span>
+                </li>
+                                
+                
+        <li class="hidden-crumb">
+                                    <span><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=6817060">内部页面</a></span>
+                </li>
+                                
+                
+        <li class="hidden-crumb">
+                                    <span><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=6817227">服务云</a></span>
+                </li>
+                                
+                
+        <li class="hidden-crumb">
+                                    <span><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=6069920">服务云关键技术</a></span>
+                </li>
+                                
+                
+        <li class="hidden-crumb">
+                                    <span><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=10763090">Hadoop深入研究</a></span>
+                </li>
+                                
+                
+        <li class="hidden-crumb">
+                                    <span><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=16385051">YARN深入研究</a></span>
+                </li>
+                    
+                
+        <li>
+                                    <span><a href="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台.html">Apache Slider项目调研</a></span>
+                </li>
+        </ol>
+
+    </div>
+</div>
+<!-- \#header -->
+        <!-- \#header -->
+
+        
+    <div id="main" class="">
+        <div id="main-header">
+            
+    <div id="navigation" class="content-navigation view">
+                    <ul class="ajs-menu-bar">
+                                <li class="ajs-button normal">
+    
+        
+    
+    <a id="editPageLink" href="http://wiki.qiyi.domain/pages/editpage.action?pageId=21961288" class="edit" accesskey="e" title="编辑 ( 类型 &#39;e&#39; )">
+                   <span><u>E</u>编辑</span></a>        </li>
+                    <li class="ajs-button normal">
+    
+            
+    
+    <a id="shareContentLink" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" class="share" title="通过发送电子邮件给其他人共享此内容 ( 类型 &#39;s&#39; )">
+                   <span><u>S</u>hare</span></a>        </li>
+                    
+            <li class="normal ajs-menu-item">
+        <a id="add-menu-link" class="add trigger ajs-menu-title" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#"><span><span>添加</span></span></a>         <div class="ajs-drop-down assistive" hidden="">
+                        <ul id="add-menu-link-space" class="section-space first">
+                                        <li>
+    
+        
+    
+    <a id="createPageLink" href="http://wiki.qiyi.domain/pages/createpage.action?spaceKey=cloud&fromPageId=21961288" class="add-page" accesskey="p" title="添加页面 ( 类型 &#39;c&#39; )">
+                   <span>页面</span></a>        </li>
+                                        <li>
+    
+        
+    
+    <a id="createBlogpostLink" href="http://wiki.qiyi.domain/pages/createblogpost.action?spaceKey=cloud" class="add-news" title="Add a Blog Post ( 类型 &#39;b&#39; )">
+                   <span>博文</span></a>        </li>
+                            </ul>
+                        <ul id="add-menu-link-page" class="section-page">
+                                        <li>
+    
+        
+    
+    <a id="add-comment-menu-link" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288&showComments=true&showCommentArea=true#addcomment" class="add-comment" title="添加评论 ( 类型 &#39;m&#39; )">
+                   <span>评论</span></a>        </li>
+                                        <li>
+    
+        
+    
+    <a id="add-attachment-link" href="http://wiki.qiyi.domain/pages/viewpageattachments.action?pageId=21961288" class="add-attachment" accesskey="a" title="">
+                   <span>附件</span></a>        </li>
+                            </ul>
+                    </div>
+    </li>
+                    
+            <li class="normal ajs-menu-item">
+        <a id="action-menu-link" class="action trigger ajs-menu-title" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#"><span><span>工具</span></span></a>         <div class="ajs-drop-down most-right-menu-item assistive" hidden="">
+                        <ul id="action-menu-link-primary" class="section-primary first">
+                                        <li>
+    
+        
+    
+    <a id="view-attachments-link" href="http://wiki.qiyi.domain/pages/viewpageattachments.action?pageId=21961288" class="action-view-attachments" accesskey="a" title="查看附件 ( 类型 &#39;t&#39; )">
+                   <span><u>A</u>附件(2)</span></a>        </li>
+                                        <li>
+    
+        
+    
+    <a id="action-view-history-link" href="http://wiki.qiyi.domain/pages/viewpreviousversions.action?pageId=21961288" class="action-view-history" title="">
+                   <span>页面历史</span></a>        </li>
+                                        <li>
+    
+        
+    
+    <a id="action-page-permissions-link" href="http://wiki.qiyi.domain/pages/viewinfo.action?pageId=21961288" class="action-page-permissions" title="编辑限制">
+                   <span>限制</span></a>        </li>
+                            </ul>
+                        <ul id="action-menu-link-marker" class="section-marker">
+                                        <li>
+    
+        
+    
+    <a id="page-favourite" href="http://wiki.qiyi.domain/labels/addfavourite.action?entityId=21961288&atl_token=97cd0396ef9989b755fd6d4d4bd7e5fbaaa6eaeb" class="action-page-favourite" title="">
+                   <span>收藏夹</span></a>        </li>
+                                        <li>
+    
+        
+    
+    <a id="page-unwatch" href="http://wiki.qiyi.domain/pages/removepagenotification.action?pageId=21961288&atl_token=97cd0396ef9989b755fd6d4d4bd7e5fbaaa6eaeb" class="action-page-watching selected ie-page-watching-selected" title="">
+                   <span>停止关注</span></a>        </li>
+                                        <li class="assistive">
+    
+        
+    
+    <a id="page-watch" href="http://wiki.qiyi.domain/pages/addpagenotification.action?pageId=21961288&atl_token=97cd0396ef9989b755fd6d4d4bd7e5fbaaa6eaeb" class="action-page-watching inactive" title="">
+                   <span>关注</span></a>        </li>
+                            </ul>
+                        <ul id="action-menu-link-secondary" class="section-secondary">
+                                        <li>
+    
+        
+    
+    <a id="view-page-info-link" href="http://wiki.qiyi.domain/pages/viewinfo.action?pageId=21961288" class="action-view-info" title="">
+                   <span>信息</span></a>        </li>
+                                        <li>
+    
+        
+    
+    <a id="link-to-page-link" href="http://wiki.qiyi.domain/pages/viewinfo.action?pageId=21961288" class="" title="链接至本页面 ( 类型 &#39;k&#39; )">
+                   <span>链接至该页…</span></a>        </li>
+                                        <li>
+    
+        
+    
+    <a id="view-in-hierarchy-link" href="http://wiki.qiyi.domain/pages/listpages-dirview.action?key=cloud&openId=21961288#selectedPageInHierarchy" class="" title="">
+                   <span>以层级方式查看</span></a>        </li>
+                                        <li>
+    
+        
+    
+    <a id="action-view-source-link" href="http://wiki.qiyi.domain/plugins/viewsource/viewpagesrc.action?pageId=21961288" class="action-view-source popup-link" title="">
+                   <span>View Source</span></a>        </li>
+                                        <li>
+    
+        
+    
+    <a id="action-source-editor-view-storage-link" href="http://wiki.qiyi.domain/plugins/viewstorage/viewpagestorage.action?pageId=21961288" class="action-view-storage view-storage-link popup-link" title="">
+                   <span>View Storage Format</span></a>        </li>
+                                        <li>
+    
+        
+    
+    <a id="import-word-doc" href="http://wiki.qiyi.domain/pages/worddav/uploadimport.action?pageId=21961288" class="" title="">
+                   <span>Doc文件导入</span></a>        </li>
+                            </ul>
+                        <ul id="action-menu-link-modify" class="section-modify">
+                                        <li>
+    
+        
+    
+    <a id="action-copy-page-link" href="http://wiki.qiyi.domain/pages/copypage.action?idOfPageToCopy=21961288&spaceKey=cloud" class="action-copy" title="">
+                   <span>复制</span></a>        </li>
+                                        <li>
+    
+        
+    
+    <a id="action-move-page-dialog-link" href="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台.html" class="action-move" title="">
+                   <span>移动</span></a>        </li>
+                                        <li>
+    
+        
+    
+    <a id="action-remove-content-link" href="http://wiki.qiyi.domain/pages/removepage.action?pageId=21961288" class="action-remove" title="">
+                   <span>删除</span></a>        </li>
+                            </ul>
+                    </div>
+    </li>
+            </ul>
+    </div>
+
+            
+            <h1 id="title-heading" class="pagetitle">
+                                    <a href="http://wiki.qiyi.domain/display/cloud"><img class="logo global custom" src="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/global.logo" alt=""></a>                
+                <span id="title-text">
+                                                <a href="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台.html">Apache Slider项目调研</a>
+                                    </span>
+            </h1>
+        </div><!-- \#main-header -->
+
+        
+
+        <div id="sidebar-container">
+                                                </div><!-- \#sidebar-container -->
+
+        
+    
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
+
+
+
+
+        
+
+    
+    
+        
+    
+    
+                    
+    
+
+    
+
+
+<div id="content" class="page view">
+    
+<div id="action-messages">
+    </div>
+
+
+
+    
+<script type="text/x-template" title="movePageDialog">
+    <div class="row information">
+        <div class="inner">
+            <div class="element">
+                按照空间和标题指定这个页面的新的父页面和子页面
+            </div>
+        </div>
+    </div>
+    <div class="form">
+        <fieldset>
+                
+
+    <legend class="assistive"><span>变更父页面至已知页面</span></legend>
+            <div class="row">
+                <label for="new-space">新空间:</label>
+                <div class="value new-space-value">
+                    <input id="new-space-key" name="new-space-key" type="hidden" value="cloud">
+                                            <span class="space-input">
+                            <input id="new-space" name="new-space" value="云平台">
+                        </span>
+                        <span class="description hidden">输入空间的名字来查看建议的空间列表。</span>
+                                        <div class="new-space-dropdown aui-dd-parent autocomplete"></div>
+                </div>
+            </div>
+            <div class="row">
+                <label for="new-parent-page">新的父页面:</label>
+                <div class="value new-parent-page-value">
+                    <span class="page-input">
+                        <input id="new-parent-page" name="new-parent-page" value="YARN深入研究">
+                    </span>
+                    <span class="description">输入页面标题来查看建议的页面列表。</span>
+                    <div class="new-parent-page-dropdown aui-dd-parent autocomplete"></div>
+                </div>
+            </div>
+        </fieldset>
+    </div>
+    <div class="location-info">
+        <div class="row">
+            <label>当前位置:</label>
+            <div class="value breadcrumbs-container">
+                <div class="breadcrumbs-line">
+                    <ul id="current-parent-breadcrumbs" class="breadcrumbs">
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <label>新位置:</label>
+            <div class="value breadcrumbs-container">
+                <div class="breadcrumbs-line">
+                    <ul id="new-parent-breadcrumbs" class="breadcrumbs">
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</script>
+
+<script type="text/x-template" title="movePageSearchPanel">
+    <div class="row information">
+        <div class="inner">
+            <div class="element">
+                为这个页面及其子页面选择新的父页面
+            </div>
+        </div>
+    </div>
+    <div id="move-page-search-container" class="row">
+        <div class="search-form">
+            <fieldset>
+                    
+
+    <legend class="assistive"><span>搜索父页面</span></legend>
+                    
+
+    <label  for="move-page-search-query" class="assistive">搜索关键字</label>
+                <input class="search-query" id="move-page-search-query">
+                    
+
+    <label  for="move-page-search-space" class="assistive">在空间中搜索</label>
+                                    <select id="move-page-search-space" class="search-space">
+                        <option value="conf_all" selected="selected">全部空间</option>
+                        <option value="cloud">云平台</option>
+                    </select>
+                                <input type="button" value="搜索">
+                            </fieldset>
+        </div>
+        <div class="search-results">
+        </div>
+    </div>
+</script>
+<script type="text/x-template" title="searchResultsGrid">
+    <table>
+        <thead>
+            <tr class="header">
+                <th class="search-result-title">页面标题</th>
+                <th class="search-result-space">空间</th>
+                <th class="search-result-date">更新于</th>
+            </tr>
+        </thead>
+    </table>
+</script>
+<script type="text/x-template" title="searchResultsGridCount">
+    <p class="search-result-count">{0}</p>
+</script>
+<script type="text/x-template" title="searchResultsGridRow">
+    <tr class="search-result">
+        <th class="search-result-title"><a href="{1}" class="content-type-{2}"><span>{0}</span></a></th>
+        <td class="search-result-space"><a class="space" href="/display/{4}/" title="{3}">{3}</a></td>
+        <td class="search-result-date"><span class="date" title="{6}">{5}</span></td>
+    </tr>
+</script><!-- Start restrictions section -->
+<script type="text/x-template" title="page-permissions-div">
+<div id="page-permissions-div">
+    <div id="page-permissions-editor-form">
+
+                <div id="page-permissions-error-div" class="hidden">
+            <a href="#" id="permissions-error-div-close">确定</a>
+            <div></div>
+        </div>
+
+                <div id="page-permissions-type-radios" class="page-permissions-label-rows">
+            <div>
+                <input id="restrictViewRadio" type="radio" checked="checked" name="pagePermissionTypeRadio" value="view"/>
+                <label for="restrictViewRadio">页面浏览限制</label>
+                <input id="restrictEditRadio" type="radio" name="pagePermissionTypeRadio" value="edit"/>
+                <label for="restrictEditRadio">页面编辑限制</label>
+            </div>
+        </div>
+        <div id="page-permissions-input" class="page-permissions-label-rows">
+            <div class="page-permissions-label">至:</div>
+            <div id="page-permissions-chooser-box">
+                                    <span id="page-permissions-choose-me" class="ajs-button normal">
+                        <img class="permission-entity-picture" src="/images/icons/profilepics/default.gif" border="0" alt="我" align="absmiddle"/>
+                        <a href="#">我</a>
+                        <span class="remote-user-name hidden">guoleitao</span>
+                    </span>
+                                <span id="page-permissions-choose-user" class="ajs-button">
+                    
+
+
+
+    
+
+
+
+<a href="#" id='userpicker-popup-link-image' onClick="var picker = window.open('/spaces/openuserpicker.action?key=cloud&amp;startIndex=0&amp;onPopupSubmit=AJS.PagePermissions.addUserPermissions', 'EntitiesPicker', 'status=yes,resizable=yes,top=100,left=200,width=700,height=680,scrollbars=yes'); picker.focus(); return false;"><img src="/s/zh_CN/3281/1/_/images/icons/user_16.gif" height=16 width=16 border=0 align="absmiddle"  title="Choose users" /></a>
+<a href="#" id='userpicker-popup-link-text' onClick="var picker = window.open('/spaces/openuserpicker.action?key=cloud&amp;startIndex=0&amp;onPopupSubmit=AJS.PagePermissions.addUserPermissions', 'EntitiesPicker', 'status=yes,resizable=yes,top=100,left=200,width=700,height=680,scrollbars=yes'); picker.focus(); return false;">人员...</a>
+
+
+                </span>
+                <span id="page-permissions-choose-group" class="ajs-button">
+                    
+
+
+
+    
+
+ 
+
+<a href="#" id='grouppicker-popup-link-image' onClick="var picker = window.open('/spaces/opengrouppicker.action?key=cloud&amp;startIndex=0&amp;actionName=dosearchgroups.action&amp;onPopupSubmit=AJS.PagePermissions.addGroupPermissions', 'EntitiesPicker', 'status=yes,resizable=yes,top=100,left=200,width=580,height=550,scrollbars=yes'); picker.focus(); return false;"><img src="/s/zh_CN/3281/1/_/images/icons/group_16.gif" height=16 width=16 border=0 align="absmiddle"  title="Choose groups" /></a>
+<a href="#" id='grouppicker-popup-link-text' onClick="var picker = window.open('/spaces/opengrouppicker.action?key=cloud&amp;startIndex=0&amp;actionName=dosearchgroups.action&amp;onPopupSubmit=AJS.PagePermissions.addGroupPermissions', 'EntitiesPicker', 'status=yes,resizable=yes,top=100,left=200,width=580,height=550,scrollbars=yes'); picker.focus(); return false;">组...</a>
+
+
+                </span>
+            </div>
+            <div id="page-permissions-input-box">
+                <input type="text" id="page-permissions-names-input" name="permissionNames"
+                    placeholder="输入用户和组名称" class="autocomplete-user"
+                    data-max="10" data-none-message="无匹配内容"
+                    data-target="#page-permissions-names-hidden" data-template="{username}"
+                    data-dropdown-target="#page-perms-name-dropdown-wrapper" data-resize-to-input="true"
+                    size="30"/>
+                <input
+    type="hidden"
+                            id="page-permissions-names-hidden"           />                <img height="16px" width="1px" src="/s/zh_CN/3281/1/_/images/border/spacer.gif"/>
+                <input type="button" id="add-typed-names" value="限制">
+                <div id="page-perms-name-dropdown-wrapper" class="aui-dd-parent autocomplete"></div>
+            </div>
+        </div>
+    </div>
+    <div id="page-permissions-tables">
+        <div id="page-permissions-table-div">
+                        <table id="page-permissions-table" class="page-permissions-table">
+                <tr id="page-permissions-no-views" class="marker-row">
+                    <td colspan="3" class="page-permissions-marker-cell"><span>当前页面没有浏览限制</span></td>
+                </tr>
+                <tr id="page-permissions-no-edits" class="marker-row">
+                    <td colspan="3" class="page-permissions-marker-cell"><span>当前页面没有编辑限制</span></td>
+                </tr>
+            </table>
+        </div>
+        <div id="page-inherited-permissions-table-div" class="hidden">
+            <span id="page-inherited-permissions-table-desc">
+                <a class="icon twisty-closed">显示/隐藏</a>
+                <a id="toggle-inherited-permissions" title="点击查看继承权限">此页面继承了父级页面权限，只有对父级页面拥有查看权限的用户才可以查看此页面。</a>
+            </span>
+            <div id="page-inherited-permissions-tables" class="hidden page-inheritance-togglable"></div>
+        </div>
+    </div>
+</div>
+</script>
+
+<!-- End restrictions section -->
+
+        
+    
+    
+        
+                            
+    
+
+                    
+
+        
+        <a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#page-metadata-end" class="assistive">转至元数据结尾</a>
+<div id="page-metadata-start" class="assistive"></div>
+
+    <div class="page-metadata">
+        <ul>
+                            <li class="page-metadata-item noprint">
+    
+            
+    
+    <a id="content-metadata-page-restrictions" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" class="page-metadata-icon page-restrictions" title="此页面应用了权限限制，点击小锁图标查看或编辑限制。">
+                   <span>应用页面限制</span></a>        </li>
+                            <li class="page-metadata-item noprint">
+    
+        
+    
+    <a id="content-metadata-attachments" href="http://wiki.qiyi.domain/pages/viewpageattachments.action?pageId=21961288&metadataLink=true" class="page-metadata-icon action-view-attachments" accesskey="a" title="附件：2">
+                   <span><span class="page-metadata-attachments-text">附件：</span><span class="page-metadata-attachments-count">2</span></span></a>        </li>
+                        <li class="page-metadata-modification-info">
+                                    被<a href="http://wiki.qiyi.domain/display/~guoleitao" class="url fn confluence-userlink userlink-0" data-username="guoleitao" title="" data-user-hover-bound="true">郭磊涛</a>添加，被<a href="http://wiki.qiyi.domain/display/~guoleitao" class="url fn confluence-userlink userlink-0" data-username="guoleitao" title="" data-user-hover-bound="true">郭磊涛</a>最后更新于十月 27, 2014
+                                                                <span class="noprint">&nbsp;(<a id="view-change-link" href="http://wiki.qiyi.domain/pages/diffpages.action?pageId=21961288&originalId=22840987">查看更改</a>)</span>
+                                                </li>
+                    </ul>
+                </div>
+
+
+<a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#page-metadata-start" class="assistive">转至元数据起始</a>
+<div id="page-metadata-end" class="assistive"></div>
+        
+                                
+        <div id="main-content" class="wiki-content">
+                           <div><strong>Apache Slider&nbsp;</strong><span>项目源自于Hoya项目，其目标是提供一个简单的方法使得HBase可以运行在YARN的环境中，即HBase on YARN。 Apache Slider 则将Hoya进行通用化，使用Slider可以将一些长运行应用<span>(long-running apps，例如HBase/Storm等)进行<span>打包、部署和管理，<span>简化将Apps部署到YARN以及生命周期管理的编码工作。</span></span></span></span><span style="font-size: 10.0pt;line-height: 13.0pt;">将HBase运行在YARN上将带来众多好处，包括：</span></div><ol><li>在一个物理集群中可同时部署多个HBase集群实例</li><li>为HBase集群提供资源隔离（这一点HBase本身做不到）</li><li>将多个版本的HBase集群部署到一个物理集群中</li></ol><p><span style="font-size: 10.0pt;line-height: 13.0pt;">截至2014年10月，Slider 还是Apache的incubator项目，正式release版本为&nbsp;0.40-incubating，trunk版本是0.5.2-incubating版本。在0.5.2版本中，Slider已经内置了将</span><span style="font-size: 10.0pt;line-height: 13.0pt;">Accumulo、HBase、Storm和memcached应用进行打包并可以直接部署到YARN环境中。</span></p><p><span style="font-size: 10.0pt;line-height: 13.0pt;">其他应用如果也采<u><strong>用Slider在YARN部署</strong></u>的话，需要采用如下的步骤：</span></p><ol><li><span style="font-size: 10.0pt;line-height: 13.0pt;">首先将Apps按照Slider的规范打包，目前Slider-0.5.2版本已经将Accumulo、HBase、Storm和memcached打包好了。</span></li><li><div class="_mce_tagged_br">将打包好的Apps压缩文件上传到HDFS上。</div></li><li><div class="_mce_tagged_br">配置Slider使之可以访问HDFS、YARN和ZK。</div></li><li><div class="_mce_tagged_br">通过 bin/slider create + param 来提交运行Apps。</div></li></ol><p>如步骤1提到的<u><strong>Apps按照Slider规范进行打包</strong></u>的方法可以参考：<a href="http://slider.incubator.apache.org/docs/slider_specs/hello_world_slider_app.html" class="external-link" rel="nofollow">http://slider.incubator.apache.org/docs/slider_specs/hello_world_slider_app.html</a><span style="font-size: 10.0pt;line-height: 13.0pt;">，具体如下：</span></p><div><ol><li>创建<strong>meteinfo.xml</strong>文件，内容包括：Apps的名称、版本、外部端口、包含的组件及实例数限制(min/max)、组件的启停顺序以及启停的python脚本、适用的OS 以及 Apps的压缩文件路径。详细规范可参考：&nbsp;<a href="http://slider.incubator.apache.org/docs/slider_specs/application_definition.html" class="external-link" rel="nofollow">http://slider.incubator.apache.org/docs/slider_specs/application_definition.html</a></li><li>创建Apps的压缩文件。把Apps发布的 .tar.gz 下载下来，删除掉src/ 源文件目录再打包就可以了。也可以重新编译成package。</li><li>创建<strong>resources.json</strong>文件，内容包括：该app中各个组件的资源需求，包括&lt;componentsName, memory, vcores, role_priority, #instances&gt;。还可以配置app在某段时间内失败N次的错误检测策略。详细规范可以参考：&nbsp;<a href="http://slider.incubator.apache.org/docs/slider_specs/resource_specification.html" class="external-link" rel="nofollow">http://slider.incubator.apache.org/docs/slider_specs/resource_specification.html</a></li><li>创建<strong>appConfig.json</strong>文件，以下字段是必须要定义的：application.def：Apps打包压缩文件在HDFS上的路径；java_home：JDK路径；package_list：Apps原始文件的路径；config_types：配置文件名称；site.global.app_user：运行应用的user；site.global.app_root：Apps压缩文件解压后的路径。另外还可以定义 site.global.* 的应用相关的配置参数。详细规范可以参考：&nbsp;<a href="http://slider.incubator.apache.org/docs/slider_specs/application_instance_configuration.html" class="external-link" rel="nofollow">http://slider.incubator.apache.org/docs/slider_specs/application_instance_configuration.html</a></li><li>实现metainfo.xml定义的Apps相关各组件操作的<strong>脚本</strong>。详细规范可以参考：&nbsp;<a href="http://slider.incubator.apache.org/docs/slider_specs/writing_app_command_scripts" class="external-link" rel="nofollow">http://slider.incubator.apache.org/docs/slider_specs/writing_app_command_scripts</a></li></ol></div><p><span style="font-size: 10.0pt;line-height: 13.0pt;"><u><strong>利用Slider将HBase运行在YARN上</strong></u>的方法：</span><a href="http://slider.incubator.apache.org/docs/getting_started.html" class="external-link" rel="nofollow">http://slider.incubator.apache.org/docs/getting_started.html</a></p><p><span style="font-size: 10.0pt;line-height: 13.0pt;">&nbsp;</span></p><ol><li><p>配置conf/slider-client.xml内容如下，之后运行&nbsp;<span style="font-size: 10.0pt;line-height: 13.0pt;">bin/slider version&nbsp;</span><span style="font-size: 10.0pt;line-height: 13.0pt;">可以查看slider版本。</span></p><div class="code panel" style="border-width: 1px;"><div class="codeHeader panelHeader" style="border-bottom-width: 1px;"><b>slider-client.xml</b></div><div class="codeContent panelContent">
+<div><div id="highlighter_603641" class="syntaxhighlighter   html"><div class="toolbar"><span><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" class="toolbar_item command_expandSource expandSource">expand source</a></span><span><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" class="toolbar_item command_help help">?</a></span></div><table border="0" cellpadding="0" cellspacing="0"><tbody><tr><td class="gutter"><div class="line number1 index0 alt2">1</div><div class="line number2 index1 alt1">2</div><div class="line number3 index2 alt2">3</div><div class="line number4 index3 alt1">4</div><div class="line number5 index4 alt2">5</div><div class="line number6 index5 alt1">6</div><div class="line number7 index6 alt2">7</div><div class="line number8 index7 alt1">8</div><div class="line number9 index8 alt2">9</div><div class="line number10 index9 alt1">10</div><div class="line number11 index10 alt2">11</div><div class="line number12 index11 alt1">12</div><div class="line number13 index12 alt2">13</div><div class="line number14 index13 alt1">14</div><div class="line number15 index14 alt2">15</div><div class="line number16 index15 alt1">16</div><div class="line number17 index16 alt2">17</div><div class="line number18 index17 alt1">18</div><div class="line number19 index18 alt2">19</div><div class="line number20 index19 alt1">20</div><div class="line number21 index20 alt2">21</div><div class="line number22 index21 alt1">22</div><div class="line number23 index22 alt2">23</div><div class="line number24 index23 alt1">24</div><div class="line number25 index24 alt2">25</div><div class="line number26 index25 alt1">26</div><div class="line number27 index26 alt2">27</div><div class="line number28 index27 alt1">28</div><div class="line number29 index28 alt2">29</div><div class="line number30 index29 alt1">30</div><div class="line number31 index30 alt2">31</div><div class="line number32 index31 alt1">32</div><div class="line number33 index32 alt2">33</div><div class="line number34 index33 alt1">34</div><div class="line number35 index34 alt2">35</div><div class="line number36 index35 alt1">36</div><div class="line number37 index36 alt2">37</div><div class="line number38 index37 alt1">38</div><div class="line number39 index38 alt2">39</div><div class="line number40 index39 alt1">40</div><div class="line number41 index40 alt2">41</div><div class="line number42 index41 alt1">42</div><div class="line number43 index42 alt2">43</div><div class="line number44 index43 alt1">44</div><div class="line number45 index44 alt2">45</div><div class="line number46 index45 alt1">46</div><div class="line number47 index46 alt2">47</div><div class="line number48 index47 alt1">48</div><div class="line number49 index48 alt2">49</div><div class="line number50 index49 alt1">50</div><div class="line number51 index50 alt2">51</div><div class="line number52 index51 alt1">52</div><div class="line number53 index52 alt2">53</div><div class="line number54 index53 alt1">54</div><div class="line number55 index54 alt2">55</div><div class="line number56 index55 alt1">56</div><div class="line number57 index56 alt2">57</div><div class="line number58 index57 alt1">58</div><div class="line number59 index58 alt2">59</div><div class="line number60 index59 alt1">60</div><div class="line number61 index60 alt2">61</div><div class="line number62 index61 alt1">62</div><div class="line number63 index62 alt2">63</div><div class="line number64 index63 alt1">64</div><div class="line number65 index64 alt2">65</div><div class="line number66 index65 alt1">66</div><div class="line number67 index66 alt2">67</div></td><td class="code"><div class="container" title="Hint: double-click to select code"><div class="line number1 index0 alt2"><code class="html plain">&lt;</code><code class="html keyword">property</code><code class="html plain">&gt;</code></div><div class="line number2 index1 alt1"><code class="html plain">&lt;</code><code class="html keyword">name</code><code class="html plain">&gt;yarn.log-aggregation-enable&lt;/</code><code class="html keyword">name</code><code class="html plain">&gt;</code></div><div class="line number3 index2 alt2"><code class="html plain">&lt;</code><code class="html keyword">value</code><code class="html plain">&gt;true&lt;/</code><code class="html keyword">value</code><code class="html plain">&gt;</code></div><div class="line number4 index3 alt1"><code class="html plain">&lt;/</code><code class="html keyword">property</code><code class="html plain">&gt;</code></div><div class="line number5 index4 alt2">&nbsp;</div><div class="line number6 index5 alt1"><code class="html plain">&lt;</code><code class="html keyword">property</code><code class="html plain">&gt;</code></div><div class="line number7 index6 alt2"><code class="html plain">&lt;</code><code class="html keyword">name</code><code class="html plain">&gt;slider.yarn.queue&lt;/</code><code class="html keyword">name</code><code class="html plain">&gt;</code></div><div class="line number8 index7 alt1"><code class="html plain">&lt;</code><code class="html keyword">value</code><code class="html plain">&gt;default&lt;/</code><code class="html keyword">value</code><code class="html plain">&gt;</code></div><div class="line number9 index8 alt2"><code class="html plain">&lt;</code><code class="html keyword">description</code><code class="html plain">&gt;YARN queue for the Application Master&lt;/</code><code class="html keyword">description</code><code class="html plain">&gt;</code></div><div class="line number10 index9 alt1"><code class="html plain">&lt;/</code><code class="html keyword">property</code><code class="html plain">&gt;</code></div><div class="line number11 index10 alt2">&nbsp;</div><div class="line number12 index11 alt1"><code class="html plain">&lt;</code><code class="html keyword">property</code><code class="html plain">&gt;</code></div><div class="line number13 index12 alt2"><code class="html plain">&lt;</code><code class="html keyword">name</code><code class="html plain">&gt;yarn.resourcemanager.address&lt;/</code><code class="html keyword">name</code><code class="html plain">&gt;</code></div><div class="line number14 index13 alt1"><code class="html plain">&lt;</code><code class="html keyword">value</code><code class="html plain">&gt;guoleitao-test-dev001-shjj.qiyi.virtual:8032&lt;/</code><code class="html keyword">value</code><code class="html plain">&gt;</code></div><div class="line number15 index14 alt2"><code class="html plain">&lt;/</code><code class="html keyword">property</code><code class="html plain">&gt;</code></div><div class="line number16 index15 alt1">&nbsp;</div><div class="line number17 index16 alt2"><code class="html plain">&lt;</code><code class="html keyword">property</code><code class="html plain">&gt;</code></div><div class="line number18 index17 alt1"><code class="html plain">&lt;</code><code class="html keyword">name</code><code class="html plain">&gt;yarn.resourcemanager.scheduler.address&lt;/</code><code class="html keyword">name</code><code class="html plain">&gt;</code></div><div class="line number19 index18 alt2"><code class="html plain">&lt;</code><code class="html keyword">value</code><code class="html plain">&gt;guoleitao-test-dev001-shjj.qiyi.virtual:8030&lt;/</code><code class="html keyword">value</code><code class="html plain">&gt;</code></div><div class="line number20 index19 alt1"><code class="html plain">&lt;/</code><code class="html keyword">property</code><code class="html plain">&gt;</code></div><div class="line number21 index20 alt2">&nbsp;</div><div class="line number22 index21 alt1"><code class="html plain">&lt;</code><code class="html keyword">property</code><code class="html plain">&gt;</code></div><div class="line number23 index22 alt2"><code class="html plain">&lt;</code><code class="html keyword">name</code><code class="html plain">&gt;fs.defaultFS&lt;/</code><code class="html keyword">name</code><code class="html plain">&gt;</code></div><div class="line number24 index23 alt1"><code class="html plain">&lt;</code><code class="html keyword">value</code><code class="html plain">&gt;hdfs://guoleitao-test-dev001-shjj.qiyi.virtual:8020&lt;/</code><code class="html keyword">value</code><code class="html plain">&gt;</code></div><div class="line number25 index24 alt2"><code class="html plain">&lt;/</code><code class="html keyword">property</code><code class="html plain">&gt;</code></div><div class="line number26 index25 alt1">&nbsp;</div><div class="line number27 index26 alt2"><code class="html plain">&lt;</code><code class="html keyword">property</code><code class="html plain">&gt;</code></div><div class="line number28 index27 alt1"><code class="html plain">&lt;</code><code class="html keyword">name</code><code class="html plain">&gt;slider.zookeeper.quorum&lt;/</code><code class="html keyword">name</code><code class="html plain">&gt;</code></div><div class="line number29 index28 alt2"><code class="html plain">&lt;</code><code class="html keyword">value</code><code class="html plain">&gt;guoleitao-test-dev001-shjj.qiyi.virtual:2181&lt;/</code><code class="html keyword">value</code><code class="html plain">&gt;</code></div><div class="line number30 index29 alt1"><code class="html plain">&lt;/</code><code class="html keyword">property</code><code class="html plain">&gt;</code></div><div class="line number31 index30 alt2">&nbsp;</div><div class="line number32 index31 alt1"><code class="html plain">&lt;</code><code class="html keyword">property</code><code class="html plain">&gt;</code></div><div class="line number33 index32 alt2"><code class="html plain">&lt;</code><code class="html keyword">name</code><code class="html plain">&gt;hadoop.home&lt;/</code><code class="html keyword">name</code><code class="html plain">&gt;</code></div><div class="line number34 index33 alt1"><code class="html plain">&lt;</code><code class="html keyword">value</code><code class="html plain">&gt;/home/guoleitao/cdh501/hadoop&lt;/</code><code class="html keyword">value</code><code class="html plain">&gt;</code></div><div class="line number35 index34 alt2"><code class="html plain">&lt;/</code><code class="html keyword">property</code><code class="html plain">&gt;</code></div><div class="line number36 index35 alt1">&nbsp;</div><div class="line number37 index36 alt2"><code class="html plain">&lt;</code><code class="html keyword">property</code><code class="html plain">&gt;</code></div><div class="line number38 index37 alt1"><code class="html plain">&lt;</code><code class="html keyword">name</code><code class="html plain">&gt;yarn.application.classpath&lt;/</code><code class="html keyword">name</code><code class="html plain">&gt;</code></div><div class="line number39 index38 alt2"><code class="html plain">&lt;</code><code class="html keyword">value</code><code class="html plain">&gt;/home/guoleitao/cdh501/hadoop/etc/hadoop,/home/guoleitao/cdh501/hadoop/share/hadoop/common/*,/home/guoleitao/cdh501/hadoop/share/hadoop/common/lib/*,/home/guoleitao/cdh501/hadoop/share/hadoop/hdfs/*,/home/guoleitao/cdh501/</code></div><div class="line number40 index39 alt1"><code class="html plain">hadoop/share/hadoop/hdfs/lib/*,/home/guoleitao/cdh501/hadoop/share/hadoop/mapreduce/*,/home/guoleitao/cdh501/hadoop/share/hadoop/mapreduce/lib/*,/home/guoleitao/cdh501/hadoop/share/hadoop/yarn/*,/home/guoleitao/cdh501/hadoop/share/ha</code></div><div class="line number41 index40 alt2"><code class="html plain">doop/yarn/lib/*&lt;/</code><code class="html keyword">value</code><code class="html plain">&gt;</code></div><div class="line number42 index41 alt1"><code class="html plain">&lt;/</code><code class="html keyword">property</code><code class="html plain">&gt;</code></div><div class="line number43 index42 alt2">&nbsp;</div><div class="line number44 index43 alt1"><code class="html plain">&lt;</code><code class="html keyword">property</code><code class="html plain">&gt;</code></div><div class="line number45 index44 alt2"><code class="html plain">&lt;</code><code class="html keyword">name</code><code class="html plain">&gt;ipc.client.fallback-to-simple-auth-allowed&lt;/</code><code class="html keyword">name</code><code class="html plain">&gt;</code></div><div class="line number46 index45 alt1"><code class="html plain">&lt;</code><code class="html keyword">value</code><code class="html plain">&gt;false&lt;/</code><code class="html keyword">value</code><code class="html plain">&gt;</code></div><div class="line number47 index46 alt2"><code class="html plain">&lt;/</code><code class="html keyword">property</code><code class="html plain">&gt;</code></div><div class="line number48 index47 alt1">&nbsp;</div><div class="line number49 index48 alt2"><code class="html plain">&lt;</code><code class="html keyword">property</code><code class="html plain">&gt;</code></div><div class="line number50 index49 alt1"><code class="html plain">&lt;</code><code class="html keyword">name</code><code class="html plain">&gt;yarn.nodemanager.sleep-delay-before-sigkill.ms&lt;/</code><code class="html keyword">name</code><code class="html plain">&gt;</code></div><div class="line number51 index50 alt2"><code class="html plain">&lt;</code><code class="html keyword">value</code><code class="html plain">&gt;30000&lt;/</code><code class="html keyword">value</code><code class="html plain">&gt;</code></div><div class="line number52 index51 alt1"><code class="html plain">&lt;/</code><code class="html keyword">property</code><code class="html plain">&gt;</code></div><div class="line number53 index52 alt2">&nbsp;</div><div class="line number54 index53 alt1"><code class="html plain">&lt;</code><code class="html keyword">property</code><code class="html plain">&gt;</code></div><div class="line number55 index54 alt2"><code class="html plain">&lt;</code><code class="html keyword">name</code><code class="html plain">&gt;slider.yarn.restart.limit&lt;/</code><code class="html keyword">name</code><code class="html plain">&gt;</code></div><div class="line number56 index55 alt1"><code class="html plain">&lt;</code><code class="html keyword">value</code><code class="html plain">&gt;2&lt;/</code><code class="html keyword">value</code><code class="html plain">&gt;</code></div><div class="line number57 index56 alt2"><code class="html plain">&lt;/</code><code class="html keyword">property</code><code class="html plain">&gt;</code></div><div class="line number58 index57 alt1">&nbsp;</div><div class="line number59 index58 alt2"><code class="html plain">&lt;</code><code class="html keyword">property</code><code class="html plain">&gt;</code></div><div class="line number60 index59 alt1"><code class="html plain">&lt;</code><code class="html keyword">name</code><code class="html plain">&gt;slider.cluster.directory.permissions&lt;/</code><code class="html keyword">name</code><code class="html plain">&gt;</code></div><div class="line number61 index60 alt2"><code class="html plain">&lt;</code><code class="html keyword">value</code><code class="html plain">&gt;750&lt;/</code><code class="html keyword">value</code><code class="html plain">&gt;</code></div><div class="line number62 index61 alt1"><code class="html plain">&lt;/</code><code class="html keyword">property</code><code class="html plain">&gt;</code></div><div class="line number63 index62 alt2">&nbsp;</div><div class="line number64 index63 alt1"><code class="html plain">&lt;</code><code class="html keyword">property</code><code class="html plain">&gt;</code></div><div class="line number65 index64 alt2"><code class="html plain">&lt;</code><code class="html keyword">name</code><code class="html plain">&gt;slider.data.directory.permissions&lt;/</code><code class="html keyword">name</code><code class="html plain">&gt;</code></div><div class="line number66 index65 alt1"><code class="html plain">&lt;</code><code class="html keyword">value</code><code class="html plain">&gt;750&lt;/</code><code class="html keyword">value</code><code class="html plain">&gt;</code></div><div class="line number67 index66 alt2"><code class="html plain">&lt;/</code><code class="html keyword">property</code><code class="html plain">&gt;</code></div></div></td></tr></tbody></table></div></div>
+</div></div></li><li>按照&nbsp;app-packages/hbase/README.txt 文件的内容，打包hbase压缩文件，并将hbase image放到hdfs上： &nbsp;hadoop dfs -put hbase-v098.zip /user/guoleitao/</li><li>启动HBase应用： &nbsp;./slider create hbasecluster_001 --template ../app-packages/hbase/appConfig.json --resources ../app-packages/hbase/resources.json --image <a rel="nofollow">hdfs://guoleitao-test-dev001-shjj.qiyi.virtual:8020/user/guoleitao/hbase-v098.zip</a></li></ol><p><u><strong>Apache Slider主要包括3个组件</strong></u>： SliderClient、SliderAppMaster和Apps。</p><ol><li><p><strong>SliderClient</strong>：与SliderAppMaster和YARN通过REST/RPC通信，对外提供CLI和底层API。</p></li><li><p><strong>SliderAppMaster</strong>：根据App配置向YARN申请container，每个component对应一个container，并监控container的状态。</p></li><li><p><strong>Apps</strong>：需要提供resource.json (各个components以及mem/cpu资源需求)、appsConfig (各个components的配置信息)、.zip (app应用压缩文件)。</p></li></ol><p><img class="confluence-embedded-image" src="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/slider.jpg" data-image-src="/download/attachments/21961288/slider.jpg?version=1&amp;modificationDate=1414391057000"></p><p>其中<strong>SliderAppMaster</strong>又由如下几个模块组成：</p><ul><li><p><strong>AM Engine：</strong>&nbsp;与SliderClient和YARN的接口。与RM交互请求和释放container，与NM交互启停container。当集群状态变化时，AM Engine将该信息发送给Apps State，后者返回相应的action，例如请求释放container或请求在某个特定节点上的资源。之后，AM Engine调用 provider来创建Apps启动环境并启动。</p></li><li><p><strong>Provider：</strong>用于App的部署和启动。provider会在container中首先部署一个agent，该agent调用provider的REST API来执行返回的命令。具体包括，从HDFS上下载并解压app压缩文档，运行python脚本来启动服务。</p></li><li><p><strong>Apps State：</strong>应用实例的信息，包括：<span style="font-size: 10.0pt;line-height: 13.0pt;">resource需求说明、</span><span style="font-size: 10.0pt;line-height: 13.0pt;">当前各role运行在哪些实例 instance的对应关系信息、</span><span style="font-size: 10.0pt;line-height: 13.0pt;">&nbsp;Role History用以记录哪些role部署在哪些nodes上的信息，该信息持久化存储到磁盘中，以便后续快速启动服务。</span></p></li></ul><p>下图表示了一个服务在YARN中的部署流程：</p><p>&nbsp;<img class="confluence-embedded-image" src="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/image2014-7-15+18-47-26.png" data-image-src="/download/attachments/21961288/image2014-7-15+18%3A47%3A26.png?version=1&amp;modificationDate=1405421302000"></p><p><strong><br></strong></p><p><strong>分析：</strong></p><p>apache 可以简化Apps在YARN上的部署和启停，只需要撰写Apps各项服务的描述以及启停脚本即可。但是因为目前项目还处于incubator状态，而且经过测试hbase 经常出现“<span style="color: rgb(34,34,34);">Unstable Application Instance : - failed with role HBASE_MASTER failing 3 times</span>”的错误，所以系统还不太稳定。可以等待系统正式成为top project后再考虑部署。</p><p>&nbsp;</p><p><strong style="font-size: 10.0pt;line-height: 13.0pt;">参考资料</strong><span style="font-size: 10.0pt;line-height: 13.0pt;">：</span></p><ul><li><a href="http://slider.incubator.apache.org/" class="external-link" rel="nofollow">http://slider.incubator.apache.org/</a></li><li><a href="http://dongxicheng.org/mapreduce-nextgen/apache-slider-for-yarn/" class="external-link" rel="nofollow">http://dongxicheng.org/mapreduce-nextgen/apache-slider-for-yarn/</a></li><li><a href="https://github.com/sequenceiq/slider" class="external-link" rel="nofollow">https://github.com/sequenceiq/slider</a></li><li>Hoya:&nbsp;<a href="http://hortonworks.com/blog/introducing-hoya-hbase-on-yarn/" class="external-link" rel="nofollow">http://hortonworks.com/blog/introducing-hoya-hbase-on-yarn/</a></li></ul>
+    
+        </div>
+
+        <!--
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+         xmlns:dc="http://purl.org/dc/elements/1.1/"
+         xmlns:trackback="http://madskills.com/public/xml/rss/module/trackback/">
+         <rdf:Description
+    rdf:about="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288"
+    dc:identifier="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288"
+    dc:title="Apache Slider项目调研"
+    trackback:ping="http://wiki.qiyi.domain/rpc/trackback/21961288"/>
+</rdf:RDF>
+-->
+
+                    <script type="text/x-template" title="labels-dialog-div">
+        <div id="labels-dialog">
+        <div class="labels-editor">
+            <form method="GET" action="" id="add-labels-form">
+                <div id="labelOperationErrorContainer">
+                    <span class="error"><span class="errorMessage" id="labelOperationErrorMessage"></span></span>
+                </div>
+    
+                <div id="label-input-fields">
+                    <input autocomplete="off" id="labelsString" name="labelsString" value="">
+                    <input id="add-labels-editor-button" type="submit" class="add-labels" value="添加">
+                </div>
+                <div id="labelsAutocompleteList" class="aui-dd-parent resize-to-input" style="width: 417px"></div>
+                <div id="dialog-label-list">
+                    <!-- DIV placeholder for labels list, is copied into in labels-dialog.js -->
+                </div>
+                <div id="waitImageAndStatus">
+                    <img class="waiting" alt="Please wait" src="/s/zh_CN/3281/1/_/images/icons/wait.gif">&nbsp;
+                    <span id="labelOperationStatus" class="smalltext"></span>
+                </div>
+                <div class="labels-tip"></div>
+            </form>
+        </div>
+        <div style="display: none;">
+            <div class="labels-section-content content-column"
+    	    		entityid="21961288" entitytype="Page"
+    		>
+	<div class="labels-content">
+		
+
+<ul class="label-list">
+    <li class="no-labels-message-container">
+        <span id="labels-section-title-none" class="no-labels-message">
+            无
+        </span>
+    </li>
+                <li class="labels-edit-container"><a href="#" class="show-labels-editor editor-icon" title="编辑标签">
+            <span class="icon icon-edit">编辑标签</span>
+        </a></li>
+    </ul>
+    </div>
+</div>        </div>
+    </div>
+</script>
+                
+    
+
+
+<div id="likes-and-labels-container"><div id="likes-section"><a href="" class="like-button">赞同</a><span class="like-summary"><span class="like-summary-text"><a href="http://wiki.qiyi.domain/display/~wangmeng_sx" class="confluence-userlink userlink-1" data-username="wangmeng_sx" title="" data-user-hover-bound="true">王猛</a> likes this.</span></span></div><div id="labels-section" class="pageSection group">
+    <div class="labels-editor">
+        <span id="labels-section-title" class="label-title">Labels</span>
+        <div class="labels-section-content content-column" entityid="21961288" entitytype="Page">
+	<div class="labels-content">
+		
+
+<ul class="label-list">
+    <li class="no-labels-message-container">
+        <span id="labels-section-title-none" class="no-labels-message">
+            无
+        </span>
+    </li>
+                <li class="labels-edit-container"><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" class="show-labels-editor editor-icon" title="编辑标签 ( 类型 &#39;l&#39; )">
+            <span class="icon icon-edit">编辑标签</span>
+        </a></li>
+    </ul>
+    </div>
+</div>    </div>
+</div></div>
+        
+            
+            
+
+
+
+
+            
+    
+
+
+
+
+
+
+
+
+<div id="comments-section" class="pageSection group">
+    
+    
+    
+            <div class="bottom-comment-panels comment-panels">
+                                    
+    
+
+                    
+    
+
+
+    
+
+<div class="quick-comment-container comment add"><p class="comment-user-logo"><a class="userLogoLink userlink-0" data-username="guoleitao" href="http://wiki.qiyi.domain/users/editmyprofilepicture.action" title="" data-user-hover-bound="true"><img class="userLogo logo defaultLogo" src="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/add_profile_pic.png" alt="用户图标: 添加头像" title=""></a></p><div class="quick-comment-vertical-spacer"></div><div class="quick-comment-body"><div class="quick-comment-loading-container" style="display:none;"><p class="quick-comment-loading-message">Loading the Editor</p></div><form style="display:block;" class="quick-comment-form" method="post" name="inlinecommentform" action="http://wiki.qiyi.domain/pages/doaddcomment.action?pageId=21961288"><div title="添加评论 ( 类型 &#39;m&#39; )" class="quick-comment-prompt"><span>Write a comment…</span></div></form></div></div>
+
+            </div>
+    
+                        <div id="comments-actions" class="aui-toolbar noprint" style="display: none;">
+                <p class="toolbar-group">
+                    <span class="toolbar-item"><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288&showComments=true&showCommentArea=true#addcomment" id="add-comment-rte" accesskey="m" class="toolbar-trigger">添加评论</a></span>
+                </p>
+            </div>
+            </div>
+
+
+            
+</div>
+
+
+    
+
+
+
+    
+    
+
+    
+    
+    
+
+
+    
+
+
+
+        <br class="clear">
+    </div><!-- \#main -->
+    
+    
+        
+            <div id="footer">
+                        
+    <ul id="poweredby">
+        <li class="noprint">Powered by <a href="http://www.atlassian.com/software/confluence" class="hover-footer-link">Atlassian Confluence</a> <span id="footer-build-information">4.2.4</span>, <a href="http://www.atlassian.com/software/confluence/tour/enterprise-wiki.jsp" class="hover-footer-link">企业级Wiki</a></li>
+        <li class="print-only">由企业级wiki软件 Atlassian Confluence 4.2.4 打印。</li>        
+        <li class="noprint"> &nbsp;·&nbsp; <a href="http://jira.atlassian.com/secure/BrowseProject.jspa?id=10470" class="hover-footer-link">报告缺陷</a></li>
+        <li class="noprint"> &nbsp;·&nbsp; <a href="http://www.atlassian.com/about/connected.jsp?s_kwcid=Confluence-stayintouch" class="hover-footer-link">Atlassian 新闻</a></li>
+    </ul>
+
+            
+    </div>
+    
+</div><!-- \#full-height-container -->
+</div><!-- \#page -->
+
+
+<div id="content-hover-0" class="ajs-content-hover" style="display: none;"><div class="contents" style="width: 300px;"></div></div><div id="fancybox-tmp"></div><div id="fancybox-loading"><div></div></div><div id="fancybox-overlay"></div><div id="fancybox-wrap"><div id="fancybox-outer"><div class="fancybox-bg" id="fancybox-bg-n"></div><div class="fancybox-bg" id="fancybox-bg-ne"></div><div class="fancybox-bg" id="fancybox-bg-e"></div><div class="fancybox-bg" id="fancybox-bg-se"></div><div class="fancybox-bg" id="fancybox-bg-s"></div><div class="fancybox-bg" id="fancybox-bg-sw"></div><div class="fancybox-bg" id="fancybox-bg-w"></div><div class="fancybox-bg" id="fancybox-bg-nw"></div><div id="fancybox-content"></div><a id="fancybox-close"></a><div id="fancybox-title"></div><a href="javascript:;" id="fancybox-left"><span class="fancy-ico" id="fancybox-left-ico"></span></a><a href="javascript:;" id="fancybox-right"><span class="fancy-ico" id="fancybox-right-ico"></span></a></div></div><div id="content-hover-shadow" style="display: none;"><div class="tl"></div><div class="tr"></div><div class="l"></div><div class="r"></div><div class="bl"></div><div class="br"></div><div class="b"></div></div><div id="fileuploadShim" style="position: relative; z-index: 0;"></div><div id="p19b16c2bv6nofht11t2ots50d0_html5_container" class="plupload html5" style="position: absolute; width: 1349px; height: 0px; overflow: hidden; z-index: -1; opacity: 0; top: 676px; left: 0px; background: transparent;"><input id="p19b16c2bv6nofht11t2ots50d0_html5" style="font-size: 999px; position: absolute; width: 100%; height: 100%;" type="file" accept="" multiple="multiple"></div><div id="content-hover-1" class="ajs-content-hover" style="display: none;"><div class="contents" style="width: 300px;"></div></div><div id="editor-preload-container" style="display: none;">
+                                                
+
+<script type="text/x-template" title="editor-css">
+    <link type="text/css" rel="stylesheet" href="/s/zh_CN/3281/1/1.0/_/download/batch/confluence.web.resources:content-styles/confluence.web.resources:content-styles.css" media="all">
+<link type="text/css" rel="stylesheet" href="/s/zh_CN/3281/1/1.0/_/download/batch/confluence.web.resources:content-styles/confluence.web.resources:content-styles.css?media=print" media="print">
+<link type="text/css" rel="stylesheet" href="/s/zh_CN/3281/1/1.13/_/download/batch/com.atlassian.confluence.plugins.status-macro:editor_content_status/com.atlassian.confluence.plugins.status-macro:editor_content_status.css" media="all">
+<link type="text/css" rel="stylesheet" href="/s/zh_CN/3281/1/4.2.4/_/download/batch/com.atlassian.confluence.tinymceplugin:editor-content-styles/com.atlassian.confluence.tinymceplugin:editor-content-styles.css" media="all">
+<link type="text/css" rel="stylesheet" href="/s/zh_CN/3281/1/1/_/styles/colors.css" media="all">
+<link type="text/css" rel="stylesheet" href="/s/zh_CN/3281/1/1.0/_/download/resources/com.atlassian.confluence.themes.default:styles/default-theme.css" media="all">
+
+</script>
+
+    
+
+
+
+
+
+
+
+
+        
+            
+
+
+
+
+
+
+
+
+
+
+        <div id="toolbar">
+
+        <div id="rte-toolbar" class="aui-toolbar">
+
+            <div class="toolbar-split toolbar-split-left">
+                <ul class="toolbar-group">
+                                        <li id="format-dropdown" class="toolbar-item toolbar-dropdown">
+                        <div class="aui-dd-parent">
+                            <a id="format-dropdown-display" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" class="toolbar-trigger aui-dd-trigger" data-control-id="formatselect">
+                                <span class="dropdown-text">正文</span>
+                                    <span class="icon icon-dropdown "></span>
+                            </a>
+                            <ul class="aui-dropdown hidden">
+                                    <li class="dropdown-item format-p" data-format="p">
+        <a class="item-link" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" title="正文 (Ctrl+0)">正文</a>
+    </li>
+                                    <li class="dropdown-item format-h1" data-format="h1">
+        <a class="item-link" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" title="标题 1 (Ctrl+1)">标题 1</a>
+    </li>
+                                    <li class="dropdown-item format-h2" data-format="h2">
+        <a class="item-link" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" title="标题 2 (Ctrl+2)">标题 2</a>
+    </li>
+                                    <li class="dropdown-item format-h3" data-format="h3">
+        <a class="item-link" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" title="标题 3 (Ctrl+3)">标题 3</a>
+    </li>
+                                    <li class="dropdown-item format-h4" data-format="h4">
+        <a class="item-link" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" title="标题 4 (Ctrl+4)">标题 4</a>
+    </li>
+                                    <li class="dropdown-item format-h5" data-format="h5">
+        <a class="item-link" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" title="标题 5 (Ctrl+5)">标题 5</a>
+    </li>
+                                    <li class="dropdown-item format-h6" data-format="h6">
+        <a class="item-link" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" title="标题 6 (Ctrl+6)">标题 6</a>
+    </li>
+                                    <li class="dropdown-item format-pre" data-format="pre">
+        <a class="item-link" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" title="预格式化 (Ctrl+7)">预格式化</a>
+    </li>
+                                    <li class="dropdown-item format-blockquote" data-format="blockquote">
+        <a class="item-link" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" title="引用 (Ctrl+8)">引用</a>
+    </li>
+                            </ul>
+                        </div>
+                    </li>
+                </ul>
+
+                <ul class="toolbar-group">
+                    
+                <li class="toolbar-item" id="rte-button-bold">
+        <a class="toolbar-trigger" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" title="粗体 (Ctrl+B)" data-control-id="bold">
+                <span class="icon icon-bold ">粗体</span>
+        </a>
+    </li>
+                    
+                <li class="toolbar-item" id="rte-button-italic">
+        <a class="toolbar-trigger" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" title="斜体 (Ctrl+I)" data-control-id="italic">
+                <span class="icon icon-italic ">斜体</span>
+        </a>
+    </li>
+                    
+                <li class="toolbar-item" id="rte-button-underline">
+        <a class="toolbar-trigger" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" title="下划线 (Ctrl+U)" data-control-id="underline">
+                <span class="icon icon-underline ">下划线</span>
+        </a>
+    </li>
+                    <li class="toolbar-item toolbar-splitbutton" id="color-picker-control">
+                        <a class="toolbar-trigger" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" id="rte-button-color" title="颜色" data-color="003366">
+                            <span class="selected-color"></span>
+                        </a>
+                        <div class="aui-dd-parent">
+                            <a class="toolbar-trigger aui-dd-trigger" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" id="rte-button-color-selector" data-control-id="colorSelector" title="更多颜色">
+                                    <span class="icon icon-dropdown ">更多颜色</span>
+                            </a>
+                            <div class="color-picker-container">
+                                <div class="color-picker aui-dropdown hidden">
+                                    <ul>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #000000" data-color="000000">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #993300" data-color="993300">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #333300" data-color="333300">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #003300" data-color="003300">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #003366" data-color="003366">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #000080" data-color="000080">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #333399" data-color="333399">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #333333" data-color="333333">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #800000" data-color="800000">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #FF6600" data-color="FF6600">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #808000" data-color="808000">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #008000" data-color="008000">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #008080" data-color="008080">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #0000FF" data-color="0000FF">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #666699" data-color="666699">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #808080" data-color="808080">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #FF0000" data-color="FF0000">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #FF9900" data-color="FF9900">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #99CC00" data-color="99CC00">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #339966" data-color="339966">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #33CCCC" data-color="33CCCC">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #3366FF" data-color="3366FF">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #800080" data-color="800080">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #999999" data-color="999999">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #FF00FF" data-color="FF00FF">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #FFCC00" data-color="FFCC00">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #FFFF00" data-color="FFFF00">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #00FF00" data-color="00FF00">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #00FFFF" data-color="00FFFF">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #00CCFF" data-color="00CCFF">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #993366" data-color="993366">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #C0C0C0" data-color="C0C0C0">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #FF99CC" data-color="FF99CC">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #FFCC99" data-color="FFCC99">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #FFFF99" data-color="FFFF99">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #CCFFCC" data-color="CCFFCC">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #CCFFFF" data-color="CCFFFF">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #99CCFF" data-color="99CCFF">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #CC99FF" data-color="CC99FF">&nbsp;</a></li>
+            <li><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" style="background-color: #FFFFFF" data-color="FFFFFF">&nbsp;</a></li>
+    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="toolbar-item toolbar-dropdown" id="more-menu">
+                        <div class="aui-dd-parent">
+                            <a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" class="toolbar-trigger aui-dd-trigger" id="rte-button-more" title="更多">
+                                    <span class="icon icon-more "></span>
+                                    <span class="icon icon-dropdown "></span>
+                            </a>
+                            <div class="aui-dropdown grouped hidden">
+                                <div class="grouped-dropdown-item">
+                                    <ul>
+                                                            <li class="dropdown-item more-menu-trigger" data-control-id="strikethrough">
+        <a id="rte-strikethrough" class="item-link" title="删除线 (Ctrl+Shift+S)" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#">
+                <span class="icon icon-check hidden"></span>
+删除线
+        </a>
+    </li>
+                                                        <li class="dropdown-item more-menu-trigger" data-control-id="sub">
+        <a id="rte-sub" class="item-link" title="下标" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#">
+                <span class="icon icon-check hidden"></span>
+下标
+        </a>
+    </li>
+                                                        <li class="dropdown-item more-menu-trigger" data-control-id="sup">
+        <a id="rte-sup" class="item-link" title="上标" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#">
+                <span class="icon icon-check hidden"></span>
+上标
+        </a>
+    </li>
+                                                    <li class="dropdown-item more-menu-trigger" data-control-id="monospace">
+        <a id="rte-monospace" class="item-link" title="用等宽字体格式化文本" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#">
+                <span class="icon icon-check hidden"></span>
+等宽
+        </a>
+    </li>
+
+                                                                                                                    </ul>
+                                </div>
+                                <div class="grouped-dropdown-item">
+                                    <ul>
+                                            <li class="dropdown-item more-menu-trigger no-icon" data-format="removeformat">
+        <a id="rte-removeformat" class="item-link" title="当前选中文本清除格式" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#">
+            清除格式
+        </a>
+    </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                    </li>
+                </ul>
+
+                <ul class="toolbar-group">
+                    
+                <li class="toolbar-item" id="rte-button-bullist">
+        <a class="toolbar-trigger" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" title="无序列表 (Ctrl+Shift+B)" data-control-id="bullist">
+                <span class="icon icon-bullist ">无序列表</span>
+        </a>
+    </li>
+                    
+                <li class="toolbar-item" id="rte-button-numlist">
+        <a class="toolbar-trigger" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" title="有序列表 (Ctrl+Shift+N)" data-control-id="numlist">
+                <span class="icon icon-numlist ">有序列表</span>
+        </a>
+    </li>
+                </ul>
+
+                <ul class="toolbar-group">
+                    
+                <li class="toolbar-item" id="rte-button-outdent">
+        <a class="toolbar-trigger" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" title="减小缩进t" data-control-id="outdent">
+                <span class="icon icon-outdent ">减小缩进t</span>
+        </a>
+    </li>
+                    
+                <li class="toolbar-item" id="rte-button-indent">
+        <a class="toolbar-trigger" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" title="增大缩进" data-control-id="indent">
+                <span class="icon icon-indent ">增大缩进</span>
+        </a>
+    </li>
+                </ul>
+
+                <ul class="toolbar-group">
+                    
+                <li class="toolbar-item" id="rte-button-justifyleft">
+        <a class="toolbar-trigger" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" title="左对齐" data-control-id="justifyleft">
+                <span class="icon icon-justifyleft ">左对齐</span>
+        </a>
+    </li>
+                    
+                <li class="toolbar-item" id="rte-button-justifycenter">
+        <a class="toolbar-trigger" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" title="居中" data-control-id="justifycenter">
+                <span class="icon icon-justifycenter ">居中</span>
+        </a>
+    </li>
+                    
+                <li class="toolbar-item" id="rte-button-justifyright">
+        <a class="toolbar-trigger" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" title="右对齐" data-control-id="justifyright">
+                <span class="icon icon-justifyright ">右对齐</span>
+        </a>
+    </li>
+                </ul>
+
+                <ul class="toolbar-group">
+                    <li class="toolbar-item">
+                        <a class="toolbar-trigger" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" id="rte-button-link" data-control-id="linkbrowserButton" title="插入链接 (Ctrl+K)">
+                                <span class="icon icon-link "></span>
+                            <span class="trigger-text">链接</span>
+                        </a>
+                    </li>
+                </ul>
+
+                <ul class="toolbar-group">
+                    <li class="toolbar-item toolbar-dropdown" id="insert-table-dropdown">
+                        <div class="aui-dd-parent">
+                            <a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" class="toolbar-trigger aui-dd-trigger" id="rte-button-insert-table" title="插入表格">
+                                    <span class="icon icon-table "></span>
+                                <span class="dropdown-text">表格</span>
+                                    <span class="icon icon-dropdown "></span>
+                            </a>
+
+                            <div id="table-picker-container" class="hidden">
+                                <div class="table-picker-box" title="按住 SHIFT键，创建无表头表格 。">
+                                    <div class="table-picker-background">
+                                        <div class="picker picker-cell"></div>
+                                        <div class="picker picker-heading heading"></div>
+                                        <div class="picker picker-selected-cell"></div>
+                                        <div class="picker picker-selected-heading heading"></div>
+                                    </div>
+                                    <p class="desc"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+
+                <ul class="toolbar-group">
+                    <li class="toolbar-item toolbar-dropdown" id="insert-menu">
+                        <div class="aui-dd-parent">
+                            <a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" class="toolbar-trigger aui-dd-trigger" id="rte-button-insert" title="插入">
+                                    <span class="icon icon-insert "></span>
+                                <span class="dropdown-text">插入</span>
+                                    <span class="icon icon-dropdown "></span>
+                            </a>
+
+                            <div class="aui-dropdown grouped hidden">
+                                <div class="grouped-dropdown-item">
+                                    <span class="assistive">插入内容</span>
+                                    <ul id="content-insert-list">
+                                        
+        
+        <li class="dropdown-item content-image" data-command="mceConfimage">
+        <a id="rte-insert-image" class="item-link" title="插入图片 (Ctrl+M)" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#">
+                <span class="icon "></span>
+ 图片
+        </a>
+    </li>
+                                        
+        
+        <li class="dropdown-item content-link" data-control-id="linkbrowserButton">
+        <a id="rte-insert-link" class="item-link" title="插入链接 (Ctrl+K)" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#">
+                <span class="icon "></span>
+ 链接
+        </a>
+    </li>
+                                        
+    
+        <li class="dropdown-item content-attachment" data-command="mceConfAttachments">
+        <a id="rte-insert-attachment" class="item-link" title="插入附件" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#">
+                <span class="icon "></span>
+ 附件
+        </a>
+    </li>
+                                        
+    
+        <li class="dropdown-item content-symbol" data-command="confCharmap">
+        <a id="rte-insert-symbol" class="item-link" title="插入符号" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#">
+                <span class="icon "></span>
+ 符号
+        </a>
+    </li>
+                                        
+    
+        <li class="dropdown-item content-emoticon" data-command="mceEmotion">
+        <a id="rte-insert-emoticon" class="item-link" title="插入表情" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#">
+                <span class="icon "></span>
+ 表情符号
+        </a>
+    </li>
+                                        
+        
+        <li class="dropdown-item content-wikimarkup" data-command="InsertWikiMarkup">
+        <a id="rte-insert-wikimarkup" class="item-link" title="插入Wiki标记 (Ctrl+Shift+D)" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#">
+                <span class="icon "></span>
+ Wiki标记
+        </a>
+    </li>
+                                        
+    
+        <li class="dropdown-item content-hr" data-command="InsertHorizontalRule">
+        <a id="rte-insert-hr" class="item-link" title="插入水平线 " href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#">
+                <span class="icon "></span>
+ 水平线
+        </a>
+    </li>
+                                    </ul>
+                                </div>
+                                <div class="grouped-dropdown-item">
+                                    <span class="assistive">tinymce.confluence.insert_menu.macro_desc</span>
+                                    <ul id="macro-insert-list">
+                                                                                                                                                                                <li class="dropdown-item macro-groupdocs-doc" data-macro-name="groupdocs-doc">
+        <a id="groupdocs-doc" class="item-link" title="插入&#39;GroupDocs - File&#39;宏" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#">
+                <span class="icon "></span>
+ GroupDocs - File
+        </a>
+    </li>
+                                                                                                <li class="dropdown-item macro-groupdocs-folder" data-macro-name="groupdocs-folder">
+        <a id="groupdocs-folder" class="item-link" title="插入&#39;GroupDocs - Folder&#39;宏" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#">
+                <span class="icon "></span>
+ GroupDocs - Folder
+        </a>
+    </li>
+                                                                                                <li class="dropdown-item macro-info" data-macro-name="info">
+        <a id="info" class="item-link" title="插入&#39;Info&#39;宏" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#">
+                <span class="icon "></span>
+ Info
+        </a>
+    </li>
+                                                                                                <li class="dropdown-item macro-jiralink" data-macro-name="jiralink">
+        <a id="jiralink" class="item-link" title="插入&#39;JIRA Issue&#39;宏" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#">
+                <span class="icon "></span>
+ JIRA Issue
+        </a>
+    </li>
+                                                                                                <li class="dropdown-item macro-status" data-macro-name="status">
+        <a id="status" class="item-link" title="插入&#39;Status&#39;宏" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#">
+                <span class="icon "></span>
+ Status
+        </a>
+    </li>
+                                                                                                <li class="dropdown-item macro-gallery" data-macro-name="gallery">
+        <a id="gallery" class="item-link" title="插入&#39;画廊&#39;宏" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#">
+                <span class="icon "></span>
+ 画廊
+        </a>
+    </li>
+                                                                                                <li class="dropdown-item macro-tasklist" data-macro-name="tasklist">
+        <a id="tasklist" class="item-link" title="插入&#39;任务列表&#39;宏" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#">
+                <span class="icon "></span>
+ 任务列表
+        </a>
+    </li>
+                                                                                                <li class="dropdown-item macro-toc" data-macro-name="toc">
+        <a id="toc" class="item-link" title="插入&#39;Table of Contents&#39;宏" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#">
+                <span class="icon "></span>
+ Table of Contents
+        </a>
+    </li>
+                                                                                                                            
+        
+        <li class="dropdown-item content-macro" data-command="mceConfMacroBrowser">
+        <a id="rte-insert-macro" class="item-link" title="打开宏浏览器 (Ctrl+Shift+A)" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#">
+                <span class="icon "></span>
+ 其他宏
+        </a>
+    </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+                
+                <ul class="toolbar-group">
+                    
+                <li class="toolbar-item" id="rte-button-undo">
+        <a class="toolbar-trigger" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" title="回退 (Ctrl+Z)" data-control-id="undo">
+                <span class="icon icon-undo ">回退</span>
+        </a>
+    </li>
+                    
+                <li class="toolbar-item" id="rte-button-redo">
+        <a class="toolbar-trigger" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" title="重做 (Ctrl+Y)" data-control-id="redo">
+                <span class="icon icon-redo ">重做</span>
+        </a>
+    </li>
+                </ul>
+
+                
+            </div>            <div class="toolbar-split toolbar-split-right">
+                <ul class="toolbar-group">
+                        <li class="toolbar-item" id="rte-button-searchreplace">
+        <a class="toolbar-trigger" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" title="查找/替换" data-control-id="searchreplace">
+                <span class="icon icon-searchreplace ">查找/替换</span>
+        </a>
+    </li>
+                </ul>
+                <ul class="toolbar-group">
+                        <li class="toolbar-item" id="rte-button-help">
+        <a class="toolbar-trigger" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" title="帮助" data-control-id="help">
+                <span class="icon icon-help ">键盘快捷键帮助</span>
+        </a>
+    </li>
+                </ul>
+            </div>        </div>    </div>
+    <div id="wysiwyg" class="resize">
+        <div id="rte" class="cell editor-default">
+            <textarea id="wysiwygTextarea" name="wysiwygContent" class="hidden tinymce-editor"></textarea>
+        </div>
+    </div>
+    <div id="editor-html-source-container" class="hidden">
+        <textarea id="editor-html-source" class="monospaceInput"></textarea>
+    </div>
+
+    <div id="preview">
+                        <div id="previewArea" class="cell">
+        </div>
+    </div>
+
+    
+
+<div id="savebar-container">
+    <div id="rte-savebar" class="aui-toolbar">
+
+                    
+        
+        <div class="toolbar-split toolbar-split-row">
+            <div class="toolbar-split toolbar-split-left">
+            <ul class="toolbar-group">
+                                            </ul>
+                    </div>
+            <div class="toolbar-split toolbar-split-right">
+            <div class="toolbar-group" id="toolbar-group-minor-edit">
+                <ul class="toolbar-group toolbar-group-watch-page" id="toolbar-group-watch-page-after-comment" style="display:none;">
+                    <li class="toolbar-item">
+                        <label for="watchPage">关注此页面</label>
+                        <input id="watchPage" name="watchPageAfterComment" value="true" type="checkbox" checked="checked">
+                    </li>
+                </ul>
+                                            </div>
+
+        
+            <ul class="toolbar-group toolbar-group-edit assistive">
+                <li class="toolbar-item">
+                    <a id="rte-button-edit" class="toolbar-trigger" title="返回编辑模式" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#">&lt; 编辑</a>
+                </li>
+            </ul>
+            <ul class="toolbar-group toolbar-group-preview">
+                <li class="toolbar-item">
+                    <a id="rte-button-preview" title="预览" class="toolbar-trigger" href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#">预览 &gt;</a>
+                    <span id="wysiwygWaitImage" class="icon loading hidden">加载…</span>
+                </li>
+            </ul>
+
+        
+            <ul class="toolbar-group">
+                <li class="toolbar-item">
+                                            <button class="toolbar-trigger" type="submit" title="保存" id="rte-button-publish" value="保存" name="confirm">保存</button>
+                                    </li>
+            </ul>
+            <ul class="toolbar-group">
+                <li class="toolbar-item toolbar-item-link">
+                    <button class="toolbar-trigger" type="submit" id="rte-button-cancel" value="取消" name="cancel">取消</button>
+                </li>
+            </ul>
+
+        </div>         </div>
+             </div> </div>
+
+ 
+            <div id="link-browser-tab-items" class="hidden">
+                <div title="搜索" data-weight="10">search</div>
+            <div title="最近查看" data-weight="20">recentlyviewed</div>
+            <div title="附件" data-weight="30">attachments</div>
+            <div title="Web链接" data-weight="40">weblink</div>
+            <div title="高级" data-weight="50">advanced</div>
+    </div>
+    
+
+
+<script type="text/x-template" title="dynamic-editor-metadata">
+            <meta name="ajs-content-type" content="comment">
+            <meta name="ajs-min-editor-height" content="150">
+            <meta name="ajs-editor-plugin-resource-prefix" content="/s/zh_CN/3281/1/4.2.4/_">
+            <meta name="ajs-num-attachments" content="">
+            <meta name="ajs-auto-start" content="false">
+            <meta name="ajs-content-id" content="21961288">
+            <meta name="ajs-save-drafts" content="false">
+            <meta name="ajs-action-locale" content="zh_CN">
+            <meta name="ajs-heartbeat" content="true">
+            <meta name="ajs-new-page" content="">
+            <meta name="ajs-form-name" content="inlinecommentform">
+            <meta name="ajs-attachment-source-content-id" content="21961288">
+            <meta name="ajs-editor-mode" content="richtext">
+            <meta name="ajs-draft-type" content="">
+            <meta name="ajs-can-attach-files" content="true">
+                
+            		    <meta name="ajs-max-thumb-width" content="300">
+		    <meta name="ajs-is-dev-mode" content="false">
+		    <meta name="ajs-draft-save-interval" content="30000">
+		    <meta name="ajs-show-hidden-user-macros" content="false">
+		    <meta name="ajs-is-admin" content="false">
+		    <meta name="ajs-confluence.prefs.editor.disable.autocomplete" content="false">
+		    <meta name="ajs-confluence.prefs.editor.disable.autoformat" content="false">
+		    <meta name="ajs-heartbeat-interval" content="30000">
+	
+    </script>
+
+
+<script type="text/x-template" title="tableForm">
+    <form id="tinymce-table-form" class="aui">
+        <div class="field-group">
+            <label for="rows">行</label>
+            <input id="rows" name="rows" type="text" size="3" autocomplete="off" value="{0}">
+        </div>
+        <div class="field-group">
+            <label for="cols">列</label>
+            <input id="cols" name="cols" type="text" size="3" autocomplete="off" value="{1}">
+        </div>
+        <div class="field-group hidden">
+            <input id="width" type="hidden" name="width" value="">
+            <label for="width">宽</label>
+        </div>
+        <div class="group">
+            <div class="checkbox">
+                <input id="table-heading-checkbox" class="checkbox" type="checkbox" name="heading" checked="checked" value="true">
+                <label for="table-heading-checkbox">首行设为表头</label>
+            </div>
+        </div>
+        <div class="group hidden">
+            <div class="checkbox">
+                <input id="table-equal-width-columns-checkbox" class="checkbox" type="checkbox" name="equal-width-columns" value="false">
+                <label for="table-equal-width-columns-checkbox">等宽列</label>
+            </div>
+        </div>
+    </form>
+</script><script type="text/x-template" title="labels-dialog-div">
+        <div id="labels-dialog">
+        <div class="labels-editor">
+            <form method="GET" action="" id="add-labels-form">
+                <div id="labelOperationErrorContainer">
+                    <span class="error"><span class="errorMessage" id="labelOperationErrorMessage"></span></span>
+                </div>
+    
+                <div id="label-input-fields">
+                    <input autocomplete="off" id="labelsString" name="labelsString" value="">
+                    <input id="add-labels-editor-button" type="submit" class="add-labels" value="添加">
+                </div>
+                <div id="labelsAutocompleteList" class="aui-dd-parent resize-to-input" style="width: 417px"></div>
+                <div id="dialog-label-list">
+                    <!-- DIV placeholder for labels list, is copied into in labels-dialog.js -->
+                </div>
+                <div id="waitImageAndStatus">
+                    <img class="waiting" alt="Please wait" src="/s/zh_CN/3281/1/_/images/icons/wait.gif">&nbsp;
+                    <span id="labelOperationStatus" class="smalltext"></span>
+                </div>
+                <div class="labels-tip"></div>
+            </form>
+        </div>
+        <div style="display: none;">
+            <div class="labels-section-content content-column"
+    		>
+	<div class="labels-content">
+		
+
+    </div>
+</div>        </div>
+    </div>
+</script>
+    <input type="hidden" name="atl_token" value="97cd0396ef9989b755fd6d4d4bd7e5fbaaa6eaeb">
+</div><div class="aui-popup aui-dialog" id="image-effects-dialog" style="margin-top: -205px; margin-left: -230px; width: 460px; height: 410px; z-index: 3002; display: none; background: rgb(255, 255, 255);"><div class="dialog-components"><h2 class="dialog-title">Add Image Effect</h2><ul class="dialog-page-menu" style="height: 314px; display: none;"><li class="page-menu-item selected"><button class="item-button">imgs</button></li></ul><div class="dialog-page-body"><div class="dialog-panel-body" style="height: 304px;"><div class="image-effects"><ul class="image-list"><li class="attached-image image-effect-preview image-effect-none"><div class="image-container"><img class="thumbnail" src="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/imgFilter.png" title="None" width="100" height="90" style="margin-top: 5px"></div><span class="caption filename" title="None">None</span></li><li class="attached-image image-effect-preview"><div class="image-container"><img class="thumbnail" src="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/imgFilter(1).png" title="Taped" width="100" height="90" style="margin-top: 5px"></div><span class="caption filename" title="Taped">Taped</span></li><li class="attached-image image-effect-preview"><div class="image-container"><img class="thumbnail" src="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/imgFilter(2).png" title="Instant Camera" width="100" height="90" style="margin-top: 5px"></div><span class="caption filename" title="Instant Camera">Instant Camera</span></li><li class="attached-image image-effect-preview"><div class="image-container"><img class="thumbnail" src="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/imgFilter(3).png" title="Curl Shadow" width="100" height="90" style="margin-top: 5px"></div><span class="caption filename" title="Curl Shadow">Curl Shadow</span></li><li class="attached-image image-effect-preview"><div class="image-container"><img class="thumbnail" src="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/imgFilter(4).png" title="Snapshot" width="100" height="90" style="margin-top: 5px"></div><span class="caption filename" title="Snapshot">Snapshot</span></li><li class="attached-image image-effect-preview"><div class="image-container"><img class="thumbnail" src="./Apache Slider项目调研 - 云平台 - 奇艺技术产品中心统一文档平台_files/imgFilter(5).png" title="Drop Shadow" width="100" height="90" style="margin-top: 5px"></div><span class="caption filename" title="Drop Shadow">Drop Shadow</span></li></ul></div></div></div><div class="dialog-button-panel"><a href="http://wiki.qiyi.domain/pages/viewpage.action?pageId=21961288#" class="button-panel-link button-panel-cancel-link">Close</a></div></div></div></body></html>

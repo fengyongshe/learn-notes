@@ -1,0 +1,30 @@
+Index: slider-core/src/main/java/org/apache/slider/providers/agent/Command.java
+===================================================================
+--- slider-core/src/main/java/org/apache/slider/providers/agent/Command.java	(revision 93663)
++++ slider-core/src/main/java/org/apache/slider/providers/agent/Command.java	(working copy)
+@@ -26,8 +26,8 @@
+   START,         // Start the component
+   STOP,          // Stop the component
+   UPGRADE,       // The component will undergo upgrade
++  DELETEFILE,    // delete file to specified containers
+   UPLOADFILE,    // upload file to specified containers
+-  DELETEFILE,    // delete file to specified containers
+   TERMINATE;     // Send terminate signal to agent
+ 
+   public static Command getCommand(String commandVal) {
+@@ -46,12 +46,12 @@
+     if (commandVal.equals(Command.TERMINATE.toString())) {
+       return Command.TERMINATE;
+     }
+-    if(commandVal.equals(Command.UPLOADFILE.toString())){
++    if (commandVal.equals(Command.DELETEFILE.toString())){
++      return Command.DELETEFILE;
++    }
++    if (commandVal.equals(Command.UPLOADFILE.toString())){
+       return Command.UPLOADFILE;
+     }
+-    if(commandVal.equals(Command.DELETEFILE.toString())){
+-      return Command.DELETEFILE;
+-    }
+     return Command.NOP;
+   }

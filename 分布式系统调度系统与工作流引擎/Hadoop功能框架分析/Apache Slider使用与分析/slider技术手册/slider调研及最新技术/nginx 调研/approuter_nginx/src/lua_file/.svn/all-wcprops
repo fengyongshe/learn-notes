@@ -1,0 +1,71 @@
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/omae/!svn/ver/5849/runtime/trunk/dev/approuter_nginx/src/lua_file
+END
+access_phase_test.lua
+K 25
+svn:wc:ra_dav:version-url
+V 92
+/svn/omae/!svn/ver/5330/runtime/trunk/dev/approuter_nginx/src/lua_file/access_phase_test.lua
+END
+router_control.lua
+K 25
+svn:wc:ra_dav:version-url
+V 89
+/svn/omae/!svn/ver/5710/runtime/trunk/dev/approuter_nginx/src/lua_file/router_control.lua
+END
+gen_cookie.lua
+K 25
+svn:wc:ra_dav:version-url
+V 85
+/svn/omae/!svn/ver/5847/runtime/trunk/dev/approuter_nginx/src/lua_file/gen_cookie.lua
+END
+show_dict.lua
+K 25
+svn:wc:ra_dav:version-url
+V 84
+/svn/omae/!svn/ver/5708/runtime/trunk/dev/approuter_nginx/src/lua_file/show_dict.lua
+END
+gen_cookie1.lua
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/svn/omae/!svn/ver/5848/runtime/trunk/dev/approuter_nginx/src/lua_file/gen_cookie1.lua
+END
+access_phase_dict.lua
+K 25
+svn:wc:ra_dav:version-url
+V 92
+/svn/omae/!svn/ver/5849/runtime/trunk/dev/approuter_nginx/src/lua_file/access_phase_dict.lua
+END
+gen_cookie2.lua
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/svn/omae/!svn/ver/5848/runtime/trunk/dev/approuter_nginx/src/lua_file/gen_cookie2.lua
+END
+gen_cookie3.lua
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/svn/omae/!svn/ver/5848/runtime/trunk/dev/approuter_nginx/src/lua_file/gen_cookie3.lua
+END
+access_phase_redis.lua
+K 25
+svn:wc:ra_dav:version-url
+V 93
+/svn/omae/!svn/ver/5568/runtime/trunk/dev/approuter_nginx/src/lua_file/access_phase_redis.lua
+END
+dump_route_redis.lua
+K 25
+svn:wc:ra_dav:version-url
+V 91
+/svn/omae/!svn/ver/5701/runtime/trunk/dev/approuter_nginx/src/lua_file/dump_route_redis.lua
+END
+output_header_filter.lua
+K 25
+svn:wc:ra_dav:version-url
+V 95
+/svn/omae/!svn/ver/5847/runtime/trunk/dev/approuter_nginx/src/lua_file/output_header_filter.lua
+END

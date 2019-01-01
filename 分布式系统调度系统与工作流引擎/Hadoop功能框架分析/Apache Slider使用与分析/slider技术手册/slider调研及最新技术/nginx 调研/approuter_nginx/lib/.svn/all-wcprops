@@ -1,0 +1,89 @@
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/svn/omae/!svn/ver/5838/runtime/trunk/dev/approuter_nginx/lib
+END
+curl-7.24.0.tar.gz
+K 25
+svn:wc:ra_dav:version-url
+V 80
+/svn/omae/!svn/ver/5787/runtime/trunk/dev/approuter_nginx/lib/curl-7.24.0.tar.gz
+END
+redis-2.4.7.tar.gz
+K 25
+svn:wc:ra_dav:version-url
+V 80
+/svn/omae/!svn/ver/5331/runtime/trunk/dev/approuter_nginx/lib/redis-2.4.7.tar.gz
+END
+zlib-1.2.3-fixed.tar.gz
+K 25
+svn:wc:ra_dav:version-url
+V 85
+/svn/omae/!svn/ver/5333/runtime/trunk/dev/approuter_nginx/lib/zlib-1.2.3-fixed.tar.gz
+END
+json-c-0.9.tar.gz
+K 25
+svn:wc:ra_dav:version-url
+V 79
+/svn/omae/!svn/ver/5787/runtime/trunk/dev/approuter_nginx/lib/json-c-0.9.tar.gz
+END
+protobuf-2.3.0.tar.gz
+K 25
+svn:wc:ra_dav:version-url
+V 83
+/svn/omae/!svn/ver/5333/runtime/trunk/dev/approuter_nginx/lib/protobuf-2.3.0.tar.gz
+END
+protobuf-c-0.13.tar.gz
+K 25
+svn:wc:ra_dav:version-url
+V 84
+/svn/omae/!svn/ver/5333/runtime/trunk/dev/approuter_nginx/lib/protobuf-c-0.13.tar.gz
+END
+ngx_openresty-1.0.11.11.tar.gz
+K 25
+svn:wc:ra_dav:version-url
+V 92
+/svn/omae/!svn/ver/5331/runtime/trunk/dev/approuter_nginx/lib/ngx_openresty-1.0.11.11.tar.gz
+END
+antirez-hiredis-v0.10.1-28-gd5d8843.tar.gz
+K 25
+svn:wc:ra_dav:version-url
+V 104
+/svn/omae/!svn/ver/5333/runtime/trunk/dev/approuter_nginx/lib/antirez-hiredis-v0.10.1-28-gd5d8843.tar.gz
+END
+ngx_openresty-1.0.11.21.tar.gz
+K 25
+svn:wc:ra_dav:version-url
+V 92
+/svn/omae/!svn/ver/5570/runtime/trunk/dev/approuter_nginx/lib/ngx_openresty-1.0.11.21.tar.gz
+END
+nginx-1.1.14.tar.gz
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/svn/omae/!svn/ver/5331/runtime/trunk/dev/approuter_nginx/lib/nginx-1.1.14.tar.gz
+END
+nginx-1.0.15.tar.gz
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/svn/omae/!svn/ver/5838/runtime/trunk/dev/approuter_nginx/lib/nginx-1.0.15.tar.gz
+END
+openmq4_4-c-source.tar.gz
+K 25
+svn:wc:ra_dav:version-url
+V 87
+/svn/omae/!svn/ver/5803/runtime/trunk/dev/approuter_nginx/lib/openmq4_4-c-source.tar.gz
+END
+ngx_openresty-1.0.11.28.tar.gz
+K 25
+svn:wc:ra_dav:version-url
+V 92
+/svn/omae/!svn/ver/5838/runtime/trunk/dev/approuter_nginx/lib/ngx_openresty-1.0.11.28.tar.gz
+END
+ngx_openresty-1.0.10.48.tar.gz
+K 25
+svn:wc:ra_dav:version-url
+V 92
+/svn/omae/!svn/ver/5331/runtime/trunk/dev/approuter_nginx/lib/ngx_openresty-1.0.10.48.tar.gz
+END

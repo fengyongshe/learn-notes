@@ -1,0 +1,59 @@
+diff --git a/slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java b/slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java
+index b3c513a..0d2744c 100644
+--- a/slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java
++++ b/slider-core/src/main/java/org/apache/slider/providers/agent/AgentProviderService.java
+@@ -1906,6 +1906,8 @@ public class AgentProviderService extends AbstractProviderService implements
+     hostLevelParams.put(CONTAINER_ID, containerId);
+     cmd.setHostLevelParams(hostLevelParams);
+ 
++    Map<String, Map<String, String>> componentConfigurations = buildComponentConfigurations(appConf);
++    cmd.setComponentConfigurations(componentConfigurations);
+     Map<String, Map<String, String>> configurations = buildCommandConfigurations(appConf, containerId, componentName);
+     cmd.setConfigurations(configurations);
+ 
+@@ -1951,6 +1953,8 @@ public class AgentProviderService extends AbstractProviderService implements
+     hostLevelParams.put(CONTAINER_ID, containerId);
+     cmd.setHostLevelParams(hostLevelParams);
+ 
++    Map<String, Map<String, String>> componentConfigurations = buildComponentConfigurations(appConf);
++    cmd.setComponentConfigurations(componentConfigurations);
+     Map<String, Map<String, String>> configurations = buildCommandConfigurations(
+         appConf, containerId, componentName);
+     cmd.setConfigurations(configurations);
+@@ -2262,6 +2266,8 @@ public class AgentProviderService extends AbstractProviderService implements
+     startCommand.setExec("exec");
+     cmd.setCommandParams(setCommandParameters(startCommand, timeout, true));
+     
++    Map<String, Map<String, String>> componentConfigurations = buildComponentConfigurations(appConf);
++    cmd.setComponentConfigurations(componentConfigurations);
+     Map<String, Map<String, String>> configurations = buildCommandConfigurations(
+         appConf, containerId, componentName);
+ 
+@@ -2466,7 +2472,9 @@ public class AgentProviderService extends AbstractProviderService implements
+     Map<String, String> roleParams = new TreeMap<>();
+     cmd.setRoleParams(roleParams);
+     cmd.getRoleParams().put("auto_restart", Boolean.toString(isMarkedAutoRestart));
+-
++    
++    Map<String, Map<String, String>> componentConfigurations = buildComponentConfigurations(appConf);
++    cmd.setComponentConfigurations(componentConfigurations);
+     Map<String, Map<String, String>> configurations = buildCommandConfigurations(appConf, containerId, componentName);
+     cmd.setConfigurations(configurations);
+ 
+diff --git a/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/ExecutionCommand.java b/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/ExecutionCommand.java
+index e852902..e0d3a75 100644
+--- a/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/ExecutionCommand.java
++++ b/slider-core/src/main/java/org/apache/slider/server/appmaster/web/rest/agent/ExecutionCommand.java
+@@ -214,10 +214,12 @@ public class ExecutionCommand {
+     this.pkg = pkg;
+   }
+ 
++  @JsonProperty("componentConfig")
+   public Map<String, Map<String, String>> getComponentConfigurations() {
+     return componentConfigurations;
+   }
+ 
++  @JsonProperty("componentConfig")
+   public void setComponentConfigurations(
+       Map<String, Map<String, String>> componentConfigurations) {
+     this.componentConfigurations = componentConfigurations;

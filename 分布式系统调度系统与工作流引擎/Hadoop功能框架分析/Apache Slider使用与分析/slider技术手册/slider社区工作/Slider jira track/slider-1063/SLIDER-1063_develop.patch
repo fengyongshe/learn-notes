@@ -1,0 +1,91 @@
+diff --git a/slider-agent/src/main/python/agent/CustomServiceOrchestrator.py b/slider-agent/src/main/python/agent/CustomServiceOrchestrator.py
+index b40a8b5..1db2044 100644
+--- a/slider-agent/src/main/python/agent/CustomServiceOrchestrator.py
++++ b/slider-agent/src/main/python/agent/CustomServiceOrchestrator.py
+@@ -63,6 +63,8 @@ class CustomServiceOrchestrator():
+     self.stored_command = {}
+     self.allocated_ports = {}
+     self.log_folders = {}
++
++    self.allocated_ports_set = set()
+     # Clean up old status command files if any
+     try:
+       os.unlink(self.status_commands_stdout)
+@@ -300,7 +302,6 @@ class CustomServiceOrchestrator():
+     allocated_for_any = ".ALLOCATED_PORT}"
+ 
+     port_allocation_req = allocated_for_this_component_format.format(component)
+-    allowed_ports = self.get_allowed_ports(command)
+     if 'configurations' in command:
+       for key in command['configurations']:
+         if len(command['configurations'][key]) > 0:
+@@ -311,7 +312,7 @@ class CustomServiceOrchestrator():
+               value = value.replace("${AGENT_LOG_ROOT}",
+                                     self.config.getLogPath())
+               if port_allocation_req in value:
+-                value = self.allocate_ports(value, port_allocation_req, allowed_ports)
++                value = self.allocate_ports(value, port_allocation_req, self.get_allowed_ports(command))
+                 allocated_ports[key + "." + k] = value
+               elif allocated_for_any in value:
+                 ## All unallocated ports should be set to 0
+@@ -413,6 +414,9 @@ class CustomServiceOrchestrator():
+       value = value.replace(replaced_pattern, str(port), 1)
+       logger.info("Allocated port " + str(port) + " for " + replaced_pattern)
+       index = value.find(port_req_pattern)
++
++      allowed_ports.remove(port)
++      self.allocated_ports_set.add(port)
+       pass
+     return value
+     pass
+@@ -488,6 +492,7 @@ class CustomServiceOrchestrator():
+         except:
+           # not an int and not a range...
+           invalid.add(i)
++    selection = selection - self.allocated_ports_set
+     selection = random.sample(selection, min (len(selection), num_values))
+     # Report invalid tokens before returning valid selection
+     logger.info("Allowed port values: " + str(selection))
+diff --git a/slider-agent/src/test/python/agent/TestCustomServiceOrchestrator.py b/slider-agent/src/test/python/agent/TestCustomServiceOrchestrator.py
+index aaef3f9..a6fa054 100644
+--- a/slider-agent/src/test/python/agent/TestCustomServiceOrchestrator.py
++++ b/slider-agent/src/test/python/agent/TestCustomServiceOrchestrator.py
+@@ -674,6 +674,38 @@ class TestCustomServiceOrchestrator(TestCase):
+     self.assertTrue(set(allowed_ports).issubset(port_range_full_list))
+ 
+ 
++  def test_finalize_command_when_set_allowed_ports(self):
++    dummy_controller = MagicMock()
++    tempdir = tempfile.gettempdir()
++    tempWorkDir = tempdir + "W"
++    config = MagicMock()
++    config.get.return_value = "something"
++    config.getResolvedPath.return_value = tempdir
++    config.getWorkRootPath.return_value = tempWorkDir
++    config.getLogPath.return_value = tempdir
++
++    allowed_ports = "6700-6701"
++    allowed_ports_full_list = [6700, 6701]
++
++    orchestrator = CustomServiceOrchestrator(config, dummy_controller, self.agentToggleLogger)
++    command = {}
++    command['componentName'] = "HBASE_MASTER"
++    command['configurations'] = {}
++    command['configurations']['global'] = {}
++    command['configurations']['global']['slider.allowed.ports'] = allowed_ports
++    command['configurations']['hbase-site'] = {}
++    command['configurations']['hbase-site']['work_root'] = "${AGENT_WORK_ROOT}"
++    command['configurations']['hbase-site']['a_port'] = "${HBASE_MASTER.ALLOCATED_PORT}"
++    command['configurations']['hbase-site']['b_port'] = "${HBASE_MASTER.ALLOCATED_PORT}"
++
++    orchestrator.finalize_command(command, False, {})
++    a_port = int(command['configurations']['hbase-site']['a_port'])
++    b_port = int(command['configurations']['hbase-site']['b_port'])
++
++    self.assertTrue((a_port in allowed_ports_full_list) and (b_port in allowed_ports_full_list))
++    self.assertTrue(a_port != b_port)
++
++
+   def tearDown(self):
+     # enable stdout
+     sys.stdout = sys.__stdout__
