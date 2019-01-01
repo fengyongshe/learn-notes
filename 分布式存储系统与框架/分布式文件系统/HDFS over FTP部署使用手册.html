@@ -1,0 +1,212 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+   <meta http-equiv="content-type" content="text/html;charset=UTF-8">
+   <style type="text/css">
+   /*CSS stylesheet is based on killwing's flavored markdown style:https://gist.github.com/2937864*/body{    margin: 0 auto;    font: 13px/1.231 Helvetica, Arial, sans-serif;    color: #444444;    line-height: 1;    max-width: 960px;    padding: 5px;}h1, h2, h3, h4 {    color: #111111;    font-weight: 400;}h1, h2, h3, h4, h5, p {    margin-bottom: 16px;    padding: 0;}h1 {    font-size: 28px;}h2 {    font-size: 22px;    margin: 20px 0 6px;}h3 {    font-size: 21px;}h4 {    font-size: 18px;}h5 {    font-size: 16px;}a {    color: #0099ff;    margin: 0;    padding: 0;    vertical-align: baseline;}a:link,a:visited{ text-decoration:none;}a:hover{ text-decoration:underline;}ul, ol {    padding: 0;    margin: 0;}li {    line-height: 24px;    margin-left: 44px;}li ul, li ul {    margin-left: 24px;}ul, ol {    font-size: 14px;    line-height: 20px;    max-width: 540px;}p {    font-size: 14px;    line-height: 20px;    max-width: 540px;    margin-top: 3px;}pre {    padding: 0px 4px;    max-width: 800px;    white-space: pre-wrap;    font-family: Consolas, Monaco, Andale Mono, monospace;    line-height: 1.5;    font-size: 13px;    border: 1px solid #ddd;    background-color: #f7f7f7;    border-radius: 3px;}code {    font-family: Consolas, Monaco, Andale Mono, monospace;    line-height: 1.5;    font-size: 13px;    border: 1px solid #ddd;    background-color: #f7f7f7;    border-radius: 3px;}pre code {    border: 0px;}aside {    display: block;    float: right;    width: 390px;}blockquote {    border-left:.5em solid #40AA53;    padding: 0 2em;    margin-left:0;    max-width: 476px;}blockquote  cite {    font-size:14px;    line-height:20px;    color:#bfbfbf;}blockquote cite:before {    content: '\2014 \00A0';}blockquote p {      color: #666;    max-width: 460px;}hr {    height: 1px;    border: none;    border-top: 1px dashed #0066CC}button,input,select,textarea {  font-size: 100%;  margin: 0;  vertical-align: baseline;  *vertical-align: middle;}button, input {  line-height: normal;  *overflow: visible;}button::-moz-focus-inner, input::-moz-focus-inner {  border: 0;  padding: 0;}button,input[type="button"],input[type="reset"],input[type="submit"] {  cursor: pointer;  -webkit-appearance: button;}input[type=checkbox], input[type=radio] {  cursor: pointer;}/* override default chrome & firefox settings */input:not([type="image"]), textarea {  -webkit-box-sizing: content-box;  -moz-box-sizing: content-box;  box-sizing: content-box;}input[type="search"] {  -webkit-appearance: textfield;  -webkit-box-sizing: content-box;  -moz-box-sizing: content-box;  box-sizing: content-box;}input[type="search"]::-webkit-search-decoration {  -webkit-appearance: none;}label,input,select,textarea {  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;  font-size: 13px;  font-weight: normal;  line-height: normal;  margin-bottom: 18px;}input[type=checkbox], input[type=radio] {  cursor: pointer;  margin-bottom: 0;}input[type=text],input[type=password],textarea,select {  display: inline-block;  width: 210px;  padding: 4px;  font-size: 13px;  font-weight: normal;  line-height: 18px;  height: 18px;  color: #808080;  border: 1px solid #ccc;  -webkit-border-radius: 3px;  -moz-border-radius: 3px;  border-radius: 3px;}select, input[type=file] {  height: 27px;  line-height: 27px;}textarea {  height: auto;}/* grey out placeholders */:-moz-placeholder {  color: #bfbfbf;}::-webkit-input-placeholder {  color: #bfbfbf;}input[type=text],input[type=password],select,textarea {  -webkit-transition: border linear 0.2s, box-shadow linear 0.2s;  -moz-transition: border linear 0.2s, box-shadow linear 0.2s;  transition: border linear 0.2s, box-shadow linear 0.2s;  -webkit-box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);  -moz-box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);}input[type=text]:focus, input[type=password]:focus, textarea:focus {  outline: none;  border-color: rgba(82, 168, 236, 0.8);  -webkit-box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1), 0 0 8px rgba(82, 168, 236, 0.6);  -moz-box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1), 0 0 8px rgba(82, 168, 236, 0.6);  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1), 0 0 8px rgba(82, 168, 236, 0.6);}/* buttons */button {  display: inline-block;  padding: 4px 14px;  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;  font-size: 13px;  line-height: 18px;  -webkit-border-radius: 4px;  -moz-border-radius: 4px;  border-radius: 4px;  -webkit-box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 2px rgba(0, 0, 0, 0.05);  -moz-box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 2px rgba(0, 0, 0, 0.05);  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 2px rgba(0, 0, 0, 0.05);  background-color: #0064cd;  background-repeat: repeat-x;  background-image: -khtml-gradient(linear, left top, left bottom, from(#049cdb), to(#0064cd));  background-image: -moz-linear-gradient(top, #049cdb, #0064cd);  background-image: -ms-linear-gradient(top, #049cdb, #0064cd);  background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%, #049cdb), color-stop(100%, #0064cd));  background-image: -webkit-linear-gradient(top, #049cdb, #0064cd);  background-image: -o-linear-gradient(top, #049cdb, #0064cd);  background-image: linear-gradient(top, #049cdb, #0064cd);  color: #fff;  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.25);  border: 1px solid #004b9a;  border-bottom-color: #003f81;  -webkit-transition: 0.1s linear all;  -moz-transition: 0.1s linear all;  transition: 0.1s linear all;  border-color: #0064cd #0064cd #003f81;  border-color: rgba(0, 0, 0, 0.1) rgba(0, 0, 0, 0.1) rgba(0, 0, 0, 0.25);}button:hover {  color: #fff;  background-position: 0 -15px;  text-decoration: none;}button:active {  -webkit-box-shadow: inset 0 3px 7px rgba(0, 0, 0, 0.15), 0 1px 2px rgba(0, 0, 0, 0.05);  -moz-box-shadow: inset 0 3px 7px rgba(0, 0, 0, 0.15), 0 1px 2px rgba(0, 0, 0, 0.05);  box-shadow: inset 0 3px 7px rgba(0, 0, 0, 0.15), 0 1px 2px rgba(0, 0, 0, 0.05);}button::-moz-focus-inner {  padding: 0;  border: 0;}/* table  */table {    border-spacing: 0;    border: 1px solid #ccc;}td, th{    border: 1px solid #ccc;    padding: 5px;}/* code syntax highlight.Documentation: http://www.mdcharm.com/documentation/code_syntax_highlighting.html#custom_your_own */pre .literal,pre .comment,pre .template_comment,pre .diff .header,pre .javadoc {    color: #008000;}pre .keyword,pre .css .rule .keyword,pre .winutils,pre .javascript .title,pre .nginx .title,pre .subst,pre .request,pre .status {    color: #0000FF;    font-weight: bold}pre .number,pre .hexcolor,pre .python .decorator,pre .ruby .constant {    color: #0000FF;}pre .string,pre .tag .value,pre .phpdoc,pre .tex .formula {    color: #D14}pre .title,pre .id {    color: #900;    font-weight: bold}pre .javascript .title,pre .lisp .title,pre .clojure .title,pre .subst {    font-weight: normal}pre .class .title,pre .haskell .type,pre .vhdl .literal,pre .tex .command {    color: #458;    font-weight: bold}pre .tag,pre .tag .title,pre .rules .property,pre .django .tag .keyword {    color: #000080;    font-weight: normal}pre .attribute,pre .variable,pre .lisp .body {    color: #008080}pre .regexp {    color: #009926}pre .class {    color: #458;    font-weight: bold}pre .symbol,pre .ruby .symbol .string,pre .lisp .keyword,pre .tex .special,pre .prompt {    color: #990073}pre .built_in,pre .lisp .title,pre .clojure .built_in {    color: #0086b3}pre .preprocessor,pre .pi,pre .doctype,pre .shebang,pre .cdata {    color: #999;    font-weight: bold}pre .deletion {    background: #fdd}pre .addition {    background: #dfd}pre .diff .change {    background: #0086b3}pre .chunk {    color: #aaa}pre .markdown .header {    color: #800;    font-weight: bold;}pre .markdown .blockquote {    color: #888;}pre .markdown .link_label {    color: #88F;}pre .markdown .strong {    font-weight: bold;}pre .markdown .emphasis {    font-style: italic;}
+   </style>
+   
+   
+</head>
+<body>
+    <h1>HDFS over FTP部署使用手册</h1>
+
+<hr>
+
+<p>(Aug, 23th, 2017 by CMSS)</p>
+
+<h3><a href="#%E7%AE%80%E4%BB%8B">简介</a></h3>
+
+<h3><a href="#%E9%83%A8%E7%BD%B2">部署</a></h3>
+
+<h3><a href="#%E4%BD%BF%E7%94%A8">使用</a></h3>
+
+<p><a name="简介"></p>
+
+<h2>简介</h2>
+
+<p></a></p>
+
+<p>HDFS over FTP是构建在HDFS之上的一个FTP服务器，用户可以通过ftp协议访问HDFS。同时支持访问开启Kerberos的HDFS集群，客户端无需修改，通过<strong>ftp://user:password@host:2222</strong>的方式连接FTP服务器，服务端使用Kerberos票据以代理用户的方式访问HDFS集群。</p>
+
+<p><a name="部署"></p>
+
+<h2>部署</h2>
+
+<p></a></p>
+
+<p>注：通常选择集群内的<strong>非数据节点</strong>，比如NameNode节点，进行部署，默认已经有了Hadoop客户端。</p>
+
+<ol>
+<li><p>创建hdfsftp用户</p>
+
+<pre><code>useradd hdfsftp
+su - hdfsftp
+</code></pre></li>
+<li><p>解压安装包</p>
+
+<pre><code>tar zxvf hdfs-over-ftp-1.0.tar.gz      
+</code></pre></li>
+<li><p>进入hdfs-over-ftp-1.0/conf目录，修改hdfs-over-ftp-env.sh文件：</p>
+
+<pre><code>#!/bin/bash
+export JAVA_HOME=&quot;/usr/jdk64/jdk1.7.0_67/&quot;
+export HADOOP_CONF_DIR=&quot;/cmss/bch/bc1.3.6/hadoop/etc/hadoop&quot;
+</code></pre>
+
+<p>将其中的JAVA_HOME与HADOOP_CONF_DIR（Hadoop配置目录）修改成环境中的实际路径。</p></li>
+<li><p>在conf目录下，修改hdfs-over-ftp.properties服务端配置文件：</p>
+
+<pre><code>#uncomment this to run ftp server
+port = 2222
+data-ports = 2223-2225
+
+#uncomment this to run ssl ftp server
+#ssl-port = 2226
+#ssl-data-ports = 2227-2229
+
+# hdfs uri
+hdfs-uri = hdfs://pyx
+
+# is kerberos enabled
+kerberos-enable = true
+
+# path of keytab file
+keytab-path = /etc/security/keytabs/hdfs.headless.keytab
+
+# principal of user
+principal = hdfs-pyx@BCHKDC
+</code></pre>
+
+<p>配置项如下表所示：</p>
+
+<table>
+<tr>
+<td><b>配置项</td>
+<td><b>说明</td>
+</tr>
+<tr>
+<td>port</td>
+<td>ftp server监听端口，默认值为2222，无需修改。</td>
+</tr>
+<tr>
+<td>data-ports</td>
+<td>ftp server数据端口，默认2223-2225，无需修改。</td>
+</tr>
+<tr>
+<td>hdfs-uri</td>
+<td>HDFS默认地址，即core-site.xml中fs.defaultFS的值。</td>
+</tr>
+<tr>
+<td>kerberos-enable</td>
+<td>HDFS是否开启了Kerberos，若开启则配置为true，否则配置为false。</td>
+</tr>
+<tr>
+<td>keytab-path</td>
+<td>若HDFS开启了Kerberos，则hdfs-over-ftp服务使用的keytab票据路径。</td>
+</tr>
+<tr>
+<td>principal</td>
+<td>若HDFS开启了Kerberos，则hdfs-over-ftp服务使用的principal名称。</td>
+</tr>
+</table></li>
+<li><p>注册ftp用户，进入hdfs-over-ftp-1.0/sbin目录，执行：</p>
+
+<pre><code>./register-user.sh username password
+</code></pre>
+
+<p>参数为用户名和密码，结果如下：</p>
+
+<pre><code>[hdfsftp@pyx1 sbin]$ ./register-user.sh pyx pyx
+# the pyx user
+ftpserver.user.pyx.userpassword=CF1369A5A0DAC5A13981C396BBB10FBE
+ftpserver.user.pyx.homedirectory=/
+ftpserver.user.pyx.enableflag=true
+ftpserver.user.pyx.writepermission=true
+ftpserver.user.pyx.maxloginnumber=0
+ftpserver.user.pyx.maxloginperip=0
+ftpserver.user.pyx.idletime=0
+ftpserver.user.pyx.uploadrate=0
+ftpserver.user.pyx.downloadrate=0
+ftpserver.user.pyx.groups=hadoop          
+</code></pre>
+
+<p>将控制台的输出结果复制到hdfs-over-ftp-1.0/conf/users.properties中，追加到该文件的结尾即可。<br>
+这里的用户名和密码就是我们连接ftp server所需要的用户名和密码。</p></li>
+<li><p>启动hdfs-over-ftp服务，进入：hdfs-over-ftp-1.0/sbin目录，执行：</p>
+
+<pre><code>./hdfs-over-ftp.sh start
+</code></pre>
+
+<p>若要停止hdfs-over-ftp服务，则执行：</p>
+
+<pre><code>./hdfs-over-ftp.sh stop
+</code></pre></li>
+</ol>
+
+<p><a name="使用"></p>
+
+<h2>使用</h2>
+
+<p></a>        </p>
+
+<p>这里使用linux的ftp服务进行登录测试。</p>
+
+<ol>
+<li><p>执行ftp hostname 2222，依次输入前面注册的用户名和密码，进入ftp命令行：</p>
+
+<pre><code>[root@pyx2 ~]# ftp 10.139.9.87 2222
+Connected to 10.139.9.87 (10.139.9.87).
+220 Service ready for new user.
+Name (10.139.9.87:root): pyx
+331 User name okay, need password for pyx.
+Password:
+230 User logged in, proceed.
+Remote system type is UNIX.
+ftp&gt; 
+</code></pre></li>
+<li><p>执行ls，查看结果：</p>
+
+<pre><code>ftp&gt; ls
+227 Entering Passive Mode (10,139,9,87,8,175)
+150 File status okay; about to open data connection.
+drw-------   3 yarn hadoop            0 Aug 21 14:24 app-logs
+dr--------   3 hdfs hdfs            0 Aug 21 14:22 apps
+dr--------   3 hdfs hdfs            0 Aug 21 14:22 iothrottle
+dr--------   3 mapred hdfs            0 Aug 21 14:21 mapred
+drw-------   3 mapred hadoop            0 Aug 21 14:21 mr-history
+drw-------   3 hdfs hdfs            0 Aug 21 14:22 tmp
+dr--------   3 hdfs hdfs            0 Aug 22 14:38 user
+226 Closing data connection.
+ftp&gt;        
+</code></pre></li>
+<li><p>进入用户目录：</p>
+
+<pre><code>ftp&gt; cd /user/pyx
+250 Directory changed to /user/pyx
+ftp&gt;       
+</code></pre></li>
+<li><p>上传本地文件/root/a.txt到HDFS：</p>
+
+<pre><code>ftp&gt; put /root/a.txt /user/pyx/a.txt
+local: /root/a.txt remote: /user/pyx/a.txt
+227 Entering Passive Mode (10,139,9,87,8,175)
+150 File status okay; about to open data connection.
+226 Transfer complete.
+3 bytes sent in 3.8e-05 secs (78.95 Kbytes/sec)
+ftp&gt; 
+</code></pre></li>
+<li><p>下载HDFS文件/user/pyx/b.txt到本地：</p>
+
+<pre><code>ftp&gt; get /user/pyx/b.txt /root/b.txt
+local: /root/b.txt remote: /user/pyx/b.txt
+227 Entering Passive Mode (10,139,9,87,8,175)
+150 File status okay; about to open data connection.
+226 Transfer complete.
+3 bytes received in 0.057 secs (0.05 Kbytes/sec)
+ftp&gt; 
+</code></pre></li>
+</ol>
+
+</body>
+</html>

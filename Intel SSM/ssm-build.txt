@@ -1,0 +1,39 @@
+git clone https://github.com/Intel-bigdata/SSM.git
+git clone --branch release-1.3.1 https://github.com/Intel-bigdata/SSM.git
+
+mvn package -Pdist,web,hadoop-cdh-2.6 -DskipTests
+mvn package -Pdist,web,hadoop-2.7 -DskipTests
+
+1. zeppelin-web
+
+# comment "npm-run-all clean" in package.json to cancel prebuild.
+
+2. smart-alluxio
+
+# delete org/smartdata and org/glassfish in local maven repository.
+
+####################################################################################################
+
+$ mv /opt/smart-data-1.3.1/lib/smart* /usr/hdp/2.6.0.3-8/hadoop/lib/
+$ mkdir -p /tmp/smart-process
+
+modify hadoop directory in hdfs-site.xml:
+
+<property>
+   <name>dfs.datanode.data.dir</name>
+   <value>/hadoop/hdfs/data,[ARCHIVE]/hadoop/hdfs/archive</value>
+   <final>true</final>
+</property>
+
+file: path matches "/ssm/*.csv" and age > 2min | archive
+
+$ hdfs storagepolicies -getStoragePolicy -path /ssm/kobe.csv
+$ hdfs fsck /ssm/kobe.csv -files -blocks -locations
+$ tree /hadoop/hdfs/archive
+
+$ hdfs dfs -put cury.csv /ssm
+$ hdfs dfs -ls /ssm/cury.csv
+$ hdfs fsck /ssm/cury.csv -files -blocks -locations
+$ tree /hadoop/hdfs/archive
+
+####################################################################################################
